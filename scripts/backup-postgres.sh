@@ -1,21 +1,16 @@
-#!/bin/bash
+#!/usr/bin/env bash
 set -euo pipefail
 
-# FarmOS Core PostgreSQL backup script
-# Day 2: local-only draft
-# Production use requires restore testing.
+mkdir -p backups/postgres
 
-BACKUP_DIR="./backups/postgres"
-DATE="$(date +%Y%m%d-%H%M%S)"
-FILE="$BACKUP_DIR/farmos_core_local_$DATE.dump"
-
-mkdir -p "$BACKUP_DIR"
+STAMP=$(date +"%Y%m%d-%H%M%S")
+OUT="backups/postgres/farmos_core_local-${STAMP}.dump"
 
 docker exec farmos-postgres pg_dump \
   -U farmos_local_admin \
   -d farmos_core_local \
-  -F c \
-  > "$FILE"
+  -Fc \
+  > "$OUT"
 
 echo "Backup created:"
-echo "$FILE"
+echo "$OUT"

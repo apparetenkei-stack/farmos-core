@@ -25,3 +25,8 @@ backups/
 node_modules/
 .next/
 dist/
+
+# Allow version-controlled SQL design files
+!scripts/
+!scripts/sql/
+!scripts/sql/*.sql
