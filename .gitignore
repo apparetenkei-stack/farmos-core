@@ -1,0 +1,27 @@
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Local data
+data/
+backups/
+
+# Secrets and keys
+*.key
+*.pem
+*.p12
+*.crt
+*.sql
+*.dump
+
+# macOS
+.DS_Store
+
+# Logs
+*.log
+
+# Node
+node_modules/
+.next/
+dist/
