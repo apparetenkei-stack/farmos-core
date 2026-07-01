@@ -30,3 +30,23 @@ dist/
 !scripts/
 !scripts/sql/
 !scripts/sql/*.sql
+
+# FarmOS local runtime data - never commit originals, OCR outputs, backups, or secrets
+data/
+storage/
+backups/
+
+# Database backups
+*.dump
+*.backup
+*.sql.gz
+
+# Environment / secrets
+.env
+.env.*
+!.env.example
+
+# Keep SQL design files version-controlled
+!scripts/
+!scripts/sql/
+!scripts/sql/*.sql

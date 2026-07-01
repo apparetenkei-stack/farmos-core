@@ -1,0 +1,25 @@
+{
+  "name": "farmos-core",
+  "version": "1.0.0",
+  "description": "Local FarmOS core foundation for Mac mini M4.",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "register-source": "tsx scripts/ingest/register_source_document.ts"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "pg": "^8.22.0"
+  },
+  "devDependencies": {
+    "@types/node": "^26.0.1",
+    "@types/pg": "^8.20.0",
+    "tsx": "^4.22.4"
+  }
+}
