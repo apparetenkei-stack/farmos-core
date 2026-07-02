@@ -10,7 +10,8 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "register-source": "tsx scripts/ingest/register_source_document.ts",
     "enqueue-job": "tsx scripts/ingest/enqueue_processing_job.ts",
-    "process-job-dry-run": "tsx scripts/ingest/process_document_job_dry_run.ts"
+    "process-job-dry-run": "tsx scripts/ingest/process_document_job_dry_run.ts",
+    "store-extraction-from-job": "tsx scripts/ingest/store_document_extraction_from_job.ts"
   },
   "keywords": [],
   "author": "",
