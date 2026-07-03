@@ -22,7 +22,8 @@
     "review-app-projection-apply-plan": "tsx scripts/ingest/review_app_projection_apply_plan.ts",
     "apply-crop-cycle-apply-plan": "tsx scripts/ingest/apply_crop_cycle_apply_plan.ts",
     "list-crop-cycles": "tsx scripts/app/list_crop_cycles.ts",
-    "show-crop-cycle-provenance": "tsx scripts/app/show_crop_cycle_provenance.ts"
+    "show-crop-cycle-provenance": "tsx scripts/app/show_crop_cycle_provenance.ts",
+    "test-crop-cycle-read-api-boundary": "tsx scripts/app/test_crop_cycle_read_api_boundary.ts"
   },
   "keywords": [],
   "author": "",
