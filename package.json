@@ -18,7 +18,8 @@
     "create-projection-candidates": "tsx scripts/ingest/create_projection_candidates_from_verified_facts.ts",
     "review-projection-candidate": "tsx scripts/ingest/review_projection_candidate.ts",
     "create-app-projection-apply-plan": "tsx scripts/ingest/create_app_projection_apply_plan.ts",
-    "refresh-app-projection-apply-plan-readiness": "tsx scripts/ingest/refresh_app_projection_apply_plan_readiness.ts"
+    "refresh-app-projection-apply-plan-readiness": "tsx scripts/ingest/refresh_app_projection_apply_plan_readiness.ts",
+    "review-app-projection-apply-plan": "tsx scripts/ingest/review_app_projection_apply_plan.ts"
   },
   "keywords": [],
   "author": "",
