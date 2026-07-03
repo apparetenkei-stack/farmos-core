@@ -27,7 +27,9 @@
     "dev": "next dev -H 127.0.0.1",
     "build": "next build",
     "start": "next start -H 127.0.0.1",
-    "check-crop-cycle-read-ui": "next build"
+    "check-crop-cycle-read-ui": "next build",
+    "test-proposal-inbox-read-api-boundary": "tsx scripts/app/test_proposal_inbox_read_api_boundary.ts",
+    "check-proposal-inbox-read-ui": "next build"
   },
   "keywords": [],
   "author": "",

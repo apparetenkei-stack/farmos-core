@@ -1,29 +1,29 @@
-import type { Metadata } from "next";
 import Link from "next/link";
-import type { ReactNode } from "react";
 import "./globals.css";
 
-export const metadata: Metadata = {
+export const metadata = {
   title: "FarmOS Core",
-  description: "Crop Cycle Read-only UI Foundation"
+  description: "Local FarmOS Core read-only UI foundation",
 };
 
-export default function RootLayout({ children }: { children: ReactNode }) {
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
   return (
     <html lang="ja">
       <body>
-        <div className="site-shell">
-          <header className="site-header">
-            <nav aria-label="Primary navigation">
-              <Link href="/">FarmOS Core</Link>
-              <Link href="/crop-cycles">Crop Cycles</Link>
-            </nav>
-          </header>
-          <main>{children}</main>
-          <footer className="site-footer">
-            Day22 Crop Cycle Read-only UI Foundation / No write routes / No mutation UI
-          </footer>
-        </div>
+        <header>
+          <nav>
+            <Link href="/">FarmOS Core</Link>
+            {" | "}
+            <Link href="/crop-cycles">Crop Cycles</Link>
+            {" | "}
+            <Link href="/proposals">AI Proposal Inbox</Link>
+          </nav>
+        </header>
+        {children}
       </body>
     </html>
   );
