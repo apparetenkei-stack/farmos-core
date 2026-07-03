@@ -126,23 +126,33 @@ function asRequiredInteger(value: unknown, fieldName: string): number {
   throw new Error(`completed_fields.${fieldName} must be an integer`);
 }
 
+function toIntegerOrNull(value: unknown): number | null {
+  if (typeof value === "number" && Number.isInteger(value)) return value;
+
+  if (typeof value === "string" && value.trim() !== "") {
+    const parsed = Number(value);
+    if (Number.isInteger(parsed)) return parsed;
+  }
+
+  return null;
+}
+
 function asNumberArray(value: unknown): number[] {
   if (!Array.isArray(value)) return [];
 
   return value
-    .map((item) => {
-      if (typeof item === "number" && Number.isInteger(item)) return item;
-      if (typeof item === "string" && item.trim() !== "") {
-        const parsed = Number(item);
-        if (Number.isInteger(parsed)) return parsed;
-      }
-      return null;
-    })
+    .map(toIntegerOrNull)
     .filter((item): item is number => item !== null);
 }
 
-function uniqueSortedNumbers(values: number[]): number[] {
-  return Array.from(new Set(values)).sort((a, b) => a - b);
+function uniqueSortedNumbers(values: unknown[]): number[] {
+  return Array.from(
+    new Set(
+      values
+        .map(toIntegerOrNull)
+        .filter((value): value is number => value !== null),
+    ),
+  ).sort((a, b) => a - b);
 }
 
 function refused(reason: string, applyPlan?: ApplyPlanRow) {
@@ -322,14 +332,18 @@ async function main() {
 
     const projectionCandidate = projectionResult.rows[0];
 
-    const projectionFactIds = projectionCandidate?.supporting_extracted_fact_ids ?? [];
+    const planPayload = asRecord(applyPlan.plan_payload);
+
+    const projectionFactIds = asNumberArray(
+      projectionCandidate?.supporting_extracted_fact_ids ?? [],
+    );
 
     const completionFactIds = asNumberArray(
-      asRecord(applyPlan.plan_payload).completion_source_extracted_fact_id_list,
+      planPayload.completion_source_extracted_fact_id_list,
     );
 
     const completionFactIdMap = asRecord(
-      asRecord(applyPlan.plan_payload).completion_source_extracted_fact_ids,
+      planPayload.completion_source_extracted_fact_ids,
     );
 
     const completionFactIdsFromMap = asNumberArray(
