@@ -14,7 +14,8 @@
     "store-extraction-from-job": "tsx scripts/ingest/store_document_extraction_from_job.ts",
     "process-text-extraction-job": "tsx scripts/ingest/process_text_extraction_job.ts",
     "create-extracted-facts-candidates": "tsx scripts/ingest/create_extracted_facts_candidates.ts",
-    "review-extracted-fact": "tsx scripts/ingest/review_extracted_fact.ts"
+    "review-extracted-fact": "tsx scripts/ingest/review_extracted_fact.ts",
+    "create-projection-candidates": "tsx scripts/ingest/create_projection_candidates_from_verified_facts.ts"
   },
   "keywords": [],
   "author": "",
