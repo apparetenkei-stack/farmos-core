@@ -23,18 +23,28 @@
     "apply-crop-cycle-apply-plan": "tsx scripts/ingest/apply_crop_cycle_apply_plan.ts",
     "list-crop-cycles": "tsx scripts/app/list_crop_cycles.ts",
     "show-crop-cycle-provenance": "tsx scripts/app/show_crop_cycle_provenance.ts",
-    "test-crop-cycle-read-api-boundary": "tsx scripts/app/test_crop_cycle_read_api_boundary.ts"
+    "test-crop-cycle-read-api-boundary": "tsx scripts/app/test_crop_cycle_read_api_boundary.ts",
+    "dev": "next dev -H 127.0.0.1",
+    "build": "next build",
+    "start": "next start -H 127.0.0.1",
+    "check-crop-cycle-read-ui": "next build"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "type": "commonjs",
+  "type": "module",
   "dependencies": {
-    "pg": "^8.22.0"
+    "next": "^16.2.10",
+    "pg": "^8.22.0",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7"
   },
   "devDependencies": {
     "@types/node": "^26.0.1",
     "@types/pg": "^8.20.0",
-    "tsx": "^4.22.4"
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "tsx": "^4.22.4",
+    "typescript": "6.0.3"
   }
 }
