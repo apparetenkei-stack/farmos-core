@@ -2,6 +2,8 @@ import { Client } from "pg";
 import {
   getLatestProposalReviewDecisionReadModel,
   listProposalReviewDecisionEventsReadModel,
+  proposalReviewDecisionReadTypes,
+  type ProposalReviewDecisionEventReadModel,
   type ProposalReviewDecisionReadBoundary,
 } from "./api_boundary/proposal_review_decision_read_api_boundary.ts";
 
@@ -93,6 +95,10 @@ async function readSafetySnapshot(): Promise<SafetySnapshot> {
   }
 }
 
+function isAllowedDecisionType(value: string): boolean {
+  return proposalReviewDecisionReadTypes.some((type) => type === value);
+}
+
 function assertReadBoundary(boundary: ProposalReviewDecisionReadBoundary): void {
   assert(
     boundary.mode === "proposal_review_decision_read_boundary",
@@ -103,6 +109,30 @@ function assertReadBoundary(boundary: ProposalReviewDecisionReadBoundary): void 
   assert(boundary.writes_performed === false, "writes_performed must be false");
   assert(boundary.app_schema_write_allowed === false, "app_schema_write_allowed must be false");
   assert(boundary.ai_proposal_write_allowed === false, "ai_proposal_write_allowed must be false");
+  assert(
+    boundary.audit_event_write_allowed === true,
+    "audit_event_write_allowed must remain true for the Day24 CLI append boundary",
+  );
+}
+
+function assertEventBelongsToProposal(
+  event: ProposalReviewDecisionEventReadModel,
+  label: string,
+): void {
+  assert(event.id.length > 0, `${label} event id must be present`);
+  assert(
+    event.proposal_id === existingProposalId,
+    `${label} proposal_id must match the requested proposal`,
+  );
+  assert(
+    isAllowedDecisionType(event.decision_type),
+    `${label} decision_type must be one of: ${proposalReviewDecisionReadTypes.join(", ")}`,
+  );
+  assert(event.decided_by.length > 0, `${label} decided_by must be present`);
+  assert(event.decided_by_role.length > 0, `${label} decided_by_role must be present`);
+  assert(event.decision_source.length > 0, `${label} decision_source must be present`);
+  assert(event.decided_at.length > 0, `${label} decided_at must be present`);
+  assert(event.created_at.length > 0, `${label} created_at must be present`);
 }
 
 async function main(): Promise<void> {
@@ -130,9 +160,23 @@ async function main(): Promise<void> {
 
   assert(listResult.result === "ok", "list result must be ok");
   assert(listResult.proposalId === existingProposalId, "proposalId must round-trip");
-  assert(listResult.events.length === 0, "current review decision event count must be 0");
-  assert(listResult.latest === null, "latest review decision must be null when no events exist");
+  assert(listResult.events.length >= 0, "event count must be zero or greater");
   assertReadBoundary(listResult.boundary);
+
+  if (listResult.events.length === 0) {
+    assert(listResult.latest === null, "latest review decision must be null when no events exist");
+  } else {
+    assert(listResult.latest !== null, "latest review decision must exist when events exist");
+    assertEventBelongsToProposal(listResult.latest, "list latest");
+
+    const firstHistoryEvent = listResult.events[0];
+    assertEventBelongsToProposal(firstHistoryEvent, "first history");
+
+    assert(
+      listResult.latest.id === firstHistoryEvent.id,
+      "latest event must match the first history event",
+    );
+  }
 
   const latestResult = await getLatestProposalReviewDecisionReadModel({
     proposalId: existingProposalId,
@@ -154,8 +198,19 @@ async function main(): Promise<void> {
   );
 
   assert(latestResult.result === "ok", "latest result must be ok");
-  assert(latestResult.latest === null, "latest review decision must be null when no events exist");
   assertReadBoundary(latestResult.boundary);
+
+  if (listResult.events.length === 0) {
+    assert(latestResult.latest === null, "latest result must be null when no events exist");
+  } else {
+    assert(latestResult.latest !== null, "latest result must exist when events exist");
+    assertEventBelongsToProposal(latestResult.latest, "direct latest");
+
+    assert(
+      listResult.latest?.id === latestResult.latest.id,
+      "list latest and direct latest must refer to the same event",
+    );
+  }
 
   const badRequestResult = await listProposalReviewDecisionEventsReadModel({
     proposalId: "not-a-uuid",

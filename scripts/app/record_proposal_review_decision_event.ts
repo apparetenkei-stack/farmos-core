@@ -11,6 +11,7 @@ type CliArgs = {
   decidedByRole?: string;
   decisionNote?: string;
   decisionSource?: "local_cli" | "test" | "manual";
+  eventMetadataJson?: string;
   commit: boolean;
 };
 
@@ -48,6 +49,9 @@ function parseArgs(argv: string[]): CliArgs {
     } else if (arg === "--decision-source") {
       parsed.decisionSource = next as CliArgs["decisionSource"];
       i += 1;
+    } else if (arg === "--event-metadata-json") {
+      parsed.eventMetadataJson = next;
+      i += 1;
     } else {
       throw new Error(`Unknown argument: ${arg}`);
     }
@@ -64,6 +68,28 @@ function assertDecisionType(value: string | undefined): ProposalReviewDecisionTy
   }
 
   return value as ProposalReviewDecisionType;
+}
+
+function parseEventMetadataJson(value: string | undefined): Record<string, unknown> {
+  if (!value) {
+    return {
+      cli: true,
+      day: 24,
+      dry_run_default: true,
+    };
+  }
+
+  const parsed = JSON.parse(value);
+
+  if (
+    typeof parsed !== "object" ||
+    parsed === null ||
+    Array.isArray(parsed)
+  ) {
+    throw new Error("--event-metadata-json must be a JSON object");
+  }
+
+  return parsed as Record<string, unknown>;
 }
 
 async function main() {
@@ -88,11 +114,7 @@ async function main() {
     decidedByRole: args.decidedByRole,
     decisionNote: args.decisionNote,
     decisionSource: args.decisionSource ?? "local_cli",
-    eventMetadata: {
-      cli: true,
-      day: 24,
-      dry_run_default: true,
-    },
+    eventMetadata: parseEventMetadataJson(args.eventMetadataJson),
     commit: args.commit,
   });
 
