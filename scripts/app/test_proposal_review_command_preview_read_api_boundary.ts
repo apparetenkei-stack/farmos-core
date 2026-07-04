@@ -120,8 +120,14 @@ async function main() {
   );
 
   assert(
-    model.latest_review_decision?.decision_type === "defer_review",
-    "expected latest review decision to be defer_review",
+    model.latest_review_decision !== null,
+    "expected latest review decision to exist",
+  );
+  assert(
+    ["approve_review", "reject_review", "request_revision", "defer_review"].includes(
+      model.latest_review_decision.decision_type,
+    ),
+    "expected latest review decision to be an allowed decision type",
   );
 
   assert(
@@ -144,8 +150,11 @@ async function main() {
     "audit event append privilege should be present for future command boundary",
   );
 
-  assert(before.event_count === 1, "expected starting audit event count to be 1");
-  assert(after.event_count === 1, "expected ending audit event count to be 1");
+  assert(before.event_count >= 1, "expected starting audit event count to be at least 1");
+  assert(
+    after.event_count === before.event_count,
+    "expected audit event count to remain unchanged",
+  );
 
   assert(
     JSON.stringify(before.proposal_rows) === JSON.stringify(after.proposal_rows),

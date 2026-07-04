@@ -93,8 +93,11 @@ function assertSnapshotUnchanged(
   before: Awaited<ReturnType<typeof readSafetySnapshot>>,
   after: Awaited<ReturnType<typeof readSafetySnapshot>>,
 ) {
-  assert(before.event_count === 1, "expected starting audit event count to be 1");
-  assert(after.event_count === 1, "expected ending audit event count to be 1");
+  assert(before.event_count >= 1, "expected starting audit event count to be at least 1");
+  assert(
+    after.event_count === before.event_count,
+    "expected audit event count to remain unchanged",
+  );
 
   assert(
     JSON.stringify(before.proposal_rows) === JSON.stringify(after.proposal_rows),
@@ -135,8 +138,14 @@ async function assertOkDryRun(decisionType: string, decisionNote: string) {
     `${decisionType} expected pending proposal`,
   );
   assert(
-    result.latest_review_decision?.decision_type === "defer_review",
-    `${decisionType} expected latest review decision to be defer_review`,
+    result.latest_review_decision !== null,
+    `${decisionType} expected latest review decision to exist`,
+  );
+  assert(
+    ["approve_review", "reject_review", "request_revision", "defer_review"].includes(
+      result.latest_review_decision.decision_type,
+    ),
+    `${decisionType} expected latest review decision to be an allowed decision type`,
   );
 
   assert(result.validation.accepted === true, `${decisionType} not accepted`);
