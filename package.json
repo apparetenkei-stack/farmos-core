@@ -33,7 +33,9 @@
     "test-proposal-review-decision-event-boundary": "tsx scripts/app/test_proposal_review_decision_event_api_boundary.ts",
     "record-proposal-review-decision-event": "tsx scripts/app/record_proposal_review_decision_event.ts",
     "test-proposal-review-decision-read-api-boundary": "tsx scripts/app/test_proposal_review_decision_read_api_boundary.ts",
-    "check-proposal-review-read-ui": "next build"
+    "check-proposal-review-read-ui": "next build",
+    "test-proposal-review-latest-summary-read-api-boundary": "tsx scripts/app/test_proposal_review_latest_summary_read_api_boundary.ts",
+    "check-proposal-review-list-summary-ui": "next build"
   },
   "keywords": [],
   "author": "",

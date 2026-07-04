@@ -18,6 +18,21 @@ function JsonBlock(props: { value: unknown }) {
   return <pre>{JSON.stringify(props.value, null, 2)}</pre>;
 }
 
+function decisionLabel(decisionType: string): string {
+  switch (decisionType) {
+    case "approve_review":
+      return "承認ログ";
+    case "reject_review":
+      return "却下ログ";
+    case "request_revision":
+      return "修正依頼ログ";
+    case "defer_review":
+      return "保留ログ";
+    default:
+      return "Review decision log";
+  }
+}
+
 function ReviewDecisionEventDetail(props: {
   event: ProposalReviewDecisionEventReadModel;
 }) {
@@ -34,7 +49,11 @@ function ReviewDecisionEventDetail(props: {
         <code>{event.proposal_id}</code>
       </dd>
       <dt>decision_type</dt>
-      <dd>{event.decision_type}</dd>
+      <dd>
+        <strong>{decisionLabel(event.decision_type)}</strong>
+        <br />
+        <code>{event.decision_type}</code>
+      </dd>
       <dt>decision_note</dt>
       <dd>{event.decision_note ?? "-"}</dd>
       <dt>decided_by</dt>
@@ -52,6 +71,52 @@ function ReviewDecisionEventDetail(props: {
         <JsonBlock value={event.event_metadata} />
       </dd>
     </dl>
+  );
+}
+
+function LatestReviewDecisionCard(props: {
+  event: ProposalReviewDecisionEventReadModel;
+}) {
+  const event = props.event;
+
+  return (
+    <article>
+      <h4>
+        {decisionLabel(event.decision_type)} / <code>{event.decision_type}</code>
+      </h4>
+      <p>
+        This is the latest audit-only review decision. It does not apply proposal
+        changes to app data.
+      </p>
+      <ReviewDecisionEventDetail event={event} />
+    </article>
+  );
+}
+
+function ReviewDecisionTimeline(props: {
+  events: ProposalReviewDecisionEventReadModel[];
+}) {
+  if (props.events.length === 0) {
+    return <p>No review decision events recorded yet.</p>;
+  }
+
+  return (
+    <ol>
+      {props.events.map((event, index) => (
+        <li key={event.id}>
+          <article>
+            <h4>
+              #{index + 1} {decisionLabel(event.decision_type)} /{" "}
+              <code>{event.decision_type}</code>
+            </h4>
+            <p>
+              decided_at: <code>{event.decided_at}</code>
+            </p>
+            <ReviewDecisionEventDetail event={event} />
+          </article>
+        </li>
+      ))}
+    </ol>
   );
 }
 
@@ -138,7 +203,10 @@ export default async function ProposalDetailPage(props: ProposalDetailPageProps)
         <Link href="/proposals">← AI Proposal Inbox</Link>
       </p>
       <h1>AI Proposal detail</h1>
-      <p>read-only detail view. No approve, reject, apply, archive, edit, or mutation controls.</p>
+      <p>
+        read-only detail view. No approve, reject, apply, archive, edit, or
+        mutation controls.
+      </p>
 
       <section>
         <h2>{proposal.title}</h2>
@@ -177,7 +245,9 @@ export default async function ProposalDetailPage(props: ProposalDetailPageProps)
       <section>
         <h2>Review Decision Events</h2>
         <p>
-          Review decisions are audit events only. They do not apply proposal changes to app data.
+          Review decisions are append-only audit events. They do not apply
+          proposal changes to app data and do not update ai.proposal_inbox
+          review/apply fields.
         </p>
 
         {reviewModel.result === "ok" ? (
@@ -185,25 +255,21 @@ export default async function ProposalDetailPage(props: ProposalDetailPageProps)
             <section>
               <h3>Latest review decision</h3>
               {reviewModel.latest ? (
-                <ReviewDecisionEventDetail event={reviewModel.latest} />
+                <LatestReviewDecisionCard event={reviewModel.latest} />
               ) : (
                 <p>No review decision events recorded yet.</p>
               )}
             </section>
 
             <section>
+              <h3>Review decision timeline</h3>
+              <p>Newest events are shown first.</p>
+              <ReviewDecisionTimeline events={reviewModel.events} />
+            </section>
+
+            <section>
               <h3>Review decision history</h3>
-              {reviewModel.events.length > 0 ? (
-                <ol>
-                  {reviewModel.events.map((event) => (
-                    <li key={event.id}>
-                      <ReviewDecisionEventDetail event={event} />
-                    </li>
-                  ))}
-                </ol>
-              ) : (
-                <p>No review decision events recorded yet.</p>
-              )}
+              <JsonBlock value={reviewModel.events} />
             </section>
 
             <section>
