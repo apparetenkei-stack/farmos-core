@@ -1,5 +1,9 @@
 import Link from "next/link";
 import { showProposalInboxReadModel } from "../../../../scripts/app/api_boundary/proposal_inbox_read_api_boundary";
+import {
+  listProposalReviewDecisionEventsReadModel,
+  type ProposalReviewDecisionEventReadModel,
+} from "../../../../scripts/app/api_boundary/proposal_review_decision_read_api_boundary";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -12,6 +16,43 @@ type ProposalDetailPageProps = {
 
 function JsonBlock(props: { value: unknown }) {
   return <pre>{JSON.stringify(props.value, null, 2)}</pre>;
+}
+
+function ReviewDecisionEventDetail(props: {
+  event: ProposalReviewDecisionEventReadModel;
+}) {
+  const event = props.event;
+
+  return (
+    <dl>
+      <dt>event_id</dt>
+      <dd>
+        <code>{event.id}</code>
+      </dd>
+      <dt>proposal_id</dt>
+      <dd>
+        <code>{event.proposal_id}</code>
+      </dd>
+      <dt>decision_type</dt>
+      <dd>{event.decision_type}</dd>
+      <dt>decision_note</dt>
+      <dd>{event.decision_note ?? "-"}</dd>
+      <dt>decided_by</dt>
+      <dd>{event.decided_by}</dd>
+      <dt>decided_by_role</dt>
+      <dd>{event.decided_by_role}</dd>
+      <dt>decision_source</dt>
+      <dd>{event.decision_source}</dd>
+      <dt>decided_at</dt>
+      <dd>{event.decided_at}</dd>
+      <dt>created_at</dt>
+      <dd>{event.created_at}</dd>
+      <dt>event_metadata</dt>
+      <dd>
+        <JsonBlock value={event.event_metadata} />
+      </dd>
+    </dl>
+  );
 }
 
 export default async function ProposalDetailPage(props: ProposalDetailPageProps) {
@@ -87,13 +128,15 @@ export default async function ProposalDetailPage(props: ProposalDetailPageProps)
   }
 
   const proposal = model.proposal;
+  const reviewModel = await listProposalReviewDecisionEventsReadModel({
+    proposalId: proposal.id,
+  });
 
   return (
     <main>
       <p>
         <Link href="/proposals">← AI Proposal Inbox</Link>
       </p>
-
       <h1>AI Proposal detail</h1>
       <p>read-only detail view. No approve, reject, apply, archive, edit, or mutation controls.</p>
 
@@ -132,6 +175,56 @@ export default async function ProposalDetailPage(props: ProposalDetailPageProps)
       </section>
 
       <section>
+        <h2>Review Decision Events</h2>
+        <p>
+          Review decisions are audit events only. They do not apply proposal changes to app data.
+        </p>
+
+        {reviewModel.result === "ok" ? (
+          <>
+            <section>
+              <h3>Latest review decision</h3>
+              {reviewModel.latest ? (
+                <ReviewDecisionEventDetail event={reviewModel.latest} />
+              ) : (
+                <p>No review decision events recorded yet.</p>
+              )}
+            </section>
+
+            <section>
+              <h3>Review decision history</h3>
+              {reviewModel.events.length > 0 ? (
+                <ol>
+                  {reviewModel.events.map((event) => (
+                    <li key={event.id}>
+                      <ReviewDecisionEventDetail event={event} />
+                    </li>
+                  ))}
+                </ol>
+              ) : (
+                <p>No review decision events recorded yet.</p>
+              )}
+            </section>
+
+            <section>
+              <h3>Review decision read boundary</h3>
+              <JsonBlock value={reviewModel.boundary} />
+            </section>
+          </>
+        ) : (
+          <section>
+            <h3>Review decision boundary error</h3>
+            <dl>
+              <dt>result</dt>
+              <dd>{reviewModel.result}</dd>
+              <dt>reason</dt>
+              <dd>{reviewModel.reason}</dd>
+            </dl>
+          </section>
+        )}
+      </section>
+
+      <section>
         <h2>Body</h2>
         <p>{proposal.body}</p>
       </section>
@@ -157,7 +250,7 @@ export default async function ProposalDetailPage(props: ProposalDetailPageProps)
       </section>
 
       <section>
-        <h2>Read boundary</h2>
+        <h2>Proposal inbox read boundary</h2>
         <JsonBlock value={model.read_boundary} />
       </section>
     </main>
