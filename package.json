@@ -41,7 +41,9 @@
     "test-proposal-review-decision-command-dry-run-boundary": "tsx scripts/app/test_proposal_review_decision_command_dry_run_boundary.ts",
     "dry-run-proposal-review-decision-command": "tsx scripts/app/dry_run_proposal_review_decision_command.ts",
     "test-proposal-review-decision-audit-append-command-boundary": "tsx scripts/app/test_proposal_review_decision_audit_append_command_boundary.ts",
-    "append-proposal-review-decision-event-command": "tsx scripts/app/append_proposal_review_decision_event_command.ts"
+    "append-proposal-review-decision-event-command": "tsx scripts/app/append_proposal_review_decision_event_command.ts",
+    "test-proposal-review-status-transition-command-boundary": "tsx scripts/app/test_proposal_review_status_transition_command_boundary.ts",
+    "transition-proposal-review-status-command": "tsx scripts/app/transition_proposal_review_status_command.ts"
   },
   "keywords": [],
   "author": "",
