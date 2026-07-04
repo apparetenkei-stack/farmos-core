@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ReviewCommandPreviewSection } from "./ReviewCommandPreviewSection";
 import { showProposalInboxReadModel } from "../../../../scripts/app/api_boundary/proposal_inbox_read_api_boundary";
 import {
   listProposalReviewDecisionEventsReadModel,
@@ -319,6 +320,7 @@ export default async function ProposalDetailPage(props: ProposalDetailPageProps)
         <h2>Proposal inbox read boundary</h2>
         <JsonBlock value={model.read_boundary} />
       </section>
+      <ReviewCommandPreviewSection proposalId={proposalId} />
     </main>
   );
 }
