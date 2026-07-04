@@ -29,7 +29,9 @@
     "start": "next start -H 127.0.0.1",
     "check-crop-cycle-read-ui": "next build",
     "test-proposal-inbox-read-api-boundary": "tsx scripts/app/test_proposal_inbox_read_api_boundary.ts",
-    "check-proposal-inbox-read-ui": "next build"
+    "check-proposal-inbox-read-ui": "next build",
+    "test-proposal-review-decision-event-boundary": "tsx scripts/app/test_proposal_review_decision_event_api_boundary.ts",
+    "record-proposal-review-decision-event": "tsx scripts/app/record_proposal_review_decision_event.ts"
   },
   "keywords": [],
   "author": "",
