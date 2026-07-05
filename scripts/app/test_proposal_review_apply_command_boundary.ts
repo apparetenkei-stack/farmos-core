@@ -295,6 +295,52 @@ async function readProposalMarker(client: Client, proposalId: string): Promise<{
   };
 }
 
+async function countApplyAuditEvents(client: Client, proposalId: string): Promise<number> {
+  return scalarNumber(
+    client,
+    `
+      select count(*)::int as value
+      from audit.proposal_review_apply_events
+      where proposal_id = $1::uuid
+    `,
+    [proposalId],
+  );
+}
+
+async function readSingleApplyAuditEvent(
+  client: Client,
+  proposalId: string,
+): Promise<Record<string, unknown>> {
+  const result = await client.query(
+    `
+      select
+        proposal_id::text,
+        apply_operation,
+        result,
+        dry_run,
+        committed,
+        app_projection_apply_performed,
+        ai_proposal_apply_marker_updated,
+        inserted_crop_cycle_id,
+        applied_by,
+        applied_by_role,
+        apply_source,
+        event_metadata
+      from audit.proposal_review_apply_events
+      where proposal_id = $1::uuid
+    `,
+    [proposalId],
+  );
+
+  assertOk(result.rows.length === 1, "proposal must have exactly one apply audit event", {
+    proposalId,
+    count: result.rows.length,
+    rows: result.rows,
+  });
+
+  return result.rows[0];
+}
+
 async function readCropCycleById(client: Client, id: number): Promise<Record<string, unknown>> {
   const result = await client.query(
     `
@@ -343,6 +389,14 @@ async function readPrivileges(client: Client): Promise<Record<string, unknown>[]
       has_table_privilege('farmos_app_local', 'audit.proposal_review_decision_events', 'UPDATE') as can_update,
       has_table_privilege('farmos_app_local', 'audit.proposal_review_decision_events', 'DELETE') as can_delete,
       has_table_privilege('farmos_app_local', 'audit.proposal_review_decision_events', 'TRUNCATE') as can_truncate
+    union all
+    select
+      'audit.proposal_review_apply_events' as object_name,
+      has_table_privilege('farmos_app_local', 'audit.proposal_review_apply_events', 'SELECT') as can_select,
+      has_table_privilege('farmos_app_local', 'audit.proposal_review_apply_events', 'INSERT') as can_insert,
+      has_table_privilege('farmos_app_local', 'audit.proposal_review_apply_events', 'UPDATE') as can_update,
+      has_table_privilege('farmos_app_local', 'audit.proposal_review_apply_events', 'DELETE') as can_delete,
+      has_table_privilege('farmos_app_local', 'audit.proposal_review_apply_events', 'TRUNCATE') as can_truncate
   `);
 
   return result.rows;
@@ -485,6 +539,9 @@ async function main(): Promise<void> {
 
     const existingCropCycleBefore = await readCropCycleById(client, 2);
 
+    const insertApplyAuditCountBefore = await countApplyAuditEvents(client, insertId);
+    const noOpApplyAuditCountBefore = await countApplyAuditEvents(client, noOpId);
+
     const insertPreview = await previewProposalReviewApplyPlan({ proposalId: insertId, allowPrivilegedReadOnlyCaller: true });
     assertOk((insertPreview as { result?: string }).result === "preview", "insert fixture preview must be preview", insertPreview);
     assertOk(
@@ -521,6 +578,13 @@ async function main(): Promise<void> {
     assertOk(insertMarkerAfterDryRun.applied_by === null, "insert dry-run must not set applied_by", insertMarkerAfterDryRun);
     assertOk(insertMarkerAfterDryRun.applied_at === null, "insert dry-run must not set applied_at", insertMarkerAfterDryRun);
 
+    const insertApplyAuditCountAfterDryRun = await countApplyAuditEvents(client, insertId);
+    assertOk(
+      insertApplyAuditCountAfterDryRun === insertApplyAuditCountBefore,
+      "insert dry-run must not append apply audit event",
+      { insertApplyAuditCountBefore, insertApplyAuditCountAfterDryRun },
+    );
+
     const insertCommit = await applyProposalReviewApplyPlanCommand({
       proposalId: insertId,
       commit: true,
@@ -540,6 +604,7 @@ async function main(): Promise<void> {
     assertOk(insertCommit.boundary.app_crop_cycles_insert_performed === true, "insert commit boundary must report crop cycle insert", insertCommit);
     assertOk(insertCommit.boundary.ai_proposal_apply_marker_updated === true, "insert commit must update apply marker", insertCommit);
     assertOk(insertCommit.boundary.ai_proposal_status_updated === false, "insert commit must not update proposal status", insertCommit);
+    assertOk(insertCommit.boundary.audit_apply_event_appended === true, "insert commit must append apply audit event", insertCommit);
 
     const cropCycleCountAfterInsertCommit = await scalarNumber(
       client,
@@ -572,6 +637,48 @@ async function main(): Promise<void> {
     assertOk(insertMarkerAfterCommit.applied_by === "hayate", "insert commit must set applied_by", insertMarkerAfterCommit);
     assertOk(insertMarkerAfterCommit.applied_at !== null, "insert commit must set applied_at", insertMarkerAfterCommit);
 
+    const insertApplyAuditEvent = await readSingleApplyAuditEvent(client, insertId);
+    assertOk(insertApplyAuditEvent.apply_operation === "insert_candidate", "insert commit audit operation must be insert_candidate", insertApplyAuditEvent);
+    assertOk(insertApplyAuditEvent.result === "applied", "insert commit audit result must be applied", insertApplyAuditEvent);
+    assertOk(insertApplyAuditEvent.dry_run === false, "insert commit audit must not be dry-run", insertApplyAuditEvent);
+    assertOk(insertApplyAuditEvent.committed === true, "insert commit audit must be committed", insertApplyAuditEvent);
+    assertOk(insertApplyAuditEvent.app_projection_apply_performed === true, "insert commit audit must record app projection apply", insertApplyAuditEvent);
+    assertOk(insertApplyAuditEvent.ai_proposal_apply_marker_updated === true, "insert commit audit must record proposal marker update", insertApplyAuditEvent);
+    assertOk(
+      Number(insertApplyAuditEvent.inserted_crop_cycle_id) === insertCommit.apply.inserted_crop_cycle_id,
+      "insert commit audit must reference inserted crop cycle id",
+      { insertApplyAuditEvent, insertCommit },
+    );
+    assertOk(insertApplyAuditEvent.applied_by === "hayate", "insert commit audit must record applied_by", insertApplyAuditEvent);
+    assertOk(insertApplyAuditEvent.applied_by_role === "owner", "insert commit audit must record applied_by_role", insertApplyAuditEvent);
+    assertOk(insertApplyAuditEvent.apply_source === "local_cli", "insert commit audit source must be local_cli", insertApplyAuditEvent);
+
+    const duplicateInsertCommit = await applyProposalReviewApplyPlanCommand({
+      proposalId: insertId,
+      commit: true,
+      appliedBy: "hayate",
+      appliedByRole: "owner",
+    });
+    assertOk(duplicateInsertCommit.result === "blocked", "second insert commit must be blocked", duplicateInsertCommit);
+    const duplicateInsertReadinessReasons =
+      (
+        duplicateInsertCommit.preview as
+          | { readiness?: { blocked_reasons?: string[] } }
+          | null
+      )?.readiness?.blocked_reasons ?? [];
+
+    assertOk(
+      duplicateInsertCommit.blocked_reasons.includes("proposal_already_applied") ||
+        duplicateInsertReadinessReasons.includes("proposal_already_applied"),
+      "second insert commit must be blocked by proposal already applied marker",
+      duplicateInsertCommit,
+    );
+    assertOk(
+      (await countApplyAuditEvents(client, insertId)) === 1,
+      "second insert commit must not append duplicate apply audit event",
+      duplicateInsertCommit,
+    );
+
     const noOpPreview = await previewProposalReviewApplyPlan({ proposalId: noOpId, allowPrivilegedReadOnlyCaller: true });
     assertOk((noOpPreview as { result?: string }).result === "preview", "no-op fixture preview must be preview", noOpPreview);
     assertOk(
@@ -597,7 +704,9 @@ async function main(): Promise<void> {
     assertOk(noOpCommit.apply.operation === "no_op", "no-op commit operation must be no_op", noOpCommit);
     assertOk(noOpCommit.apply.app_crop_cycles_rows_inserted === 0, "no-op commit must not insert app.crop_cycles", noOpCommit);
     assertOk(noOpCommit.boundary.app_schema_writes_performed === false, "no-op commit must not perform app schema writes", noOpCommit);
+    assertOk(noOpCommit.boundary.app_projection_apply_performed === false, "no-op commit must not perform app projection apply", noOpCommit);
     assertOk(noOpCommit.boundary.ai_proposal_apply_marker_updated === true, "no-op commit must update proposal apply marker", noOpCommit);
+    assertOk(noOpCommit.boundary.audit_apply_event_appended === true, "no-op commit must append apply audit event", noOpCommit);
 
     const countAfterNoOpCommit = await scalarNumber(
       client,
@@ -613,6 +722,24 @@ async function main(): Promise<void> {
     assertOk(noOpMarkerAfterCommit.status === "approved", "no-op commit must keep status approved", noOpMarkerAfterCommit);
     assertOk(noOpMarkerAfterCommit.applied_by === "hayate", "no-op commit must set applied_by", noOpMarkerAfterCommit);
     assertOk(noOpMarkerAfterCommit.applied_at !== null, "no-op commit must set applied_at", noOpMarkerAfterCommit);
+
+    const noOpApplyAuditEvent = await readSingleApplyAuditEvent(client, noOpId);
+    assertOk(noOpApplyAuditEvent.apply_operation === "no_op_candidate", "no-op commit audit operation must be no_op_candidate", noOpApplyAuditEvent);
+    assertOk(noOpApplyAuditEvent.result === "applied", "no-op commit audit result must be applied", noOpApplyAuditEvent);
+    assertOk(noOpApplyAuditEvent.dry_run === false, "no-op commit audit must not be dry-run", noOpApplyAuditEvent);
+    assertOk(noOpApplyAuditEvent.committed === true, "no-op commit audit must be committed", noOpApplyAuditEvent);
+    assertOk(noOpApplyAuditEvent.app_projection_apply_performed === false, "no-op commit audit must not record app projection apply", noOpApplyAuditEvent);
+    assertOk(noOpApplyAuditEvent.ai_proposal_apply_marker_updated === true, "no-op commit audit must record proposal marker update", noOpApplyAuditEvent);
+    assertOk(noOpApplyAuditEvent.inserted_crop_cycle_id === null, "no-op commit audit must not reference crop cycle id", noOpApplyAuditEvent);
+    assertOk(noOpApplyAuditEvent.applied_by === "hayate", "no-op commit audit must record applied_by", noOpApplyAuditEvent);
+    assertOk(noOpApplyAuditEvent.applied_by_role === "owner", "no-op commit audit must record applied_by_role", noOpApplyAuditEvent);
+    assertOk(noOpApplyAuditEvent.apply_source === "local_cli", "no-op commit audit source must be local_cli", noOpApplyAuditEvent);
+
+    assertOk(
+      (await countApplyAuditEvents(client, noOpId)) === noOpApplyAuditCountBefore + 1,
+      "no-op commit must append exactly one apply audit event",
+      { noOpApplyAuditCountBefore },
+    );
 
     const updatePreview = await previewProposalReviewApplyPlan({ proposalId: updateId, allowPrivilegedReadOnlyCaller: true });
     assertOk((updatePreview as { result?: string }).result === "preview", "update fixture preview must be preview", updatePreview);
@@ -683,6 +810,7 @@ async function main(): Promise<void> {
     const appCropCyclesPrivileges = privileges.find((row) => row.object_name === "app.crop_cycles");
     const proposalInboxPrivileges = privileges.find((row) => row.object_name === "ai.proposal_inbox");
     const auditPrivileges = privileges.find((row) => row.object_name === "audit.proposal_review_decision_events");
+    const applyAuditPrivileges = privileges.find((row) => row.object_name === "audit.proposal_review_apply_events");
 
     assertOk(appCropCyclesPrivileges?.can_select === true, "farmos_app_local must keep app.crop_cycles SELECT", appCropCyclesPrivileges);
     assertOk(appCropCyclesPrivileges?.can_insert === false, "farmos_app_local must not get app.crop_cycles INSERT", appCropCyclesPrivileges);
@@ -696,11 +824,17 @@ async function main(): Promise<void> {
     assertOk(proposalInboxPrivileges?.can_delete === false, "farmos_app_local must not get ai.proposal_inbox DELETE", proposalInboxPrivileges);
     assertOk(proposalInboxPrivileges?.can_truncate === false, "farmos_app_local must not get ai.proposal_inbox TRUNCATE", proposalInboxPrivileges);
 
-    assertOk(auditPrivileges?.can_select === true, "farmos_app_local must keep audit SELECT", auditPrivileges);
-    assertOk(auditPrivileges?.can_insert === true, "farmos_app_local must keep audit INSERT", auditPrivileges);
-    assertOk(auditPrivileges?.can_update === false, "farmos_app_local must not get audit UPDATE", auditPrivileges);
-    assertOk(auditPrivileges?.can_delete === false, "farmos_app_local must not get audit DELETE", auditPrivileges);
-    assertOk(auditPrivileges?.can_truncate === false, "farmos_app_local must not get audit TRUNCATE", auditPrivileges);
+    assertOk(auditPrivileges?.can_select === true, "farmos_app_local must keep decision audit SELECT", auditPrivileges);
+    assertOk(auditPrivileges?.can_insert === true, "farmos_app_local must keep decision audit INSERT", auditPrivileges);
+    assertOk(auditPrivileges?.can_update === false, "farmos_app_local must not get decision audit UPDATE", auditPrivileges);
+    assertOk(auditPrivileges?.can_delete === false, "farmos_app_local must not get decision audit DELETE", auditPrivileges);
+    assertOk(auditPrivileges?.can_truncate === false, "farmos_app_local must not get decision audit TRUNCATE", auditPrivileges);
+
+    assertOk(applyAuditPrivileges?.can_select === true, "farmos_app_local must read apply audit history", applyAuditPrivileges);
+    assertOk(applyAuditPrivileges?.can_insert === false, "farmos_app_local must not insert apply audit history", applyAuditPrivileges);
+    assertOk(applyAuditPrivileges?.can_update === false, "farmos_app_local must not update apply audit history", applyAuditPrivileges);
+    assertOk(applyAuditPrivileges?.can_delete === false, "farmos_app_local must not delete apply audit history", applyAuditPrivileges);
+    assertOk(applyAuditPrivileges?.can_truncate === false, "farmos_app_local must not truncate apply audit history", applyAuditPrivileges);
 
     console.log(JSON.stringify({
       result: "ok",

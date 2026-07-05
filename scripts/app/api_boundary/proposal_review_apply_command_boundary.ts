@@ -68,10 +68,12 @@ type Boundary = {
   ai_proposal_apply_marker_updated: boolean;
   ai_proposal_status_updated: false;
   app_projection_apply_performed: boolean;
+  audit_apply_event_appended: boolean;
   commands_executed: boolean;
   ui_invoked: false;
   app_crop_cycles_insert_allowed: boolean;
   ai_proposal_apply_marker_update_allowed: boolean;
+  audit_apply_event_insert_allowed: boolean;
 };
 
 type ApplySummary = {
@@ -186,6 +188,7 @@ function buildBoundary(args: {
   appCropCyclesInsertPerformed: boolean;
   aiProposalApplyMarkerUpdated: boolean;
   appProjectionApplyPerformed: boolean;
+  auditApplyEventAppended?: boolean;
   commandsExecuted: boolean;
 }): Boundary {
   return {
@@ -202,12 +205,14 @@ function buildBoundary(args: {
     ai_proposal_apply_marker_updated: args.aiProposalApplyMarkerUpdated,
     ai_proposal_status_updated: false,
     app_projection_apply_performed: args.appProjectionApplyPerformed,
+    audit_apply_event_appended: args.auditApplyEventAppended === true,
     commands_executed: args.commandsExecuted,
     ui_invoked: false,
     app_crop_cycles_insert_allowed: Boolean(args.row?.app_crop_cycles_insert_allowed),
     ai_proposal_apply_marker_update_allowed: Boolean(
       args.row?.ai_proposal_applied_by_update_allowed,
     ) && Boolean(args.row?.ai_proposal_applied_at_update_allowed),
+    audit_apply_event_insert_allowed: Boolean(args.row?.audit_apply_event_insert_allowed),
   };
 }
 
@@ -218,7 +223,8 @@ async function readBoundaryRow(client: Client): Promise<Record<string, unknown>>
       current_setting('transaction_read_only') as transaction_read_only,
       has_table_privilege(current_user, 'app.crop_cycles', 'INSERT') as app_crop_cycles_insert_allowed,
       has_column_privilege(current_user, 'ai.proposal_inbox', 'applied_by', 'UPDATE') as ai_proposal_applied_by_update_allowed,
-      has_column_privilege(current_user, 'ai.proposal_inbox', 'applied_at', 'UPDATE') as ai_proposal_applied_at_update_allowed
+      has_column_privilege(current_user, 'ai.proposal_inbox', 'applied_at', 'UPDATE') as ai_proposal_applied_at_update_allowed,
+      has_table_privilege(current_user, 'audit.proposal_review_apply_events', 'INSERT') as audit_apply_event_insert_allowed
   `);
 
   return result.rows[0] ?? {};
@@ -427,6 +433,63 @@ async function updateApplyMarker(args: {
   };
 }
 
+async function appendApplyAuditEvent(args: {
+  client: Client;
+  proposalId: string;
+  applyOperation: "insert_candidate" | "no_op_candidate";
+  insertedCropCycleId: number | null;
+  appliedBy: string;
+  appliedByRole: string;
+  appProjectionApplyPerformed: boolean;
+}): Promise<void> {
+  await args.client.query(
+    `
+      insert into audit.proposal_review_apply_events (
+        proposal_id,
+        apply_operation,
+        result,
+        dry_run,
+        committed,
+        app_projection_apply_performed,
+        ai_proposal_apply_marker_updated,
+        inserted_crop_cycle_id,
+        applied_by,
+        applied_by_role,
+        apply_source,
+        event_metadata
+      )
+      values (
+        $1,
+        $2,
+        'applied',
+        false,
+        true,
+        $3,
+        true,
+        $4,
+        $5,
+        $6,
+        'local_cli',
+        $7::jsonb
+      )
+    `,
+    [
+      args.proposalId,
+      args.applyOperation,
+      args.appProjectionApplyPerformed,
+      args.insertedCropCycleId,
+      args.appliedBy,
+      args.appliedByRole,
+      JSON.stringify({
+        day: 35,
+        boundary: "proposal_review_apply_command_boundary",
+        source: "cli_only_apply_command",
+        idempotency: "one_committed_apply_event_per_proposal",
+      }),
+    ],
+  );
+}
+
 async function rollbackQuietly(client: Client): Promise<void> {
   try {
     await client.query("rollback");
@@ -496,6 +559,7 @@ export async function applyProposalReviewApplyPlanCommand(
   const proposalId = input.proposalId;
   const commitRequested = input.commit === true;
   const appliedBy = (input.appliedBy ?? "hayate").trim();
+  const appliedByRole = (input.appliedByRole ?? "owner").trim() || "owner";
 
   if (!isUuid(proposalId)) {
     return buildNonWritingResult({
@@ -830,6 +894,16 @@ export async function applyProposalReviewApplyPlanCommand(
       };
     }
 
+      await appendApplyAuditEvent({
+        client,
+        proposalId,
+        applyOperation: operation === "insert_candidate" ? "insert_candidate" : "no_op_candidate",
+        insertedCropCycleId,
+        appliedBy,
+        appliedByRole,
+        appProjectionApplyPerformed: rowsInserted > 0,
+      });
+
     await client.query("commit");
 
     return {
@@ -854,7 +928,8 @@ export async function applyProposalReviewApplyPlanCommand(
         appSchemaWritesPerformed: rowsInserted > 0,
         appCropCyclesInsertPerformed: rowsInserted > 0,
         aiProposalApplyMarkerUpdated: true,
-        appProjectionApplyPerformed: true,
+        appProjectionApplyPerformed: rowsInserted > 0,
+        auditApplyEventAppended: true,
         commandsExecuted: true,
       }),
     };
