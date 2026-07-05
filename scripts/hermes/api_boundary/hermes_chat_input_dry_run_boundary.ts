@@ -4,9 +4,9 @@ import {
   detectHermesBlockedRequest,
   detectHermesRequestedIntent,
   normalizeHermesUserMessage,
-  runHermesLlmAdapterMockBoundary,
   type HermesChatIntent,
 } from "./hermes_llm_adapter_mock_boundary";
+import { runHermesLlmAdapterSwitchBoundary } from "./hermes_llm_adapter_switch_boundary";
 
 const PROTECTED_PROPOSAL_ID = "24fc24ee-8efa-436b-8424-9703edeeb297";
 const MAX_MESSAGE_LENGTH = 1000;
@@ -38,7 +38,9 @@ type BoundaryFlags = {
   external_api_called: false;
   embeddings_executed: false;
   vector_search_executed: false;
+  local_model_called: false;
   restricted_domain_data_exposed: false;
+  credentials_exposed: false;
 };
 
 export type HermesChatInputDryRunResult = {
@@ -105,7 +107,9 @@ const boundary: BoundaryFlags = {
   external_api_called: false,
   embeddings_executed: false,
   vector_search_executed: false,
+  local_model_called: false,
   restricted_domain_data_exposed: false,
+  credentials_exposed: false,
 };
 
 const redactionPolicy = {
@@ -337,11 +341,13 @@ export async function runHermesChatInputDryRunBoundary(input: {
       crop_cycle_2_exists: before.crop_cycle_2_exists,
     };
 
-    const adapterResult = await runHermesLlmAdapterMockBoundary({
+    const adapterResult = await runHermesLlmAdapterSwitchBoundary({
       userMessage,
       normalizedUserMessage,
       requestedIntent,
       safeContext,
+      provider: "mock",
+      dryRun: true,
     });
 
     const after = await readSafetySnapshot(client);
@@ -357,8 +363,8 @@ export async function runHermesChatInputDryRunBoundary(input: {
           request,
           safe_context: safeContext,
           redaction_policy: redactionPolicy,
-          blocked_reason: adapterResult.blocked_reason,
-          matched_policy: adapterResult.matched_policy,
+          blocked_reason: adapterResult.switch.blocked_reason,
+          matched_policy: adapterResult.switch.matched_policy,
           safety_snapshot: {
             before,
             after,
@@ -377,9 +383,11 @@ export async function runHermesChatInputDryRunBoundary(input: {
         request,
         safe_context: safeContext,
         mock_response: {
-          adapter: adapterResult.adapter.mode,
-          response_kind: "deterministic_mock_response",
-          content: adapterResult.adapter.output.content,
+          adapter: adapterResult.switch.adapter_result?.adapter ?? "hermes_llm_adapter_mock_boundary",
+          response_kind:
+            adapterResult.switch.adapter_result?.response_kind ??
+            "deterministic_mock_response",
+          content: adapterResult.switch.adapter_result?.content ?? "",
           would_call_llm: false,
           would_write_chat_history: false,
           would_create_proposal: false,
