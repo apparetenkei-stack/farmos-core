@@ -9,6 +9,14 @@ import {
   readProposalReviewApplyHistory,
   type ProposalReviewApplyHistoryRow,
 } from "../../../../scripts/app/api_boundary/proposal_review_apply_history_read_api_boundary";
+import {
+  checkProposalReviewApplyReadiness,
+  type ProposalReviewApplyReadinessResult,
+} from "../../../../scripts/app/api_boundary/proposal_review_apply_readiness_read_api_boundary";
+import {
+  previewProposalReviewApplyPlan,
+  type ProposalReviewApplyPlanPreviewResult,
+} from "../../../../scripts/app/api_boundary/proposal_review_apply_plan_preview_read_api_boundary";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -225,6 +233,219 @@ function ApplyHistoryTimeline(props: {
   );
 }
 
+function ApplyReadinessSection(props: {
+  model: ProposalReviewApplyReadinessResult;
+}) {
+  const model = props.model;
+
+  if (model.result === "bad_request") {
+    return (
+      <section>
+        <h2>Apply Readiness</h2>
+        <p>Read-only readiness check. No apply command is executed.</p>
+        <dl>
+          <dt>result</dt>
+          <dd>{model.result}</dd>
+          <dt>error</dt>
+          <dd>{model.error}</dd>
+        </dl>
+      </section>
+    );
+  }
+
+  if (model.result === "not_found") {
+    return (
+      <section>
+        <h2>Apply Readiness</h2>
+        <p>Read-only readiness check. No apply command is executed.</p>
+        <dl>
+          <dt>result</dt>
+          <dd>{model.result}</dd>
+          <dt>proposal_id</dt>
+          <dd><code>{model.proposal_id}</code></dd>
+        </dl>
+        {model.boundary ? (
+          <section>
+            <h3>Apply readiness read boundary</h3>
+            <JsonBlock value={model.boundary} />
+          </section>
+        ) : null}
+      </section>
+    );
+  }
+
+  if (model.result === "error") {
+    return (
+      <section>
+        <h2>Apply Readiness</h2>
+        <p>Read-only readiness check failed before any apply command was executed.</p>
+        <dl>
+          <dt>result</dt>
+          <dd>{model.result}</dd>
+          <dt>error</dt>
+          <dd>{model.error}</dd>
+        </dl>
+        {model.boundary ? (
+          <section>
+            <h3>Apply readiness partial boundary</h3>
+            <JsonBlock value={model.boundary} />
+          </section>
+        ) : null}
+      </section>
+    );
+  }
+
+  return (
+    <section>
+      <h2>Apply Readiness</h2>
+      <p>
+        Read-only readiness check for whether this proposal could be applied by
+        a separate command path. This section does not execute apply, dry-run,
+        approve, reject, update, or archive commands.
+      </p>
+
+      <dl>
+        <dt>readiness_result</dt>
+        <dd><code>{model.result}</code></dd>
+        <dt>proposal_id</dt>
+        <dd><code>{model.proposal.id}</code></dd>
+        <dt>proposal_status</dt>
+        <dd>{model.proposal.status}</dd>
+        <dt>proposal_type</dt>
+        <dd>{model.proposal.proposal_type}</dd>
+        <dt>ready</dt>
+        <dd><code>{formatBoolean(model.readiness.ready)}</code></dd>
+        <dt>blocked_reasons</dt>
+        <dd><JsonBlock value={model.readiness.blocked_reasons} /></dd>
+        <dt>latest_review_decision</dt>
+        <dd><JsonBlock value={model.latest_review_decision} /></dd>
+        <dt>future_apply_candidate</dt>
+        <dd><JsonBlock value={model.readiness.future_apply_candidate} /></dd>
+      </dl>
+
+      <section>
+        <h3>Readiness checks</h3>
+        <JsonBlock value={model.readiness.checks} />
+      </section>
+
+      <section>
+        <h3>Apply readiness read boundary</h3>
+        <JsonBlock value={model.boundary} />
+      </section>
+    </section>
+  );
+}
+
+function ApplyPlanPreviewSection(props: {
+  model: ProposalReviewApplyPlanPreviewResult;
+}) {
+  const model = props.model;
+
+  if (model.result === "bad_request") {
+    return (
+      <section>
+        <h2>Apply Plan Preview</h2>
+        <p>Preview-only plan read failed. No command was executed.</p>
+        <dl>
+          <dt>result</dt>
+          <dd>{model.result}</dd>
+          <dt>error</dt>
+          <dd>{model.error}</dd>
+        </dl>
+      </section>
+    );
+  }
+
+  if (model.result === "not_found") {
+    return (
+      <section>
+        <h2>Apply Plan Preview</h2>
+        <p>Preview-only plan read found no proposal. No command was executed.</p>
+        <dl>
+          <dt>result</dt>
+          <dd>{model.result}</dd>
+        </dl>
+        <section>
+          <h3>Apply plan preview read boundary</h3>
+          <JsonBlock value={model.boundary} />
+        </section>
+      </section>
+    );
+  }
+
+  if (model.result === "error") {
+    return (
+      <section>
+        <h2>Apply Plan Preview</h2>
+        <p>Preview-only plan read failed before any command was executed.</p>
+        <dl>
+          <dt>result</dt>
+          <dd>{model.result}</dd>
+          <dt>error</dt>
+          <dd>{model.error}</dd>
+        </dl>
+      </section>
+    );
+  }
+
+  return (
+    <section>
+      <h2>Apply Plan Preview</h2>
+      <p>
+        Preview-only plan for what a separate apply command would attempt. This
+        is future-looking and is separate from committed Apply History Events.
+        It does not write to app, ai, or audit tables.
+      </p>
+
+      <dl>
+        <dt>preview_result</dt>
+        <dd><code>{model.result}</code></dd>
+        <dt>readiness_result</dt>
+        <dd><code>{model.readiness.result}</code></dd>
+        <dt>readiness_ready</dt>
+        <dd><code>{formatBoolean(model.readiness.ready)}</code></dd>
+        <dt>readiness_blocked_reasons</dt>
+        <dd><JsonBlock value={model.readiness.blocked_reasons} /></dd>
+        <dt>operation</dt>
+        <dd><code>{model.preview.operation}</code></dd>
+        <dt>target_schema</dt>
+        <dd>{model.preview.target_schema ?? "-"}</dd>
+        <dt>target_table</dt>
+        <dd>{model.preview.target_table ?? "-"}</dd>
+        <dt>preview_only</dt>
+        <dd><code>{formatBoolean(model.preview.preview_only)}</code></dd>
+        <dt>blocked_reasons</dt>
+        <dd><JsonBlock value={model.preview.blocked_reasons} /></dd>
+      </dl>
+
+      <section>
+        <h3>Candidate</h3>
+        <JsonBlock value={model.preview.candidate} />
+      </section>
+
+      <section>
+        <h3>Matched existing rows</h3>
+        <JsonBlock value={model.preview.matched_existing_rows} />
+      </section>
+
+      <section>
+        <h3>Diff</h3>
+        <JsonBlock value={model.preview.diff} />
+      </section>
+
+      <section>
+        <h3>SQL preview flags</h3>
+        <JsonBlock value={model.preview.sql_preview} />
+      </section>
+
+      <section>
+        <h3>Apply plan preview read boundary</h3>
+        <JsonBlock value={model.boundary} />
+      </section>
+    </section>
+  );
+}
+
 export default async function ProposalDetailPage(props: ProposalDetailPageProps) {
   const { proposalId } = await props.params;
   const model = await showProposalInboxReadModel({ proposalId });
@@ -304,6 +525,12 @@ export default async function ProposalDetailPage(props: ProposalDetailPageProps)
   const applyHistoryModel = await readProposalReviewApplyHistory({
     proposalId: proposal.id,
     limit: 50,
+  });
+  const applyReadinessModel = await checkProposalReviewApplyReadiness({
+    proposalId: proposal.id,
+  });
+  const applyPlanPreviewModel = await previewProposalReviewApplyPlan({
+    proposalId: proposal.id,
   });
 
   return (
@@ -399,6 +626,9 @@ export default async function ProposalDetailPage(props: ProposalDetailPageProps)
         )}
       </section>
 
+      <ApplyReadinessSection model={applyReadinessModel} />
+
+      <ApplyPlanPreviewSection model={applyPlanPreviewModel} />
 
       <section>
         <h2>Apply History Events</h2>

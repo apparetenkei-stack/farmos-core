@@ -53,7 +53,9 @@
     "show-proposal-review-apply-history": "tsx scripts/app/show_proposal_review_apply_history.ts",
     "test-proposal-review-apply-history-read-api-boundary": "tsx scripts/app/test_proposal_review_apply_history_read_api_boundary.ts",
     "test-proposal-review-apply-history-readonly-ui-boundary": "tsx scripts/app/test_proposal_review_apply_history_readonly_ui_boundary.ts",
-    "check-proposal-review-apply-history-ui": "next build"
+    "check-proposal-review-apply-history-ui": "next build",
+    "test-proposal-review-apply-readiness-plan-preview-readonly-ui-boundary": "tsx scripts/app/test_proposal_review_apply_readiness_plan_preview_readonly_ui_boundary.ts",
+    "check-proposal-review-apply-readiness-plan-preview-ui": "next build"
   },
   "keywords": [],
   "author": "",
