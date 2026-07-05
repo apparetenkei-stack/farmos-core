@@ -63,7 +63,10 @@
     "test-hermes-proposal-writer-boundary": "tsx scripts/hermes/test_hermes_proposal_writer_boundary.ts",
     "check-hermes-proposal-writer-boundary": "pnpm run test-hermes-context-read-api-boundary && pnpm run test-hermes-proposal-writer-boundary && pnpm run build",
     "test-hermes-chat-readonly-ui-boundary": "tsx scripts/app/test_hermes_chat_readonly_ui_boundary.ts",
-    "check-hermes-chat-readonly-ui-boundary": "pnpm run test-hermes-context-read-api-boundary && pnpm run test-hermes-proposal-writer-boundary && pnpm run test-hermes-chat-readonly-ui-boundary && pnpm run build"
+    "check-hermes-chat-readonly-ui-boundary": "pnpm run test-hermes-context-read-api-boundary && pnpm run test-hermes-proposal-writer-boundary && pnpm run test-hermes-chat-readonly-ui-boundary && pnpm run build",
+    "show-hermes-memory-context": "tsx scripts/hermes/show_hermes_memory_context.ts",
+    "test-hermes-memory-context-read-boundary": "tsx scripts/hermes/test_hermes_memory_context_read_boundary.ts",
+    "check-hermes-memory-context-read-boundary": "pnpm run test-hermes-context-read-api-boundary && pnpm run test-hermes-chat-readonly-ui-boundary && pnpm run test-hermes-memory-context-read-boundary && pnpm run build"
   },
   "keywords": [],
   "author": "",
