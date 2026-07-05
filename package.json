@@ -45,7 +45,9 @@
     "test-proposal-review-status-transition-command-boundary": "tsx scripts/app/test_proposal_review_status_transition_command_boundary.ts",
     "transition-proposal-review-status-command": "tsx scripts/app/transition_proposal_review_status_command.ts",
     "test-proposal-review-apply-readiness-read-api-boundary": "tsx scripts/app/test_proposal_review_apply_readiness_read_api_boundary.ts",
-    "check-proposal-review-apply-readiness": "tsx scripts/app/check_proposal_review_apply_readiness.ts"
+    "check-proposal-review-apply-readiness": "tsx scripts/app/check_proposal_review_apply_readiness.ts",
+    "test-proposal-review-apply-plan-preview-read-api-boundary": "tsx scripts/app/test_proposal_review_apply_plan_preview_read_api_boundary.ts",
+    "preview-proposal-review-apply-plan": "tsx scripts/app/preview_proposal_review_apply_plan.ts"
   },
   "keywords": [],
   "author": "",
