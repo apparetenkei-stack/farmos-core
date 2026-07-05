@@ -43,7 +43,9 @@
     "test-proposal-review-decision-audit-append-command-boundary": "tsx scripts/app/test_proposal_review_decision_audit_append_command_boundary.ts",
     "append-proposal-review-decision-event-command": "tsx scripts/app/append_proposal_review_decision_event_command.ts",
     "test-proposal-review-status-transition-command-boundary": "tsx scripts/app/test_proposal_review_status_transition_command_boundary.ts",
-    "transition-proposal-review-status-command": "tsx scripts/app/transition_proposal_review_status_command.ts"
+    "transition-proposal-review-status-command": "tsx scripts/app/transition_proposal_review_status_command.ts",
+    "test-proposal-review-apply-readiness-read-api-boundary": "tsx scripts/app/test_proposal_review_apply_readiness_read_api_boundary.ts",
+    "check-proposal-review-apply-readiness": "tsx scripts/app/check_proposal_review_apply_readiness.ts"
   },
   "keywords": [],
   "author": "",
