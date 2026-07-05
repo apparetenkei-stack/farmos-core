@@ -61,7 +61,9 @@
     "check-hermes-context-read-boundary": "next build",
     "create-hermes-proposal": "tsx scripts/hermes/create_hermes_proposal.ts",
     "test-hermes-proposal-writer-boundary": "tsx scripts/hermes/test_hermes_proposal_writer_boundary.ts",
-    "check-hermes-proposal-writer-boundary": "pnpm run test-hermes-context-read-api-boundary && pnpm run test-hermes-proposal-writer-boundary && pnpm run build"
+    "check-hermes-proposal-writer-boundary": "pnpm run test-hermes-context-read-api-boundary && pnpm run test-hermes-proposal-writer-boundary && pnpm run build",
+    "test-hermes-chat-readonly-ui-boundary": "tsx scripts/app/test_hermes_chat_readonly_ui_boundary.ts",
+    "check-hermes-chat-readonly-ui-boundary": "pnpm run test-hermes-context-read-api-boundary && pnpm run test-hermes-proposal-writer-boundary && pnpm run test-hermes-chat-readonly-ui-boundary && pnpm run build"
   },
   "keywords": [],
   "author": "",
