@@ -3,6 +3,7 @@ import { Client, type ClientConfig } from "pg";
 export const supportedProposalReviewApplyReadinessProposalTypes = [
   "day32_apply_readiness_test",
   "day33_apply_plan_preview_test",
+  "day34_apply_command_test",
   "day31_status_transition_test",
 ] as const;
 

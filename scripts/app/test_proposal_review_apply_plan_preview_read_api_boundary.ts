@@ -95,7 +95,7 @@ function runAdminSql(sql: string): void {
       "-v",
       "ON_ERROR_STOP=1",
       "-U",
-      process.env.FARMOS_DB_USER ?? "farmos_local_admin",
+      "farmos_local_admin",
       "-d",
       process.env.FARMOS_DB_NAME ?? "farmos_core_local",
       "-c",

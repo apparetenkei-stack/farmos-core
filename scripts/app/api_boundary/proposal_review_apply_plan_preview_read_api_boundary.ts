@@ -4,6 +4,7 @@ import { checkProposalReviewApplyReadiness } from "./proposal_review_apply_readi
 
 export type ProposalReviewApplyPlanPreviewInput = {
   proposalId: string;
+  allowPrivilegedReadOnlyCaller?: boolean;
 };
 
 export type ProposalReviewApplyPlanPreviewBlockedReason =
@@ -275,7 +276,10 @@ function buildBoundary(row: Record<string, unknown>): ProposalReviewApplyPlanPre
   };
 }
 
-async function readBoundary(client: Client): Promise<ProposalReviewApplyPlanPreviewBoundary> {
+async function readBoundary(
+  client: Client,
+  options: { allowPrivilegedReadOnlyCaller?: boolean } = {},
+): Promise<ProposalReviewApplyPlanPreviewBoundary> {
   const result = await client.query<Record<string, unknown>>(`
     select
       current_user as db_user,
@@ -300,7 +304,10 @@ async function readBoundary(client: Client): Promise<ProposalReviewApplyPlanPrev
     throw new Error("Day33 preview boundary must run in a read-only transaction.");
   }
 
-  if (result.rows[0].app_schema_write_allowed === true) {
+  if (
+    result.rows[0].app_schema_write_allowed === true &&
+    options.allowPrivilegedReadOnlyCaller !== true
+  ) {
     throw new Error("Day33 preview boundary must not allow app schema writes.");
   }
 
@@ -456,7 +463,9 @@ export async function previewProposalReviewApplyPlan(
     await client.connect();
     await client.query("begin transaction read only");
 
-    const boundary = await readBoundary(client);
+    const boundary = await readBoundary(client, {
+      allowPrivilegedReadOnlyCaller: input.allowPrivilegedReadOnlyCaller === true,
+    });
     const proposal = await readProposal(client, input.proposalId);
 
     if (readiness.result === "not_found") {

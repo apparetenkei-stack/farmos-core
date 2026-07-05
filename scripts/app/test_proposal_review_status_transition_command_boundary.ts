@@ -75,7 +75,7 @@ async function withClient<T>(fn: (client: Client) => Promise<T>): Promise<T> {
 }
 
 function runAdminSql(sql: string): void {
-  const adminUser = process.env.FARMOS_DB_USER ?? "farmos_local_admin";
+  const adminUser = "farmos_local_admin";
   const dbName =
     process.env.PGDATABASE ??
     process.env.FARMOS_DB_NAME ??
