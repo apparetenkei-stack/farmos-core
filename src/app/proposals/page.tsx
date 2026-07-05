@@ -117,6 +117,11 @@ export default async function ProposalsPage() {
         read-only UI foundation. No approve, reject, apply, archive, edit, or
         mutation controls.
       </p>
+      <p>
+        <Link href="/proposals/apply-history">
+          View committed apply history
+        </Link>
+      </p>
 
       <section>
         <h2>Summary</h2>

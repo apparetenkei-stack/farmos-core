@@ -5,6 +5,10 @@ import {
   listProposalReviewDecisionEventsReadModel,
   type ProposalReviewDecisionEventReadModel,
 } from "../../../../scripts/app/api_boundary/proposal_review_decision_read_api_boundary";
+import {
+  readProposalReviewApplyHistory,
+  type ProposalReviewApplyHistoryRow,
+} from "../../../../scripts/app/api_boundary/proposal_review_apply_history_read_api_boundary";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -121,6 +125,106 @@ function ReviewDecisionTimeline(props: {
   );
 }
 
+
+function formatBoolean(value: boolean): string {
+  return value ? "true" : "false";
+}
+
+function applyOperationLabel(
+  operation: ProposalReviewApplyHistoryRow["applyOperation"],
+): string {
+  switch (operation) {
+    case "insert_candidate":
+      return "Inserted app projection";
+    case "no_op_candidate":
+      return "No-op apply marker update";
+    default:
+      return "Unknown apply operation";
+  }
+}
+
+function ApplyHistoryEventDetail(props: {
+  event: ProposalReviewApplyHistoryRow;
+}) {
+  const event = props.event;
+
+  return (
+    <dl>
+      <dt>event_id</dt>
+      <dd><code>{event.id}</code></dd>
+      <dt>proposal_id</dt>
+      <dd><code>{event.proposalId}</code></dd>
+      <dt>proposal_status</dt>
+      <dd>{event.proposalStatus ?? "-"}</dd>
+      <dt>proposal_title</dt>
+      <dd>{event.proposalTitle ?? "-"}</dd>
+      <dt>apply_operation</dt>
+      <dd>
+        <strong>{applyOperationLabel(event.applyOperation)}</strong>
+        <br />
+        <code>{event.applyOperation}</code>
+      </dd>
+      <dt>result</dt>
+      <dd>{event.result}</dd>
+      <dt>committed</dt>
+      <dd><code>{formatBoolean(event.committed)}</code></dd>
+      <dt>dry_run</dt>
+      <dd><code>{formatBoolean(event.dryRun)}</code></dd>
+      <dt>app_projection_apply_performed</dt>
+      <dd><code>{formatBoolean(event.appProjectionApplyPerformed)}</code></dd>
+      <dt>ai_proposal_apply_marker_updated</dt>
+      <dd><code>{formatBoolean(event.aiProposalApplyMarkerUpdated)}</code></dd>
+      <dt>inserted_crop_cycle_id</dt>
+      <dd>
+        {event.insertedCropCycleId === null ? (
+          "-"
+        ) : (
+          <Link href={`/crop-cycles/${event.insertedCropCycleId}`}>
+            <code>{event.insertedCropCycleId}</code>
+          </Link>
+        )}
+      </dd>
+      <dt>applied_by</dt>
+      <dd>{event.appliedBy}</dd>
+      <dt>applied_by_role</dt>
+      <dd>{event.appliedByRole}</dd>
+      <dt>apply_source</dt>
+      <dd>{event.applySource}</dd>
+      <dt>created_at</dt>
+      <dd>{event.createdAt}</dd>
+      <dt>event_metadata</dt>
+      <dd><JsonBlock value={event.eventMetadata} /></dd>
+    </dl>
+  );
+}
+
+function ApplyHistoryTimeline(props: {
+  history: ProposalReviewApplyHistoryRow[];
+}) {
+  if (props.history.length === 0) {
+    return <p>No committed apply history.</p>;
+  }
+
+  return (
+    <ol>
+      {props.history.map((event, index) => (
+        <li key={event.id}>
+          <article>
+            <h4>
+              #{index + 1} {applyOperationLabel(event.applyOperation)} /{" "}
+              <code>{event.applyOperation}</code>
+            </h4>
+            <p>
+              created_at: <code>{event.createdAt}</code>
+            </p>
+            <ApplyHistoryEventDetail event={event} />
+          </article>
+        </li>
+      ))}
+    </ol>
+  );
+}
+
 export default async function ProposalDetailPage(props: ProposalDetailPageProps) {
   const { proposalId } = await props.params;
   const model = await showProposalInboxReadModel({ proposalId });
@@ -196,6 +300,10 @@ export default async function ProposalDetailPage(props: ProposalDetailPageProps)
   const proposal = model.proposal;
   const reviewModel = await listProposalReviewDecisionEventsReadModel({
     proposalId: proposal.id,
+  });
+  const applyHistoryModel = await readProposalReviewApplyHistory({
+    proposalId: proposal.id,
+    limit: 50,
   });
 
   return (
@@ -286,6 +394,41 @@ export default async function ProposalDetailPage(props: ProposalDetailPageProps)
               <dd>{reviewModel.result}</dd>
               <dt>reason</dt>
               <dd>{reviewModel.reason}</dd>
+            </dl>
+          </section>
+        )}
+      </section>
+
+
+      <section>
+        <h2>Apply History Events</h2>
+        <p>
+          Apply history is read-only observability for committed apply events.
+          Dry-run previews are not persisted here. No apply controls are exposed
+          from this page.
+        </p>
+
+        {applyHistoryModel.result === "ok" ? (
+          <>
+            <section>
+              <h3>Committed apply timeline</h3>
+              <p>Newest events are shown first.</p>
+              <ApplyHistoryTimeline history={applyHistoryModel.history} />
+            </section>
+
+            <section>
+              <h3>Apply history read boundary</h3>
+              <JsonBlock value={applyHistoryModel.boundary} />
+            </section>
+          </>
+        ) : (
+          <section>
+            <h3>Apply history boundary error</h3>
+            <dl>
+              <dt>result</dt>
+              <dd>{applyHistoryModel.result}</dd>
+              <dt>error</dt>
+              <dd>{applyHistoryModel.error}</dd>
             </dl>
           </section>
         )}

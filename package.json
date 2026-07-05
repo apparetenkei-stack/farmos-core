@@ -51,7 +51,9 @@
     "test-proposal-review-apply-command-boundary": "tsx scripts/app/test_proposal_review_apply_command_boundary.ts",
     "apply-proposal-review-apply-plan-command": "tsx scripts/app/apply_proposal_review_apply_plan_command.ts",
     "show-proposal-review-apply-history": "tsx scripts/app/show_proposal_review_apply_history.ts",
-    "test-proposal-review-apply-history-read-api-boundary": "tsx scripts/app/test_proposal_review_apply_history_read_api_boundary.ts"
+    "test-proposal-review-apply-history-read-api-boundary": "tsx scripts/app/test_proposal_review_apply_history_read_api_boundary.ts",
+    "test-proposal-review-apply-history-readonly-ui-boundary": "tsx scripts/app/test_proposal_review_apply_history_readonly_ui_boundary.ts",
+    "check-proposal-review-apply-history-ui": "next build"
   },
   "keywords": [],
   "author": "",
