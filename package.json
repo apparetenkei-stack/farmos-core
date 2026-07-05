@@ -66,7 +66,12 @@
     "check-hermes-chat-readonly-ui-boundary": "pnpm run test-hermes-context-read-api-boundary && pnpm run test-hermes-proposal-writer-boundary && pnpm run test-hermes-chat-readonly-ui-boundary && pnpm run build",
     "show-hermes-memory-context": "tsx scripts/hermes/show_hermes_memory_context.ts",
     "test-hermes-memory-context-read-boundary": "tsx scripts/hermes/test_hermes_memory_context_read_boundary.ts",
-    "check-hermes-memory-context-read-boundary": "pnpm run test-hermes-context-read-api-boundary && pnpm run test-hermes-chat-readonly-ui-boundary && pnpm run test-hermes-memory-context-read-boundary && pnpm run build"
+    "check-hermes-memory-context-read-boundary": "pnpm run test-hermes-context-read-api-boundary && pnpm run test-hermes-chat-readonly-ui-boundary && pnpm run test-hermes-memory-context-read-boundary && pnpm run build",
+    "show-hermes-proposal-review-loop": "tsx scripts/hermes/show_hermes_proposal_review_loop.ts",
+    "review-hermes-proposal-loop-command": "tsx scripts/hermes/review_hermes_proposal_loop_command.ts",
+    "test-hermes-proposal-review-loop-read-boundary": "tsx scripts/hermes/test_hermes_proposal_review_loop_read_boundary.ts",
+    "test-hermes-proposal-review-loop-command-boundary": "tsx scripts/hermes/test_hermes_proposal_review_loop_command_boundary.ts",
+    "check-hermes-proposal-review-loop-boundary": "pnpm run test-hermes-context-read-api-boundary && pnpm run test-hermes-chat-readonly-ui-boundary && pnpm run test-hermes-memory-context-read-boundary && pnpm run test-hermes-proposal-review-loop-read-boundary && pnpm run test-hermes-proposal-review-loop-command-boundary && pnpm run build"
   },
   "keywords": [],
   "author": "",
