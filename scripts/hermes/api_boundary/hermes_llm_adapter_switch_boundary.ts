@@ -5,6 +5,10 @@ import {
   runHermesLlmAdapterMockBoundary,
   type HermesChatIntent,
 } from "./hermes_llm_adapter_mock_boundary";
+import {
+  runHermesLocalLlmRuntimeHealthCheckBoundary,
+  type HermesLocalLlmRuntimeHealthCheckStatus,
+} from "./hermes_local_llm_runtime_health_check_boundary";
 
 export type HermesLlmProvider =
   | "mock"
@@ -43,10 +47,14 @@ type HermesLlmAdapterSwitchBoundary = {
   llm_runtime_executed: false;
   external_api_called: false;
   local_model_called: false;
+  local_runtime_health_http_called: false;
+  prompt_sent_to_model: false;
   embeddings_executed: false;
   vector_search_executed: false;
   restricted_domain_data_exposed: false;
+  endpoint_value_exposed: false;
   credentials_exposed: false;
+  tokens_used: 0;
 };
 
 type HermesLlmAdapterSwitchAdapterResult = {
@@ -76,6 +84,7 @@ export type HermesLlmAdapterSwitchResult = {
       external_llm_disabled: ProviderCapability;
     };
     adapter_result?: HermesLlmAdapterSwitchAdapterResult;
+    health_check_status?: HermesLocalLlmRuntimeHealthCheckStatus;
     blocked_reason?: string;
     matched_policy?: string;
   };
@@ -112,10 +121,14 @@ const boundary: HermesLlmAdapterSwitchBoundary = {
   llm_runtime_executed: false,
   external_api_called: false,
   local_model_called: false,
+  local_runtime_health_http_called: false,
+  prompt_sent_to_model: false,
   embeddings_executed: false,
   vector_search_executed: false,
   restricted_domain_data_exposed: false,
+  endpoint_value_exposed: false,
   credentials_exposed: false,
+  tokens_used: 0,
 };
 
 function makeBaseSwitch(input: {
@@ -167,8 +180,8 @@ function normalizeRequestedProvider(provider: unknown): {
       requestedProvider:
         raw === "local_llm" ? "local_llm" : "local_llm_disabled",
       normalizedProvider: "local_llm_disabled",
-      blockedReason: "local_llm_provider_disabled_by_day44_boundary",
-      matchedPolicy: "local_llm_runtime_disabled",
+      blockedReason: "local_llm_provider_disabled_by_day45_health_check_boundary",
+      matchedPolicy: "local_llm_runtime_health_check_dry_run_only",
     };
   }
 
@@ -205,6 +218,24 @@ export async function runHermesLlmAdapterSwitchBoundary(
         ...baseSwitch,
         blocked_reason: "day44_adapter_switch_requires_dry_run",
         matched_policy: "non_dry_run_request",
+      },
+      boundary,
+    };
+  }
+
+  if (provider.normalizedProvider === "local_llm_disabled") {
+    const healthCheck = runHermesLocalLlmRuntimeHealthCheckBoundary({
+      provider: provider.requestedProvider,
+      dryRun: true,
+    });
+
+    return {
+      result: "blocked",
+      switch: {
+        ...baseSwitch,
+        health_check_status: healthCheck.health_check,
+        blocked_reason: provider.blockedReason,
+        matched_policy: provider.matchedPolicy,
       },
       boundary,
     };
