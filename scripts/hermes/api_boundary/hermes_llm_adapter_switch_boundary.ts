@@ -9,6 +9,10 @@ import {
   runHermesLocalLlmRuntimeHealthCheckBoundary,
   type HermesLocalLlmRuntimeHealthCheckStatus,
 } from "./hermes_local_llm_runtime_health_check_boundary";
+import {
+  runHermesLocalLlmRuntimeHealthProbeBoundary,
+  type HermesLocalLlmRuntimeHealthProbeStatus,
+} from "./hermes_local_llm_runtime_health_probe_boundary";
 
 export type HermesLlmProvider =
   | "mock"
@@ -19,6 +23,7 @@ type HermesRequestedProvider =
   | HermesLlmProvider
   | "local_llm"
   | "external_llm"
+  | "local_llm_probe"
   | "unknown";
 
 type ProviderCapability = {
@@ -85,6 +90,7 @@ export type HermesLlmAdapterSwitchResult = {
     };
     adapter_result?: HermesLlmAdapterSwitchAdapterResult;
     health_check_status?: HermesLocalLlmRuntimeHealthCheckStatus;
+    health_probe_status?: HermesLocalLlmRuntimeHealthProbeStatus;
     blocked_reason?: string;
     matched_policy?: string;
   };
@@ -175,6 +181,15 @@ function normalizeRequestedProvider(provider: unknown): {
     };
   }
 
+  if (raw === "local_llm_probe") {
+    return {
+      requestedProvider: "local_llm_probe",
+      normalizedProvider: "local_llm_disabled",
+      blockedReason: "local_llm_provider_disabled_by_day46_probe_boundary",
+      matchedPolicy: "local_llm_runtime_health_probe_only",
+    };
+  }
+
   if (raw === "local_llm" || raw === "local_llm_disabled") {
     return {
       requestedProvider:
@@ -229,11 +244,18 @@ export async function runHermesLlmAdapterSwitchBoundary(
       dryRun: true,
     });
 
+    const healthProbe = await runHermesLocalLlmRuntimeHealthProbeBoundary({
+      provider: "local_llm_probe",
+      dryRun: true,
+      probe: false,
+    });
+
     return {
       result: "blocked",
       switch: {
         ...baseSwitch,
         health_check_status: healthCheck.health_check,
+        health_probe_status: healthProbe.health_probe,
         blocked_reason: provider.blockedReason,
         matched_policy: provider.matchedPolicy,
       },

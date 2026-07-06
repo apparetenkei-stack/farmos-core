@@ -83,7 +83,11 @@
     "run-hermes-local-llm-runtime-health-check-dry-run": "tsx scripts/hermes/run_hermes_local_llm_runtime_health_check_dry_run.ts",
     "test-hermes-local-llm-runtime-health-check-boundary": "tsx scripts/hermes/test_hermes_local_llm_runtime_health_check_boundary.ts",
     "test-hermes-llm-adapter-switch-local-health-integration": "tsx scripts/hermes/test_hermes_llm_adapter_switch_local_health_integration.ts",
-    "check-hermes-local-llm-runtime-health-check-boundary": "pnpm run check-hermes-llm-adapter-switch-boundary && pnpm run test-hermes-local-llm-runtime-health-check-boundary && pnpm run test-hermes-llm-adapter-switch-local-health-integration && pnpm run build"
+    "check-hermes-local-llm-runtime-health-check-boundary": "pnpm run check-hermes-llm-adapter-switch-boundary && pnpm run test-hermes-local-llm-runtime-health-check-boundary && pnpm run test-hermes-llm-adapter-switch-local-health-integration && pnpm run build",
+    "run-hermes-local-llm-runtime-health-probe": "tsx scripts/hermes/run_hermes_local_llm_runtime_health_probe.ts",
+    "test-hermes-local-llm-runtime-health-probe-boundary": "tsx scripts/hermes/test_hermes_local_llm_runtime_health_probe_boundary.ts",
+    "test-hermes-llm-adapter-switch-local-probe-integration": "tsx scripts/hermes/test_hermes_llm_adapter_switch_local_probe_integration.ts",
+    "check-hermes-local-llm-runtime-health-probe-boundary": "pnpm run check-hermes-local-llm-runtime-health-check-boundary && pnpm run test-hermes-local-llm-runtime-health-probe-boundary && pnpm run test-hermes-llm-adapter-switch-local-probe-integration && pnpm run build"
   },
   "keywords": [],
   "author": "",
