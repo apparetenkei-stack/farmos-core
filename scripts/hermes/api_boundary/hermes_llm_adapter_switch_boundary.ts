@@ -17,6 +17,10 @@ import {
   runHermesLocalLlmPromptSmokeTestBoundary,
   type HermesLocalLlmPromptSmokeStatus,
 } from "./hermes_local_llm_prompt_smoke_test_boundary";
+import {
+  runHermesLocalLlmBusinessPromptDryRunContractBoundary,
+  type HermesLocalLlmBusinessPromptContractStatus,
+} from "./hermes_local_llm_business_prompt_dry_run_contract_boundary";
 
 export type HermesLlmProvider =
   | "mock"
@@ -29,6 +33,7 @@ type HermesRequestedProvider =
   | "external_llm"
   | "local_llm_probe"
   | "local_llm_prompt_smoke"
+  | "local_llm_business_prompt_contract"
   | "unknown";
 
 type ProviderCapability = {
@@ -60,15 +65,18 @@ type HermesLlmAdapterSwitchBoundary = {
   local_runtime_health_http_called: false;
   local_runtime_generate_http_called: false;
   prompt_sent_to_model: false;
+  request_body_created: false;
   request_body_sent: false;
   response_body_exposed: false;
   embeddings_executed: false;
   vector_search_executed: false;
   restricted_domain_data_exposed: false;
   endpoint_value_exposed: false;
+  model_value_exposed: false;
   credentials_exposed: false;
   user_prompt_sent_to_model: false;
   business_context_sent_to_model: false;
+  business_prompt_sent_to_model: false;
   fixed_smoke_prompt_sent_to_model: false;
   tokens_used: 0;
 };
@@ -103,6 +111,7 @@ export type HermesLlmAdapterSwitchResult = {
     health_check_status?: HermesLocalLlmRuntimeHealthCheckStatus;
     health_probe_status?: HermesLocalLlmRuntimeHealthProbeStatus;
     prompt_smoke_status?: HermesLocalLlmPromptSmokeStatus;
+    business_prompt_contract_status?: HermesLocalLlmBusinessPromptContractStatus;
     blocked_reason?: string;
     matched_policy?: string;
   };
@@ -142,15 +151,18 @@ const boundary: HermesLlmAdapterSwitchBoundary = {
   local_runtime_health_http_called: false,
   local_runtime_generate_http_called: false,
   prompt_sent_to_model: false,
+  request_body_created: false,
   request_body_sent: false,
   response_body_exposed: false,
   embeddings_executed: false,
   vector_search_executed: false,
   restricted_domain_data_exposed: false,
   endpoint_value_exposed: false,
+  model_value_exposed: false,
   credentials_exposed: false,
   user_prompt_sent_to_model: false,
   business_context_sent_to_model: false,
+  business_prompt_sent_to_model: false,
   fixed_smoke_prompt_sent_to_model: false,
   tokens_used: 0,
 };
@@ -196,6 +208,16 @@ function normalizeRequestedProvider(provider: unknown): {
     return {
       requestedProvider: "mock",
       normalizedProvider: "mock",
+    };
+  }
+
+  if (raw === "local_llm_business_prompt_contract") {
+    return {
+      requestedProvider: "local_llm_business_prompt_contract",
+      normalizedProvider: "local_llm_disabled",
+      blockedReason:
+        "local_llm_provider_disabled_by_day48_business_prompt_contract_boundary",
+      matchedPolicy: "local_llm_business_prompt_dry_run_contract_only",
     };
   }
 
@@ -283,6 +305,12 @@ export async function runHermesLlmAdapterSwitchBoundary(
       smoke: false,
     });
 
+    const businessPromptContract =
+      runHermesLocalLlmBusinessPromptDryRunContractBoundary({
+        provider: "local_llm_business_prompt_contract",
+        dryRun: true,
+      });
+
     return {
       result: "blocked",
       switch: {
@@ -290,6 +318,8 @@ export async function runHermesLlmAdapterSwitchBoundary(
         health_check_status: healthCheck.health_check,
         health_probe_status: healthProbe.health_probe,
         prompt_smoke_status: promptSmoke.prompt_smoke,
+        business_prompt_contract_status:
+          businessPromptContract.business_prompt_contract,
         blocked_reason: provider.blockedReason,
         matched_policy: provider.matchedPolicy,
       },

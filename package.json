@@ -91,7 +91,11 @@
     "run-hermes-local-llm-prompt-smoke-test": "tsx scripts/hermes/run_hermes_local_llm_prompt_smoke_test.ts",
     "test-hermes-local-llm-prompt-smoke-test-boundary": "tsx scripts/hermes/test_hermes_local_llm_prompt_smoke_test_boundary.ts",
     "test-hermes-llm-adapter-switch-local-prompt-smoke-integration": "tsx scripts/hermes/test_hermes_llm_adapter_switch_local_prompt_smoke_integration.ts",
-    "check-hermes-local-llm-prompt-smoke-test-boundary": "pnpm run check-hermes-local-llm-runtime-health-probe-boundary && pnpm run test-hermes-local-llm-prompt-smoke-test-boundary && pnpm run test-hermes-llm-adapter-switch-local-prompt-smoke-integration && pnpm run build"
+    "check-hermes-local-llm-prompt-smoke-test-boundary": "pnpm run check-hermes-local-llm-runtime-health-probe-boundary && pnpm run test-hermes-local-llm-prompt-smoke-test-boundary && pnpm run test-hermes-llm-adapter-switch-local-prompt-smoke-integration && pnpm run build",
+    "run-hermes-local-llm-business-prompt-dry-run-contract": "tsx scripts/hermes/run_hermes_local_llm_business_prompt_dry_run_contract.ts",
+    "test-hermes-local-llm-business-prompt-dry-run-contract-boundary": "tsx scripts/hermes/test_hermes_local_llm_business_prompt_dry_run_contract_boundary.ts",
+    "test-hermes-llm-adapter-switch-local-business-prompt-contract-integration": "tsx scripts/hermes/test_hermes_llm_adapter_switch_local_business_prompt_contract_integration.ts",
+    "check-hermes-local-llm-business-prompt-dry-run-contract-boundary": "pnpm run check-hermes-local-llm-prompt-smoke-test-boundary && pnpm run test-hermes-local-llm-business-prompt-dry-run-contract-boundary && pnpm run test-hermes-llm-adapter-switch-local-business-prompt-contract-integration && pnpm run build"
   },
   "keywords": [],
   "author": "",
