@@ -25,6 +25,10 @@ import {
   runHermesLocalLlmBusinessPromptSmokeTestBoundary,
   type HermesLocalLlmBusinessPromptSmokeStatus,
 } from "./hermes_local_llm_business_prompt_smoke_test_boundary";
+import {
+  runHermesBusinessPromptPolicyGateRedactionBoundary,
+  type HermesBusinessPromptPolicyGateStatus,
+} from "./hermes_business_prompt_policy_gate_redaction_boundary";
 
 export type HermesLlmProvider =
   | "mock"
@@ -39,6 +43,8 @@ type HermesRequestedProvider =
   | "local_llm_prompt_smoke"
   | "local_llm_business_prompt_contract"
   | "local_llm_business_prompt_smoke"
+  | "business_prompt_policy_gate"
+  | "local_llm_business_prompt_policy_gate"
   | "unknown";
 
 type ProviderCapability = {
@@ -119,6 +125,7 @@ export type HermesLlmAdapterSwitchResult = {
     prompt_smoke_status?: HermesLocalLlmPromptSmokeStatus;
     business_prompt_contract_status?: HermesLocalLlmBusinessPromptContractStatus;
     business_prompt_smoke_status?: HermesLocalLlmBusinessPromptSmokeStatus;
+    business_prompt_policy_gate_status?: HermesBusinessPromptPolicyGateStatus;
     blocked_reason?: string;
     matched_policy?: string;
   };
@@ -216,6 +223,22 @@ function normalizeRequestedProvider(provider: unknown): {
     return {
       requestedProvider: "mock",
       normalizedProvider: "mock",
+    };
+  }
+
+  if (
+    raw === "business_prompt_policy_gate" ||
+    raw === "local_llm_business_prompt_policy_gate"
+  ) {
+    return {
+      requestedProvider:
+        raw === "business_prompt_policy_gate"
+          ? "business_prompt_policy_gate"
+          : "local_llm_business_prompt_policy_gate",
+      normalizedProvider: "local_llm_disabled",
+      blockedReason:
+        "local_llm_provider_disabled_by_day50_business_prompt_policy_gate_boundary",
+      matchedPolicy: "business_prompt_policy_gate_dry_run_only",
     };
   }
 
@@ -336,6 +359,13 @@ export async function runHermesLlmAdapterSwitchBoundary(
         smoke: false,
       });
 
+    const businessPromptPolicyGate =
+      await runHermesBusinessPromptPolicyGateRedactionBoundary({
+        provider: "business_prompt_policy_gate",
+        dryRun: true,
+        sample: typeof input.userMessage === "string" ? input.userMessage : undefined,
+      });
+
     return {
       result: "blocked",
       switch: {
@@ -347,6 +377,8 @@ export async function runHermesLlmAdapterSwitchBoundary(
           businessPromptContract.business_prompt_contract,
         business_prompt_smoke_status:
           businessPromptSmoke.business_prompt_smoke,
+        business_prompt_policy_gate_status:
+          businessPromptPolicyGate.business_prompt_policy_gate,
         blocked_reason: provider.blockedReason,
         matched_policy: provider.matchedPolicy,
       },
