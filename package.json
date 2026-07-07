@@ -103,7 +103,11 @@
     "run-hermes-business-prompt-policy-gate-redaction-dry-run": "tsx scripts/hermes/run_hermes_business_prompt_policy_gate_redaction_dry_run.ts",
     "test-hermes-business-prompt-policy-gate-redaction-boundary": "tsx scripts/hermes/test_hermes_business_prompt_policy_gate_redaction_boundary.ts",
     "test-hermes-llm-adapter-switch-business-prompt-policy-gate-integration": "tsx scripts/hermes/test_hermes_llm_adapter_switch_business_prompt_policy_gate_integration.ts",
-    "check-hermes-business-prompt-policy-gate-redaction-boundary": "pnpm run check-hermes-local-llm-business-prompt-smoke-test-boundary && pnpm run test-hermes-business-prompt-policy-gate-redaction-boundary && pnpm run test-hermes-llm-adapter-switch-business-prompt-policy-gate-integration && pnpm run build"
+    "check-hermes-business-prompt-policy-gate-redaction-boundary": "pnpm run check-hermes-local-llm-business-prompt-smoke-test-boundary && pnpm run test-hermes-business-prompt-policy-gate-redaction-boundary && pnpm run test-hermes-llm-adapter-switch-business-prompt-policy-gate-integration && pnpm run build",
+    "run-hermes-business-prompt-payload-schema-dry-run": "tsx scripts/hermes/run_hermes_business_prompt_payload_schema_dry_run.ts",
+    "test-hermes-business-prompt-payload-schema-boundary": "tsx scripts/hermes/test_hermes_business_prompt_payload_schema_boundary.ts",
+    "test-hermes-llm-adapter-switch-business-prompt-payload-schema-integration": "tsx scripts/hermes/test_hermes_llm_adapter_switch_business_prompt_payload_schema_integration.ts",
+    "check-hermes-business-prompt-payload-schema-boundary": "pnpm run check-hermes-business-prompt-policy-gate-redaction-boundary && pnpm run test-hermes-business-prompt-payload-schema-boundary && pnpm run test-hermes-llm-adapter-switch-business-prompt-payload-schema-integration && pnpm run build"
   },
   "keywords": [],
   "author": "",

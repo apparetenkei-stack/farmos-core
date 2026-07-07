@@ -29,6 +29,10 @@ import {
   runHermesBusinessPromptPolicyGateRedactionBoundary,
   type HermesBusinessPromptPolicyGateStatus,
 } from "./hermes_business_prompt_policy_gate_redaction_boundary";
+import {
+  runHermesBusinessPromptPayloadSchemaBoundary,
+  type HermesBusinessPromptPayloadSchemaStatus,
+} from "./hermes_business_prompt_payload_schema_boundary";
 
 export type HermesLlmProvider =
   | "mock"
@@ -45,6 +49,8 @@ type HermesRequestedProvider =
   | "local_llm_business_prompt_smoke"
   | "business_prompt_policy_gate"
   | "local_llm_business_prompt_policy_gate"
+  | "business_prompt_payload_schema"
+  | "local_llm_business_prompt_payload_schema"
   | "unknown";
 
 type ProviderCapability = {
@@ -126,6 +132,7 @@ export type HermesLlmAdapterSwitchResult = {
     business_prompt_contract_status?: HermesLocalLlmBusinessPromptContractStatus;
     business_prompt_smoke_status?: HermesLocalLlmBusinessPromptSmokeStatus;
     business_prompt_policy_gate_status?: HermesBusinessPromptPolicyGateStatus;
+    business_prompt_payload_schema_status?: HermesBusinessPromptPayloadSchemaStatus;
     blocked_reason?: string;
     matched_policy?: string;
   };
@@ -223,6 +230,22 @@ function normalizeRequestedProvider(provider: unknown): {
     return {
       requestedProvider: "mock",
       normalizedProvider: "mock",
+    };
+  }
+
+  if (
+    raw === "business_prompt_payload_schema" ||
+    raw === "local_llm_business_prompt_payload_schema"
+  ) {
+    return {
+      requestedProvider:
+        raw === "business_prompt_payload_schema"
+          ? "business_prompt_payload_schema"
+          : "local_llm_business_prompt_payload_schema",
+      normalizedProvider: "local_llm_disabled",
+      blockedReason:
+        "local_llm_provider_disabled_by_day51_business_prompt_payload_schema_boundary",
+      matchedPolicy: "business_prompt_payload_schema_dry_run_only",
     };
   }
 
@@ -359,11 +382,21 @@ export async function runHermesLlmAdapterSwitchBoundary(
         smoke: false,
       });
 
+    const sample =
+      typeof input.userMessage === "string" ? input.userMessage : undefined;
+
     const businessPromptPolicyGate =
       await runHermesBusinessPromptPolicyGateRedactionBoundary({
         provider: "business_prompt_policy_gate",
         dryRun: true,
-        sample: typeof input.userMessage === "string" ? input.userMessage : undefined,
+        sample,
+      });
+
+    const businessPromptPayloadSchema =
+      await runHermesBusinessPromptPayloadSchemaBoundary({
+        provider: "business_prompt_payload_schema",
+        dryRun: true,
+        sample,
       });
 
     return {
@@ -379,6 +412,8 @@ export async function runHermesLlmAdapterSwitchBoundary(
           businessPromptSmoke.business_prompt_smoke,
         business_prompt_policy_gate_status:
           businessPromptPolicyGate.business_prompt_policy_gate,
+        business_prompt_payload_schema_status:
+          businessPromptPayloadSchema.business_prompt_payload_schema,
         blocked_reason: provider.blockedReason,
         matched_policy: provider.matchedPolicy,
       },
