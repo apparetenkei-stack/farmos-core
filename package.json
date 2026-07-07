@@ -111,7 +111,11 @@
     "run-hermes-business-prompt-human-confirmation-dry-run": "tsx scripts/hermes/run_hermes_business_prompt_human_confirmation_dry_run.ts",
     "test-hermes-business-prompt-human-confirmation-boundary": "tsx scripts/hermes/test_hermes_business_prompt_human_confirmation_boundary.ts",
     "test-hermes-llm-adapter-switch-business-prompt-human-confirmation-integration": "tsx scripts/hermes/test_hermes_llm_adapter_switch_business_prompt_human_confirmation_integration.ts",
-    "check-hermes-business-prompt-human-confirmation-boundary": "pnpm run check-hermes-business-prompt-payload-schema-boundary && pnpm run test-hermes-business-prompt-human-confirmation-boundary && pnpm run test-hermes-llm-adapter-switch-business-prompt-human-confirmation-integration && pnpm run build"
+    "check-hermes-business-prompt-human-confirmation-boundary": "pnpm run check-hermes-business-prompt-payload-schema-boundary && pnpm run test-hermes-business-prompt-human-confirmation-boundary && pnpm run test-hermes-llm-adapter-switch-business-prompt-human-confirmation-integration && pnpm run build",
+    "run-hermes-business-prompt-confirmation-review-read-dry-run": "tsx scripts/hermes/run_hermes_business_prompt_confirmation_review_read_dry_run.ts",
+    "test-hermes-business-prompt-confirmation-review-read-boundary": "tsx scripts/hermes/test_hermes_business_prompt_confirmation_review_read_boundary.ts",
+    "test-hermes-llm-adapter-switch-business-prompt-confirmation-review-read-integration": "tsx scripts/hermes/test_hermes_llm_adapter_switch_business_prompt_confirmation_review_read_integration.ts",
+    "check-hermes-business-prompt-confirmation-review-read-boundary": "pnpm run check-hermes-business-prompt-human-confirmation-boundary && pnpm run test-hermes-business-prompt-confirmation-review-read-boundary && pnpm run test-hermes-llm-adapter-switch-business-prompt-confirmation-review-read-integration && pnpm run build"
   },
   "keywords": [],
   "author": "",

@@ -38,6 +38,10 @@ import {
   runHermesBusinessPromptHumanConfirmationBoundary,
   type HermesBusinessPromptHumanConfirmationStatus,
 } from "./hermes_business_prompt_human_confirmation_boundary";
+import {
+  runHermesBusinessPromptConfirmationReviewReadBoundary,
+  type HermesBusinessPromptConfirmationReviewReadStatus,
+} from "./hermes_business_prompt_confirmation_review_read_boundary";
 
 export type HermesLlmProvider =
   | "mock"
@@ -58,6 +62,8 @@ type HermesRequestedProvider =
   | "local_llm_business_prompt_payload_schema"
   | "business_prompt_human_confirmation"
   | "local_llm_business_prompt_human_confirmation"
+  | "business_prompt_confirmation_review_read"
+  | "local_llm_business_prompt_confirmation_review_read"
   | "unknown";
 
 type ProviderCapability = {
@@ -141,6 +147,7 @@ export type HermesLlmAdapterSwitchResult = {
     business_prompt_policy_gate_status?: HermesBusinessPromptPolicyGateStatus;
     business_prompt_payload_schema_status?: HermesBusinessPromptPayloadSchemaStatus;
     business_prompt_human_confirmation_status?: HermesBusinessPromptHumanConfirmationStatus;
+    business_prompt_confirmation_review_read_status?: HermesBusinessPromptConfirmationReviewReadStatus;
     blocked_reason?: string;
     matched_policy?: string;
   };
@@ -233,6 +240,22 @@ function normalizeRequestedProvider(provider: unknown): {
   }
 
   const raw = provider.trim().toLowerCase();
+
+  if (
+    raw === "business_prompt_confirmation_review_read" ||
+    raw === "local_llm_business_prompt_confirmation_review_read"
+  ) {
+    return {
+      requestedProvider:
+        raw === "business_prompt_confirmation_review_read"
+          ? "business_prompt_confirmation_review_read"
+          : "local_llm_business_prompt_confirmation_review_read",
+      normalizedProvider: "local_llm_disabled",
+      blockedReason:
+        "local_llm_provider_disabled_by_day53_business_prompt_confirmation_review_read_boundary",
+      matchedPolicy: "business_prompt_confirmation_review_read_dry_run_only",
+    };
+  }
 
   if (
     raw === "business_prompt_human_confirmation" ||
@@ -448,6 +471,14 @@ export async function runHermesLlmAdapterSwitchBoundary(
             userMessage: input.userMessage,
           })
         ).business_prompt_human_confirmation,
+        business_prompt_confirmation_review_read_status: (
+          await runHermesBusinessPromptConfirmationReviewReadBoundary({
+            provider: "business_prompt_confirmation_review_read",
+            dryRun: true,
+            sample: input.userMessage,
+            userMessage: input.userMessage,
+          })
+        ).business_prompt_confirmation_review_read,
         blocked_reason: provider.blockedReason,
         matched_policy: provider.matchedPolicy,
       },
