@@ -611,3 +611,22 @@ export function isHermesBusinessPromptConfirmationActionReadinessProviderAlias(
     provider as HermesBusinessPromptConfirmationActionReadinessProviderAlias,
   );
 }
+
+export const hermesBusinessPromptConfirmationTokenPreviewProviderAliases = [
+  'business_prompt_confirmation_token_preview',
+  'local_llm_business_prompt_confirmation_token_preview',
+] as const;
+
+export type HermesBusinessPromptConfirmationTokenPreviewProviderAlias =
+  (typeof hermesBusinessPromptConfirmationTokenPreviewProviderAliases)[number];
+
+export function isHermesBusinessPromptConfirmationTokenPreviewProviderAlias(
+  provider: unknown,
+): provider is HermesBusinessPromptConfirmationTokenPreviewProviderAlias {
+  return (
+    typeof provider === 'string' &&
+    (
+      hermesBusinessPromptConfirmationTokenPreviewProviderAliases as readonly string[]
+    ).includes(provider)
+  );
+}

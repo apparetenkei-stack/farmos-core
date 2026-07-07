@@ -123,7 +123,11 @@
     "run-hermes-business-prompt-confirmation-action-readiness-dry-run": "tsx scripts/hermes/run_hermes_business_prompt_confirmation_action_readiness_dry_run.ts",
     "test-hermes-business-prompt-confirmation-action-readiness-boundary": "tsx scripts/hermes/test_hermes_business_prompt_confirmation_action_readiness_boundary.ts",
     "test-hermes-llm-adapter-switch-business-prompt-confirmation-action-readiness-integration": "tsx scripts/hermes/test_hermes_llm_adapter_switch_business_prompt_confirmation_action_readiness_integration.ts",
-    "check-hermes-business-prompt-confirmation-action-readiness-boundary": "pnpm run check-hermes-business-prompt-confirmation-review-ui-metadata-boundary && pnpm run test-hermes-business-prompt-confirmation-action-readiness-boundary && pnpm run test-hermes-llm-adapter-switch-business-prompt-confirmation-action-readiness-integration && pnpm run build"
+    "check-hermes-business-prompt-confirmation-action-readiness-boundary": "pnpm run check-hermes-business-prompt-confirmation-review-ui-metadata-boundary && pnpm run test-hermes-business-prompt-confirmation-action-readiness-boundary && pnpm run test-hermes-llm-adapter-switch-business-prompt-confirmation-action-readiness-integration && pnpm run build",
+    "run-hermes-business-prompt-confirmation-token-preview-dry-run": "tsx scripts/hermes/run_hermes_business_prompt_confirmation_token_preview_dry_run.ts",
+    "test-hermes-business-prompt-confirmation-token-preview-boundary": "tsx scripts/hermes/test_hermes_business_prompt_confirmation_token_preview_boundary.ts",
+    "test-hermes-llm-adapter-switch-business-prompt-confirmation-token-preview-integration": "tsx scripts/hermes/test_hermes_llm_adapter_switch_business_prompt_confirmation_token_preview_integration.ts",
+    "check-hermes-business-prompt-confirmation-token-preview-boundary": "pnpm run check-hermes-business-prompt-confirmation-action-readiness-boundary && pnpm run test-hermes-business-prompt-confirmation-token-preview-boundary && pnpm run test-hermes-llm-adapter-switch-business-prompt-confirmation-token-preview-integration && pnpm run build"
   },
   "keywords": [],
   "author": "",
