@@ -595,3 +595,19 @@ export function isHermesBusinessPromptConfirmationReviewUiMetadataProviderAlias(
   );
 }
 
+// Day55 business prompt confirmation action readiness provider aliases
+export const hermesBusinessPromptConfirmationActionReadinessProviderAliases = [
+  'business_prompt_confirmation_action_readiness',
+  'local_llm_business_prompt_confirmation_action_readiness',
+] as const;
+
+export type HermesBusinessPromptConfirmationActionReadinessProviderAlias =
+  (typeof hermesBusinessPromptConfirmationActionReadinessProviderAliases)[number];
+
+export function isHermesBusinessPromptConfirmationActionReadinessProviderAlias(
+  provider: string,
+): provider is HermesBusinessPromptConfirmationActionReadinessProviderAlias {
+  return hermesBusinessPromptConfirmationActionReadinessProviderAliases.includes(
+    provider as HermesBusinessPromptConfirmationActionReadinessProviderAlias,
+  );
+}
