@@ -34,6 +34,11 @@ import {
   type HermesBusinessPromptPayloadSchemaStatus,
 } from "./hermes_business_prompt_payload_schema_boundary";
 
+import {
+  runHermesBusinessPromptHumanConfirmationBoundary,
+  type HermesBusinessPromptHumanConfirmationStatus,
+} from "./hermes_business_prompt_human_confirmation_boundary";
+
 export type HermesLlmProvider =
   | "mock"
   | "local_llm_disabled"
@@ -51,6 +56,8 @@ type HermesRequestedProvider =
   | "local_llm_business_prompt_policy_gate"
   | "business_prompt_payload_schema"
   | "local_llm_business_prompt_payload_schema"
+  | "business_prompt_human_confirmation"
+  | "local_llm_business_prompt_human_confirmation"
   | "unknown";
 
 type ProviderCapability = {
@@ -133,6 +140,7 @@ export type HermesLlmAdapterSwitchResult = {
     business_prompt_smoke_status?: HermesLocalLlmBusinessPromptSmokeStatus;
     business_prompt_policy_gate_status?: HermesBusinessPromptPolicyGateStatus;
     business_prompt_payload_schema_status?: HermesBusinessPromptPayloadSchemaStatus;
+    business_prompt_human_confirmation_status?: HermesBusinessPromptHumanConfirmationStatus;
     blocked_reason?: string;
     matched_policy?: string;
   };
@@ -225,6 +233,22 @@ function normalizeRequestedProvider(provider: unknown): {
   }
 
   const raw = provider.trim().toLowerCase();
+
+  if (
+    raw === "business_prompt_human_confirmation" ||
+    raw === "local_llm_business_prompt_human_confirmation"
+  ) {
+    return {
+      requestedProvider:
+        raw === "business_prompt_human_confirmation"
+          ? "business_prompt_human_confirmation"
+          : "local_llm_business_prompt_human_confirmation",
+      normalizedProvider: "local_llm_disabled",
+      blockedReason:
+        "local_llm_provider_disabled_by_day52_business_prompt_human_confirmation_boundary",
+      matchedPolicy: "business_prompt_human_confirmation_dry_run_only",
+    };
+  }
 
   if (raw === "mock") {
     return {
@@ -414,6 +438,16 @@ export async function runHermesLlmAdapterSwitchBoundary(
           businessPromptPolicyGate.business_prompt_policy_gate,
         business_prompt_payload_schema_status:
           businessPromptPayloadSchema.business_prompt_payload_schema,
+        business_prompt_human_confirmation_status: (
+          await runHermesBusinessPromptHumanConfirmationBoundary({
+            provider: "business_prompt_human_confirmation",
+            dryRun: input.dryRun,
+            sample: input.sample,
+            prompt: input.prompt,
+            userPrompt: input.userPrompt,
+            userMessage: input.userMessage,
+          })
+        ).business_prompt_human_confirmation,
         blocked_reason: provider.blockedReason,
         matched_policy: provider.matchedPolicy,
       },
