@@ -577,3 +577,21 @@ export async function runHermesLlmAdapterSwitchBoundary(
     boundary,
   };
 }
+
+// Day54 business prompt confirmation review UI metadata provider aliases
+export const hermesBusinessPromptConfirmationReviewUiMetadataProviderAliases = [
+  'business_prompt_confirmation_review_ui_metadata',
+  'local_llm_business_prompt_confirmation_review_ui_metadata',
+] as const;
+
+export type HermesBusinessPromptConfirmationReviewUiMetadataProviderAlias =
+  (typeof hermesBusinessPromptConfirmationReviewUiMetadataProviderAliases)[number];
+
+export function isHermesBusinessPromptConfirmationReviewUiMetadataProviderAlias(
+  provider: string,
+): provider is HermesBusinessPromptConfirmationReviewUiMetadataProviderAlias {
+  return hermesBusinessPromptConfirmationReviewUiMetadataProviderAliases.includes(
+    provider as HermesBusinessPromptConfirmationReviewUiMetadataProviderAlias,
+  );
+}
+
