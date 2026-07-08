@@ -4,6 +4,13 @@ import {
   type HermesLlmProviderResponse,
   type HermesLlmProviderStatus,
 } from "./hermes_llm_provider_adapter";
+import {
+  buildHermesCliReadonlyContextPrompt,
+  createHermesFarmosReadonlyContextSkipped,
+  normalizeReadonlyContextRequested,
+  readHermesFarmosReadonlyContext,
+  type HermesFarmosReadonlyContextEnvelope,
+} from "./hermes_farmos_readonly_context";
 
 export const HERMES_CLI_CHAT_MAX_INPUT_MESSAGE_CHARS = 500;
 
@@ -14,6 +21,8 @@ export type HermesCliChatRequestEnvelope = {
   baseUrl?: unknown;
   timeoutMs?: unknown;
   smokeTestEnabled: boolean;
+  includeReadonlyContext?: unknown;
+  readonlyContextReader?: () => Promise<HermesFarmosReadonlyContextEnvelope>;
   fetchImpl?: typeof fetch;
 };
 
@@ -41,6 +50,17 @@ export type HermesCliChatResponseEnvelope = {
   timeout_ms: number;
   http_status: number | null;
   error_message: string | null;
+  readonly_context_allowed: true;
+  readonly_context_requested: boolean;
+  readonly_context_read_performed: boolean;
+  readonly_context_included: boolean;
+  readonly_context_non_empty: boolean;
+  readonly_context_length: number;
+  readonly_context_truncated: boolean;
+  readonly_context_source: "farmos_readonly";
+  readonly_context_max_chars: 2000;
+  context_write_allowed: false;
+  db_read_performed: boolean;
   db_write_performed: false;
   proposal_created: false;
   proposal_saved: false;
@@ -56,8 +76,8 @@ export type HermesCliChatResponseEnvelope = {
   credentials_exposed: false;
   external_api_called: false;
   business_context_included: false;
-  farm_context_included: false;
-  db_context_included: false;
+  farm_context_included: boolean;
+  db_context_included: boolean;
   proposal_context_included: false;
 };
 
@@ -132,7 +152,11 @@ function makeEnvelope(input: {
   timeoutMs: number;
   httpStatus: number | null;
   errorMessage: string | null;
+  readonlyContext?: HermesFarmosReadonlyContextEnvelope;
 }): HermesCliChatResponseEnvelope {
+  const readonlyContext =
+    input.readonlyContext ?? createHermesFarmosReadonlyContextSkipped(false);
+
   return {
     mode: "hermes_cli_chat_minimal_runtime",
     provider: input.provider,
@@ -159,6 +183,18 @@ function makeEnvelope(input: {
     timeout_ms: input.timeoutMs,
     http_status: input.httpStatus,
     error_message: input.errorMessage,
+    readonly_context_allowed: readonlyContext.readonly_context_allowed,
+    readonly_context_requested: readonlyContext.readonly_context_requested,
+    readonly_context_read_performed:
+      readonlyContext.readonly_context_read_performed,
+    readonly_context_included: readonlyContext.readonly_context_included,
+    readonly_context_non_empty: readonlyContext.readonly_context_non_empty,
+    readonly_context_length: readonlyContext.readonly_context_length,
+    readonly_context_truncated: readonlyContext.readonly_context_truncated,
+    readonly_context_source: readonlyContext.readonly_context_source,
+    readonly_context_max_chars: readonlyContext.readonly_context_max_chars,
+    context_write_allowed: readonlyContext.context_write_allowed,
+    db_read_performed: readonlyContext.db_read_performed,
     db_write_performed: false,
     proposal_created: false,
     proposal_saved: false,
@@ -174,8 +210,10 @@ function makeEnvelope(input: {
     credentials_exposed: false,
     external_api_called: false,
     business_context_included: false,
-    farm_context_included: false,
-    db_context_included: false,
+    farm_context_included: readonlyContext.readonly_context_included,
+    db_context_included:
+      readonlyContext.readonly_context_included &&
+      readonlyContext.db_read_performed,
     proposal_context_included: false,
   };
 }
@@ -183,6 +221,7 @@ function makeEnvelope(input: {
 function fromProviderResult(
   result: HermesLlmProviderResponse,
   validation: MessageValidation,
+  readonlyContext: HermesFarmosReadonlyContextEnvelope,
 ): HermesCliChatResponseEnvelope {
   return makeEnvelope({
     provider: result.provider,
@@ -199,6 +238,7 @@ function fromProviderResult(
     timeoutMs: result.timeout_ms,
     httpStatus: result.http_status,
     errorMessage: result.error_message,
+    readonlyContext,
   });
 }
 
@@ -207,6 +247,9 @@ export async function runHermesCliChatRuntime(
 ): Promise<HermesCliChatResponseEnvelope> {
   const validation = validateMessage(request.message);
   const timeoutMs = normalizeTimeoutMs(request.timeoutMs);
+  const readonlyContextRequested = normalizeReadonlyContextRequested(
+    request.includeReadonlyContext,
+  );
 
   if (validation.errorMessage !== null || validation.rawMessage === null) {
     return makeEnvelope({
@@ -224,20 +267,65 @@ export async function runHermesCliChatRuntime(
       timeoutMs,
       httpStatus: null,
       errorMessage: validation.errorMessage,
+      readonlyContext: createHermesFarmosReadonlyContextSkipped(
+        readonlyContextRequested,
+      ),
     });
+  }
+
+  let readonlyContext = createHermesFarmosReadonlyContextSkipped(false);
+  let prompt = validation.rawMessage;
+
+  if (readonlyContextRequested) {
+    readonlyContext = request.readonlyContextReader
+      ? await request.readonlyContextReader()
+      : await readHermesFarmosReadonlyContext();
+
+    if (
+      readonlyContext.error_message !== null &&
+      !readonlyContext.readonly_context_included
+    ) {
+      return makeEnvelope({
+        provider: displayProvider(request.provider),
+        status: "runtime_error",
+        runtimeCallAllowed: false,
+        runtimeExecuted: false,
+        runtimeReachable: false,
+        promptSent: false,
+        validation,
+        responseText: null,
+        tokensUsed: null,
+        baseUrl: null,
+        model: null,
+        timeoutMs,
+        httpStatus: null,
+        errorMessage: `readonly_context_read_failed:${readonlyContext.error_message}`,
+        readonlyContext,
+      });
+    }
+
+    if (
+      readonlyContext.readonly_context_included &&
+      readonlyContext.context_text !== null
+    ) {
+      prompt = buildHermesCliReadonlyContextPrompt({
+        userMessage: validation.rawMessage,
+        readonlyContextText: readonlyContext.context_text,
+      });
+    }
   }
 
   const result = await runHermesLlmProviderAdapter({
     smokeTestEnabled: request.smokeTestEnabled,
     provider: request.provider,
-    prompt: validation.rawMessage,
+    prompt,
     baseUrl: request.baseUrl,
     model: request.model,
     timeoutMs: request.timeoutMs,
     fetchImpl: request.fetchImpl,
   });
 
-  return fromProviderResult(result, validation);
+  return fromProviderResult(result, validation, readonlyContext);
 }
 
 function readMessageFromArgs(args: string[]): string | undefined {
@@ -255,6 +343,22 @@ function readMessageFromArgs(args: string[]): string | undefined {
   return undefined;
 }
 
+function readBooleanFlagFromArgs(args: string[], name: string): boolean | undefined {
+  for (let index = 0; index < args.length; index += 1) {
+    const current = args[index];
+
+    if (current === name) {
+      return true;
+    }
+
+    if (current.startsWith(`${name}=`)) {
+      return normalizeReadonlyContextRequested(current.slice(name.length + 1));
+    }
+  }
+
+  return undefined;
+}
+
 export async function runHermesCliChatRuntimeFromEnv(
   args: string[] = process.argv.slice(2),
 ): Promise<HermesCliChatResponseEnvelope> {
@@ -265,5 +369,8 @@ export async function runHermesCliChatRuntimeFromEnv(
     model: process.env.HERMES_OLLAMA_MODEL,
     timeoutMs: process.env.HERMES_LLM_TIMEOUT_MS,
     message: readMessageFromArgs(args) ?? process.env.HERMES_CLI_CHAT_MESSAGE,
+    includeReadonlyContext:
+      readBooleanFlagFromArgs(args, "--include-readonly-context") ??
+      process.env.HERMES_CLI_CHAT_INCLUDE_READONLY_CONTEXT,
   });
 }
