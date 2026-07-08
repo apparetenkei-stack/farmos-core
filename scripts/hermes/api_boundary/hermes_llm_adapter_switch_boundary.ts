@@ -650,3 +650,25 @@ export function isHermesBusinessPromptConfirmationTokenIssuanceReadinessProvider
     )
   );
 }
+
+
+// Day58 business prompt confirmation token issuance request provider aliases
+export const hermesBusinessPromptConfirmationTokenIssuanceRequestProviderAliases =
+  [
+    'business_prompt_confirmation_token_issuance_request',
+    'local_llm_business_prompt_confirmation_token_issuance_request',
+  ] as const;
+
+export type HermesBusinessPromptConfirmationTokenIssuanceRequestProviderAlias =
+  (typeof hermesBusinessPromptConfirmationTokenIssuanceRequestProviderAliases)[number];
+
+export function isHermesBusinessPromptConfirmationTokenIssuanceRequestProviderAlias(
+  provider: unknown,
+): provider is HermesBusinessPromptConfirmationTokenIssuanceRequestProviderAlias {
+  return (
+    typeof provider === 'string' &&
+    (
+      hermesBusinessPromptConfirmationTokenIssuanceRequestProviderAliases as readonly string[]
+    ).includes(provider)
+  );
+}

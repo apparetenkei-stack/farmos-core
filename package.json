@@ -131,7 +131,11 @@
     "run-hermes-business-prompt-confirmation-token-issuance-readiness-dry-run": "tsx scripts/hermes/run_hermes_business_prompt_confirmation_token_issuance_readiness_dry_run.ts",
     "test-hermes-business-prompt-confirmation-token-issuance-readiness-boundary": "tsx scripts/hermes/test_hermes_business_prompt_confirmation_token_issuance_readiness_boundary.ts",
     "test-hermes-llm-adapter-switch-business-prompt-confirmation-token-issuance-readiness-integration": "tsx scripts/hermes/test_hermes_llm_adapter_switch_business_prompt_confirmation_token_issuance_readiness_integration.ts",
-    "check-hermes-business-prompt-confirmation-token-issuance-readiness-boundary": "pnpm run check-hermes-business-prompt-confirmation-token-preview-boundary && pnpm run test-hermes-business-prompt-confirmation-token-issuance-readiness-boundary && pnpm run test-hermes-llm-adapter-switch-business-prompt-confirmation-token-issuance-readiness-integration && pnpm run build"
+    "check-hermes-business-prompt-confirmation-token-issuance-readiness-boundary": "pnpm run check-hermes-business-prompt-confirmation-token-preview-boundary && pnpm run test-hermes-business-prompt-confirmation-token-issuance-readiness-boundary && pnpm run test-hermes-llm-adapter-switch-business-prompt-confirmation-token-issuance-readiness-integration && pnpm run build",
+    "run-hermes-business-prompt-confirmation-token-issuance-request-dry-run": "tsx scripts/hermes/run_hermes_business_prompt_confirmation_token_issuance_request_dry_run.ts",
+    "test-hermes-business-prompt-confirmation-token-issuance-request-boundary": "tsx scripts/hermes/test_hermes_business_prompt_confirmation_token_issuance_request_boundary.ts",
+    "test-hermes-llm-adapter-switch-business-prompt-confirmation-token-issuance-request-integration": "tsx scripts/hermes/test_hermes_llm_adapter_switch_business_prompt_confirmation_token_issuance_request_integration.ts",
+    "check-hermes-business-prompt-confirmation-token-issuance-request-boundary": "pnpm run check-hermes-business-prompt-confirmation-token-issuance-readiness-boundary && pnpm run test-hermes-business-prompt-confirmation-token-issuance-request-boundary && pnpm run test-hermes-llm-adapter-switch-business-prompt-confirmation-token-issuance-request-integration && pnpm run build"
   },
   "keywords": [],
   "author": "",
