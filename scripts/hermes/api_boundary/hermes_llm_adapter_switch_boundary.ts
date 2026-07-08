@@ -740,3 +740,20 @@ export function isHermesBusinessPromptConfirmationTokenIssuanceExecutionRequestE
     provider as HermesBusinessPromptConfirmationTokenIssuanceExecutionRequestEnvelopeProviderAlias,
   );
 }
+
+export const hermesBusinessPromptConfirmationTokenIssuanceExecutionResultPlanProviderAliases =
+  [
+    'business_prompt_confirmation_token_issuance_execution_result_plan',
+    'local_llm_business_prompt_confirmation_token_issuance_execution_result_plan',
+  ] as const;
+
+export type HermesBusinessPromptConfirmationTokenIssuanceExecutionResultPlanProviderAlias =
+  (typeof hermesBusinessPromptConfirmationTokenIssuanceExecutionResultPlanProviderAliases)[number];
+
+export function isHermesBusinessPromptConfirmationTokenIssuanceExecutionResultPlanProviderAlias(
+  provider: string | undefined,
+): provider is HermesBusinessPromptConfirmationTokenIssuanceExecutionResultPlanProviderAlias {
+  return hermesBusinessPromptConfirmationTokenIssuanceExecutionResultPlanProviderAliases.includes(
+    provider as HermesBusinessPromptConfirmationTokenIssuanceExecutionResultPlanProviderAlias,
+  );
+}
