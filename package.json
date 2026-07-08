@@ -143,7 +143,11 @@
     "run-hermes-business-prompt-confirmation-token-issuance-execution-gate-dry-run": "tsx scripts/hermes/run_hermes_business_prompt_confirmation_token_issuance_execution_gate_dry_run.ts",
     "test-hermes-business-prompt-confirmation-token-issuance-execution-gate-boundary": "tsx scripts/hermes/test_hermes_business_prompt_confirmation_token_issuance_execution_gate_boundary.ts",
     "test-hermes-llm-adapter-switch-business-prompt-confirmation-token-issuance-execution-gate-integration": "tsx scripts/hermes/test_hermes_llm_adapter_switch_business_prompt_confirmation_token_issuance_execution_gate_integration.ts",
-    "check-hermes-business-prompt-confirmation-token-issuance-execution-gate-boundary": "pnpm run check-hermes-business-prompt-confirmation-token-issuance-operation-plan-boundary && pnpm run test-hermes-business-prompt-confirmation-token-issuance-execution-gate-boundary && pnpm run test-hermes-llm-adapter-switch-business-prompt-confirmation-token-issuance-execution-gate-integration && pnpm run build"
+    "check-hermes-business-prompt-confirmation-token-issuance-execution-gate-boundary": "pnpm run check-hermes-business-prompt-confirmation-token-issuance-operation-plan-boundary && pnpm run test-hermes-business-prompt-confirmation-token-issuance-execution-gate-boundary && pnpm run test-hermes-llm-adapter-switch-business-prompt-confirmation-token-issuance-execution-gate-integration && pnpm run build",
+    "run-hermes-business-prompt-confirmation-token-issuance-execution-policy-dry-run": "tsx scripts/hermes/run_hermes_business_prompt_confirmation_token_issuance_execution_policy_dry_run.ts",
+    "test-hermes-business-prompt-confirmation-token-issuance-execution-policy-boundary": "tsx scripts/hermes/test_hermes_business_prompt_confirmation_token_issuance_execution_policy_boundary.ts",
+    "test-hermes-llm-adapter-switch-business-prompt-confirmation-token-issuance-execution-policy-integration": "tsx scripts/hermes/test_hermes_llm_adapter_switch_business_prompt_confirmation_token_issuance_execution_policy_integration.ts",
+    "check-hermes-business-prompt-confirmation-token-issuance-execution-policy-boundary": "pnpm run check-hermes-business-prompt-confirmation-token-issuance-execution-gate-boundary && pnpm run test-hermes-business-prompt-confirmation-token-issuance-execution-policy-boundary && pnpm run test-hermes-llm-adapter-switch-business-prompt-confirmation-token-issuance-execution-policy-integration && pnpm run build"
   },
   "keywords": [],
   "author": "",
