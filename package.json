@@ -8,6 +8,9 @@
   },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
+    "run-hermes-local-llm-runtime-smoke-test": "tsx scripts/hermes/run_hermes_local_llm_runtime_smoke_test.ts",
+    "test-hermes-local-llm-runtime-smoke-test": "tsx scripts/hermes/test_hermes_local_llm_runtime_smoke_test.ts",
+    "check-hermes-local-llm-runtime-smoke-test": "pnpm run test-hermes-local-llm-runtime-smoke-test && pnpm run build",
     "register-source": "tsx scripts/ingest/register_source_document.ts",
     "enqueue-job": "tsx scripts/ingest/enqueue_processing_job.ts",
     "process-job-dry-run": "tsx scripts/ingest/process_document_job_dry_run.ts",
