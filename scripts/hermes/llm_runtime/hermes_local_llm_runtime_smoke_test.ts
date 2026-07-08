@@ -68,6 +68,7 @@ export type HermesLocalLlmRuntimeSmokeInput = {
   baseUrl?: unknown;
   model?: unknown;
   timeoutMs?: unknown;
+  prompt?: unknown;
   fetchImpl?: HermesLocalLlmFetch;
 };
 
@@ -108,6 +109,19 @@ function normalizeBaseUrl(value: unknown): string | null {
 }
 
 function normalizeModel(value: unknown): string | null {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const trimmed = value.trim();
+  if (trimmed.length === 0) {
+    return null;
+  }
+
+  return trimmed;
+}
+
+function normalizePrompt(value: unknown): string | null {
   if (typeof value !== "string") {
     return null;
   }
@@ -161,6 +175,7 @@ function makeResult(input: {
   httpRequestDispatched: boolean;
   endpointValueExposed: boolean;
   modelValueExposed: boolean;
+  fixedSmokePromptOnly?: boolean;
 }): HermesLocalLlmRuntimeSmokeResult {
   return {
     result: input.result,
@@ -200,7 +215,7 @@ function makeResult(input: {
       endpoint_value_exposed: input.endpointValueExposed,
       model_value_exposed: input.modelValueExposed,
       http_request_dispatched: input.httpRequestDispatched,
-      fixed_smoke_prompt_only: true,
+      fixed_smoke_prompt_only: input.fixedSmokePromptOnly ?? true,
       user_business_context_sent: false,
     },
   };
@@ -316,6 +331,10 @@ export async function runHermesLocalLlmRuntimeSmokeTest(
     normalizeBaseUrl(input.baseUrl) ??
     (provider === "ollama" ? "http://127.0.0.1:11434" : null);
   const model = normalizeModel(input.model);
+  const prompt =
+    normalizePrompt(input.prompt) ?? HERMES_LOCAL_LLM_RUNTIME_SMOKE_PROMPT;
+  const fixedSmokePromptOnly =
+    prompt === HERMES_LOCAL_LLM_RUNTIME_SMOKE_PROMPT;
 
   if (input.smokeTestEnabled !== true) {
     return makeResult({
@@ -440,7 +459,7 @@ export async function runHermesLocalLlmRuntimeSmokeTest(
       },
       body: JSON.stringify({
         model,
-        prompt: HERMES_LOCAL_LLM_RUNTIME_SMOKE_PROMPT,
+        prompt,
         stream: false,
       }),
       signal: controller.signal,
@@ -467,6 +486,7 @@ export async function runHermesLocalLlmRuntimeSmokeTest(
         httpStatus: response.status,
         errorMessage: message,
         httpRequestDispatched: true,
+      fixedSmokePromptOnly,
         endpointValueExposed: true,
         modelValueExposed: true,
       });
@@ -498,6 +518,7 @@ export async function runHermesLocalLlmRuntimeSmokeTest(
           ? null
           : "local_llm_response_text_empty",
       httpRequestDispatched: true,
+      fixedSmokePromptOnly,
       endpointValueExposed: true,
       modelValueExposed: true,
     });
@@ -520,6 +541,7 @@ export async function runHermesLocalLlmRuntimeSmokeTest(
       httpStatus: null,
       errorMessage: classified.message,
       httpRequestDispatched: true,
+      fixedSmokePromptOnly,
       endpointValueExposed: true,
       modelValueExposed: true,
     });

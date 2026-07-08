@@ -192,6 +192,7 @@ export async function runHermesLlmProviderAdapter(
     baseUrl: request.baseUrl,
     model: request.model,
     timeoutMs: request.timeoutMs,
+    prompt: request.prompt,
     fetchImpl: request.fetchImpl,
   });
 
@@ -219,5 +220,6 @@ export async function runHermesLlmProviderAdapterFromEnv(): Promise<HermesLlmPro
     baseUrl: process.env.HERMES_OLLAMA_BASE_URL,
     model: process.env.HERMES_OLLAMA_MODEL,
     timeoutMs: process.env.HERMES_LLM_TIMEOUT_MS,
+    prompt: process.env.HERMES_LLM_PROVIDER_PROMPT,
   });
 }
