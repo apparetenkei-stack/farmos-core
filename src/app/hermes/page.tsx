@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { HermesApiBlockedStatePreview } from "../../components/hermes/hermes_api_blocked_state_preview";
 import { readHermesChatReadonlyUi } from "../../../scripts/app/api_boundary/hermes_chat_readonly_ui_boundary";
 
 export const dynamic = "force-dynamic";
@@ -38,6 +39,8 @@ export default async function HermesPage() {
           現在は読み取り専用です。AI提案の生成・承認・適用はこの画面からは行いません。
         </p>
       </header>
+
+      <HermesApiBlockedStatePreview />
 
       <section>
         <h2>Hermes status</h2>
