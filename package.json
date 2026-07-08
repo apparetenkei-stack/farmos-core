@@ -135,7 +135,11 @@
     "run-hermes-business-prompt-confirmation-token-issuance-request-dry-run": "tsx scripts/hermes/run_hermes_business_prompt_confirmation_token_issuance_request_dry_run.ts",
     "test-hermes-business-prompt-confirmation-token-issuance-request-boundary": "tsx scripts/hermes/test_hermes_business_prompt_confirmation_token_issuance_request_boundary.ts",
     "test-hermes-llm-adapter-switch-business-prompt-confirmation-token-issuance-request-integration": "tsx scripts/hermes/test_hermes_llm_adapter_switch_business_prompt_confirmation_token_issuance_request_integration.ts",
-    "check-hermes-business-prompt-confirmation-token-issuance-request-boundary": "pnpm run check-hermes-business-prompt-confirmation-token-issuance-readiness-boundary && pnpm run test-hermes-business-prompt-confirmation-token-issuance-request-boundary && pnpm run test-hermes-llm-adapter-switch-business-prompt-confirmation-token-issuance-request-integration && pnpm run build"
+    "check-hermes-business-prompt-confirmation-token-issuance-request-boundary": "pnpm run check-hermes-business-prompt-confirmation-token-issuance-readiness-boundary && pnpm run test-hermes-business-prompt-confirmation-token-issuance-request-boundary && pnpm run test-hermes-llm-adapter-switch-business-prompt-confirmation-token-issuance-request-integration && pnpm run build",
+    "run-hermes-business-prompt-confirmation-token-issuance-operation-plan-dry-run": "tsx scripts/hermes/run_hermes_business_prompt_confirmation_token_issuance_operation_plan_dry_run.ts",
+    "test-hermes-business-prompt-confirmation-token-issuance-operation-plan-boundary": "tsx scripts/hermes/test_hermes_business_prompt_confirmation_token_issuance_operation_plan_boundary.ts",
+    "test-hermes-llm-adapter-switch-business-prompt-confirmation-token-issuance-operation-plan-integration": "tsx scripts/hermes/test_hermes_llm_adapter_switch_business_prompt_confirmation_token_issuance_operation_plan_integration.ts",
+    "check-hermes-business-prompt-confirmation-token-issuance-operation-plan-boundary": "pnpm run check-hermes-business-prompt-confirmation-token-issuance-request-boundary && pnpm run test-hermes-business-prompt-confirmation-token-issuance-operation-plan-boundary && pnpm run test-hermes-llm-adapter-switch-business-prompt-confirmation-token-issuance-operation-plan-integration && pnpm run build"
   },
   "keywords": [],
   "author": "",

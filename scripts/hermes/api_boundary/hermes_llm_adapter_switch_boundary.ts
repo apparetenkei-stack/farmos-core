@@ -672,3 +672,20 @@ export function isHermesBusinessPromptConfirmationTokenIssuanceRequestProviderAl
     ).includes(provider)
   );
 }
+
+export const hermesBusinessPromptConfirmationTokenIssuanceOperationPlanProviderAliases =
+  [
+    'business_prompt_confirmation_token_issuance_operation_plan',
+    'local_llm_business_prompt_confirmation_token_issuance_operation_plan',
+  ] as const;
+
+export type HermesBusinessPromptConfirmationTokenIssuanceOperationPlanProviderAlias =
+  (typeof hermesBusinessPromptConfirmationTokenIssuanceOperationPlanProviderAliases)[number];
+
+export function isHermesBusinessPromptConfirmationTokenIssuanceOperationPlanProviderAlias(
+  provider: string,
+): provider is HermesBusinessPromptConfirmationTokenIssuanceOperationPlanProviderAlias {
+  return (
+    hermesBusinessPromptConfirmationTokenIssuanceOperationPlanProviderAliases as readonly string[]
+  ).includes(provider);
+}
