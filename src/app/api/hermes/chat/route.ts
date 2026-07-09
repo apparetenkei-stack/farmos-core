@@ -18,6 +18,13 @@ export const dynamic = "force-dynamic";
 
 const API_BOUNDARY = "hermes_api_chat_minimal_boundary" as const;
 
+const HERMES_API_CHAT_CORS_HEADERS = {
+  "Access-Control-Allow-Origin": "http://localhost:3000",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Allow-Headers": "content-type",
+  "Vary": "Origin",
+} as const;
+
 const ALLOWED_BODY_FIELDS = new Set([
   "message",
   "includeReadonlyContext",
@@ -385,6 +392,13 @@ export async function runHermesApiChatMinimalBoundary(input: {
   };
 }
 
+export async function OPTIONS(): Promise<Response> {
+  return new Response(null, {
+    status: 204,
+    headers: HERMES_API_CHAT_CORS_HEADERS,
+  });
+}
+
 export async function POST(request: Request): Promise<Response> {
   let body: unknown = null;
   let requestJsonParseError = false;
@@ -402,5 +416,6 @@ export async function POST(request: Request): Promise<Response> {
 
   return NextResponse.json(result.body, {
     status: result.httpStatus,
+    headers: HERMES_API_CHAT_CORS_HEADERS,
   });
 }
