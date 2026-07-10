@@ -190,7 +190,9 @@
     "test-hermes-proposal-apply-dry-run-api-boundary": "tsx scripts/hermes/test_hermes_proposal_apply_dry_run_api_boundary.ts",
     "check-hermes-proposal-apply-dry-run-boundary": "pnpm run test-hermes-proposal-apply-dry-run-boundary && pnpm run test-hermes-proposal-apply-dry-run-api-boundary && pnpm run test-hermes-proposal-draft-review-decision-boundary && pnpm run build",
     "test-hermes-low-risk-human-approved-apply-boundary": "tsx scripts/hermes/test_hermes_low_risk_human_approved_apply_boundary.ts",
-    "check-hermes-low-risk-human-approved-apply-boundary": "pnpm run test-hermes-low-risk-human-approved-apply-boundary && pnpm run test-hermes-proposal-apply-dry-run-boundary && pnpm run test-hermes-proposal-draft-review-decision-boundary && pnpm run build"
+    "check-hermes-low-risk-human-approved-apply-boundary": "pnpm run test-hermes-low-risk-human-approved-apply-boundary && pnpm run test-hermes-proposal-apply-dry-run-boundary && pnpm run test-hermes-proposal-draft-review-decision-boundary && pnpm run build",
+    "test-hermes-apply-audit-restore-verification-boundary": "tsx scripts/hermes/test_hermes_apply_audit_restore_verification_boundary.ts",
+    "check-hermes-apply-audit-restore-verification-boundary": "pnpm run test-hermes-apply-audit-restore-verification-boundary && pnpm run test-hermes-low-risk-human-approved-apply-boundary && pnpm run build"
   },
   "keywords": [],
   "author": "",
