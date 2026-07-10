@@ -180,7 +180,9 @@
     "test-hermes-api-chat-proposal-draft-boundary": "tsx scripts/hermes/test_hermes_api_chat_proposal_draft_boundary.ts",
     "check-hermes-api-chat-proposal-draft-boundary": "pnpm run test-hermes-api-chat-proposal-draft-boundary && pnpm run test-hermes-api-chat-minimal-boundary && pnpm run build",
     "test-hermes-proposal-draft-persistence-boundary": "tsx scripts/hermes/test_hermes_proposal_draft_persistence_boundary.ts",
-    "check-hermes-proposal-draft-persistence-boundary": "pnpm run test-hermes-proposal-draft-persistence-boundary && pnpm run check-hermes-api-chat-proposal-draft-boundary && pnpm run test-hermes-api-chat-minimal-boundary && pnpm run build"
+    "check-hermes-proposal-draft-persistence-boundary": "pnpm run test-hermes-proposal-draft-persistence-boundary && pnpm run check-hermes-api-chat-proposal-draft-boundary && pnpm run test-hermes-api-chat-minimal-boundary && pnpm run build",
+    "test-hermes-proposal-draft-persistence-api-smoke-boundary": "tsx scripts/hermes/test_hermes_proposal_draft_persistence_api_smoke_boundary.ts",
+    "check-hermes-proposal-draft-persistence-api-smoke-boundary": "pnpm run test-hermes-proposal-draft-persistence-api-smoke-boundary && pnpm run check-hermes-proposal-draft-persistence-boundary && pnpm run test-hermes-api-chat-proposal-draft-boundary && pnpm run test-hermes-api-chat-minimal-boundary && pnpm run build"
   },
   "keywords": [],
   "author": "",
