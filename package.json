@@ -198,7 +198,12 @@
     "test-hermes-limited-readonly-pilot-session-boundary": "tsx scripts/hermes/test_hermes_limited_readonly_pilot_session_boundary.ts",
     "check-hermes-limited-readonly-pilot-session-boundary": "pnpm run test-hermes-limited-readonly-pilot-session-boundary && pnpm run check-hermes-pilot-readiness-operator-runbook-boundary",
     "test-hermes-pilot-incident-stop-recovery-drill-boundary": "tsx scripts/hermes/test_hermes_pilot_incident_stop_recovery_drill_boundary.ts",
-    "check-hermes-pilot-incident-stop-recovery-drill-boundary": "pnpm run test-hermes-pilot-incident-stop-recovery-drill-boundary && pnpm run check-hermes-limited-readonly-pilot-session-boundary"
+    "check-hermes-pilot-incident-stop-recovery-drill-boundary": "pnpm run test-hermes-pilot-incident-stop-recovery-drill-boundary && pnpm run check-hermes-limited-readonly-pilot-session-boundary",
+    "test-hermes-daily-farm-brief-boundary": "tsx scripts/hermes/test_hermes_daily_farm_brief_boundary.ts",
+    "test-hermes-field-crop-cycle-note-boundary": "tsx scripts/hermes/test_hermes_field_crop_cycle_note_boundary.ts",
+    "test-hermes-inventory-work-log-suggestion-boundary": "tsx scripts/hermes/test_hermes_inventory_work_log_suggestion_boundary.ts",
+    "test-hermes-pilot-operation-review-boundary": "tsx scripts/hermes/test_hermes_pilot_operation_review_boundary.ts",
+    "check-hermes-operational-pilot-feature-completion": "pnpm run test-hermes-pilot-operation-review-boundary && pnpm run build"
   },
   "keywords": [],
   "author": "",
