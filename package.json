@@ -192,7 +192,9 @@
     "test-hermes-low-risk-human-approved-apply-boundary": "tsx scripts/hermes/test_hermes_low_risk_human_approved_apply_boundary.ts",
     "check-hermes-low-risk-human-approved-apply-boundary": "pnpm run test-hermes-low-risk-human-approved-apply-boundary && pnpm run test-hermes-proposal-apply-dry-run-boundary && pnpm run test-hermes-proposal-draft-review-decision-boundary && pnpm run build",
     "test-hermes-apply-audit-restore-verification-boundary": "tsx scripts/hermes/test_hermes_apply_audit_restore_verification_boundary.ts",
-    "check-hermes-apply-audit-restore-verification-boundary": "pnpm run test-hermes-apply-audit-restore-verification-boundary && pnpm run test-hermes-low-risk-human-approved-apply-boundary && pnpm run build"
+    "check-hermes-apply-audit-restore-verification-boundary": "pnpm run test-hermes-apply-audit-restore-verification-boundary && pnpm run test-hermes-low-risk-human-approved-apply-boundary && pnpm run build",
+    "test-hermes-pilot-readiness-operator-runbook-boundary": "tsx scripts/hermes/test_hermes_pilot_readiness_operator_runbook_boundary.ts",
+    "check-hermes-pilot-readiness-operator-runbook-boundary": "pnpm run test-hermes-pilot-readiness-operator-runbook-boundary && pnpm run check-hermes-apply-audit-restore-verification-boundary"
   },
   "keywords": [],
   "author": "",
