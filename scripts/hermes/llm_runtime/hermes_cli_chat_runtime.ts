@@ -74,8 +74,20 @@ export type HermesCliChatResponseEnvelope = {
   ui_changed: false;
   credentials_required: false;
   credentials_exposed: false;
-  external_api_called: false;
-  business_context_included: false;
+  external_api_called: boolean;
+  business_context_included: boolean;
+  operational_context_requested: boolean;
+  operational_context_read_performed: boolean;
+  operational_context_included: boolean;
+  operational_external_fetch_performed: boolean;
+  inventory_source_connected: boolean;
+  work_log_source_connected: boolean;
+  inventory_record_count: number;
+  work_log_record_count: number;
+  inventory_connected_empty: boolean;
+  work_log_connected_empty: boolean;
+  suggestion_preview_created: boolean;
+  suggestion_count: number;
   farm_context_included: boolean;
   db_context_included: boolean;
   proposal_context_included: false;
@@ -208,9 +220,36 @@ function makeEnvelope(input: {
     ui_changed: false,
     credentials_required: false,
     credentials_exposed: false,
-    external_api_called: false,
-    business_context_included: false,
-    farm_context_included: readonlyContext.readonly_context_included,
+    external_api_called:
+      readonlyContext.operational_external_fetch_performed ?? false,
+    business_context_included:
+      readonlyContext.operational_context_included ?? false,
+    operational_context_requested:
+      readonlyContext.operational_context_requested ?? false,
+    operational_context_read_performed:
+      readonlyContext.operational_context_read_performed ?? false,
+    operational_context_included:
+      readonlyContext.operational_context_included ?? false,
+    operational_external_fetch_performed:
+      readonlyContext.operational_external_fetch_performed ?? false,
+    inventory_source_connected:
+      readonlyContext.inventory_source_connected ?? false,
+    work_log_source_connected:
+      readonlyContext.work_log_source_connected ?? false,
+    inventory_record_count:
+      readonlyContext.inventory_record_count ?? 0,
+    work_log_record_count:
+      readonlyContext.work_log_record_count ?? 0,
+    inventory_connected_empty:
+      readonlyContext.inventory_connected_empty ?? false,
+    work_log_connected_empty:
+      readonlyContext.work_log_connected_empty ?? false,
+    suggestion_preview_created:
+      readonlyContext.suggestion_preview_created ?? false,
+    suggestion_count:
+      readonlyContext.suggestion_count ?? 0,
+    farm_context_included:
+      readonlyContext.readonly_context_included,
     db_context_included:
       readonlyContext.readonly_context_included &&
       readonlyContext.db_read_performed,

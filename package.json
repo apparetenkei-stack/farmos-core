@@ -206,7 +206,11 @@
     "check-hermes-operational-pilot-feature-completion": "pnpm run test-hermes-pilot-operation-review-boundary && pnpm run build",
     "test-hermes-operational-readonly-client": "tsx scripts/hermes/test_hermes_operational_readonly_client.ts",
     "run-hermes-operational-readonly-client-smoke-test": "tsx scripts/hermes/run_hermes_operational_readonly_client_smoke_test.ts",
-    "check-hermes-operational-readonly-client": "pnpm run test-hermes-operational-readonly-client && pnpm run build"
+    "check-hermes-operational-readonly-client": "pnpm run test-hermes-operational-readonly-client && pnpm run build",
+    "test-hermes-operational-context-integration": "tsx scripts/hermes/test_hermes_operational_context_integration.ts",
+    "run-hermes-operational-context-integration-smoke-test": "tsx scripts/hermes/run_hermes_operational_context_integration_smoke_test.ts",
+    "check-hermes-operational-context-integration": "pnpm run test-hermes-operational-context-integration && pnpm run build",
+    "run-hermes-day93-final-go-assessment": "node --env-file=.env.local --import tsx scripts/hermes/run_hermes_day93_final_go_assessment.ts"
   },
   "keywords": [],
   "author": "",
