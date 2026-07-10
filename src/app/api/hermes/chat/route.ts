@@ -47,6 +47,36 @@ const FORBIDDEN_BODY_FIELDS = [
 type EnvMap = Record<string, string | undefined>;
 type JsonRecord = Record<string, unknown>;
 
+type HermesProposalDraftCandidate = {
+  id: "dry_run_day78_proposal_draft_candidate";
+  status: "draft_preview_only";
+  proposal_type: "hermes_chat_draft_preview";
+  source: "mock";
+  title: string;
+  summary: string;
+  persistence: "not_saved";
+  requires_human_review: true;
+  created_from_message: true;
+};
+
+function buildProposalDraftCandidate(message: string): HermesProposalDraftCandidate {
+  const normalized = message.trim();
+  const shortMessage =
+    normalized.length > 80 ? `${normalized.slice(0, 77)}...` : normalized;
+
+  return {
+    id: "dry_run_day78_proposal_draft_candidate",
+    status: "draft_preview_only",
+    proposal_type: "hermes_chat_draft_preview",
+    source: "mock",
+    title: "Hermes draft proposal preview",
+    summary: `Mock draft candidate generated from validated message: ${shortMessage}`,
+    persistence: "not_saved",
+    requires_human_review: true,
+    created_from_message: true,
+  };
+}
+
 export type HermesApiChatMinimalBoundaryEnvelope =
   Omit<HermesCliChatResponseEnvelope, "route_added"> & {
     api_boundary: typeof API_BOUNDARY;
@@ -61,6 +91,12 @@ export type HermesApiChatMinimalBoundaryEnvelope =
     request_json_parse_error: boolean;
     response_envelope_normalized: true;
     production_chat_enabled: false;
+    proposal_draft_candidate_enabled: boolean;
+    proposal_draft_created: boolean;
+    proposal_draft_saved: false;
+    proposal_draft_persisted: false;
+    proposal_draft_apply_ready: false;
+    proposal_draft_candidate: HermesProposalDraftCandidate | null;
   };
 
 export type HermesApiChatMinimalBoundaryResult = {
@@ -214,6 +250,7 @@ function normalizeEnvelope(input: {
   requestBodyReceived: boolean;
   requestBodyValid: boolean;
   requestJsonParseError: boolean;
+  proposalDraftCandidate?: HermesProposalDraftCandidate | null;
 }): HermesApiChatMinimalBoundaryEnvelope {
   return {
     ...input.envelope,
@@ -244,6 +281,12 @@ function normalizeEnvelope(input: {
     request_json_parse_error: input.requestJsonParseError,
     response_envelope_normalized: true,
     production_chat_enabled: false,
+    proposal_draft_candidate_enabled: input.proposalDraftCandidate !== undefined,
+    proposal_draft_created: input.proposalDraftCandidate !== undefined && input.proposalDraftCandidate !== null,
+    proposal_draft_saved: false,
+    proposal_draft_persisted: false,
+    proposal_draft_apply_ready: false,
+    proposal_draft_candidate: input.proposalDraftCandidate ?? null,
   };
 }
 
@@ -388,6 +431,10 @@ export async function runHermesApiChatMinimalBoundary(input: {
       requestBodyReceived: true,
       requestBodyValid: runtimeEnvelope.status !== "bad_request",
       requestJsonParseError: false,
+      proposalDraftCandidate:
+        validation.provider === "mock" && runtimeEnvelope.status !== "bad_request"
+          ? buildProposalDraftCandidate(validation.message)
+          : null,
     }),
   };
 }
