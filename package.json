@@ -185,7 +185,10 @@
     "check-hermes-proposal-draft-persistence-api-smoke-boundary": "pnpm run test-hermes-proposal-draft-persistence-api-smoke-boundary && pnpm run check-hermes-proposal-draft-persistence-boundary && pnpm run test-hermes-api-chat-proposal-draft-boundary && pnpm run test-hermes-api-chat-minimal-boundary && pnpm run build",
     "test-hermes-proposal-draft-review-decision-boundary": "tsx scripts/hermes/test_hermes_proposal_draft_review_decision_boundary.ts",
     "test-hermes-proposal-draft-review-decision-api-boundary": "tsx scripts/hermes/test_hermes_proposal_draft_review_decision_api_boundary.ts",
-    "check-hermes-proposal-draft-review-decision-boundary": "pnpm run test-hermes-proposal-draft-review-decision-boundary && pnpm run test-hermes-proposal-draft-review-decision-api-boundary && pnpm run check-hermes-proposal-draft-persistence-api-smoke-boundary && pnpm run build"
+    "check-hermes-proposal-draft-review-decision-boundary": "pnpm run test-hermes-proposal-draft-review-decision-boundary && pnpm run test-hermes-proposal-draft-review-decision-api-boundary && pnpm run check-hermes-proposal-draft-persistence-api-smoke-boundary && pnpm run build",
+    "test-hermes-proposal-apply-dry-run-boundary": "tsx scripts/hermes/test_hermes_proposal_apply_dry_run_boundary.ts",
+    "test-hermes-proposal-apply-dry-run-api-boundary": "tsx scripts/hermes/test_hermes_proposal_apply_dry_run_api_boundary.ts",
+    "check-hermes-proposal-apply-dry-run-boundary": "pnpm run test-hermes-proposal-apply-dry-run-boundary && pnpm run test-hermes-proposal-apply-dry-run-api-boundary && pnpm run test-hermes-proposal-draft-review-decision-boundary && pnpm run build"
   },
   "keywords": [],
   "author": "",
