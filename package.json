@@ -7,6 +7,9 @@
     "doc": "docs"
   },
   "scripts": {
+    "test-hermes-job-envelope-boundary": "tsx scripts/hermes/test_hermes_job_envelope_boundary.ts",
+    "run-hermes-job-envelope-preview": "tsx scripts/hermes/run_hermes_job_envelope_preview.ts",
+    "check-hermes-job-envelope-boundary": "pnpm run test-hermes-job-envelope-boundary && pnpm run test-hermes-runtime-contract-boundary && pnpm run test-hermes-api-chat-minimal-boundary && pnpm run test-hermes-api-chat-proposal-draft-boundary && pnpm run test-hermes-operational-context-integration && pnpm run build",
     "test-hermes-runtime-contract-boundary": "tsx scripts/hermes/test_hermes_runtime_contract_boundary.ts",
     "run-hermes-runtime-operational-baseline": "tsx scripts/hermes/run_hermes_runtime_operational_baseline.ts",
     "check-hermes-runtime-contract-boundary": "pnpm run test-hermes-runtime-contract-boundary && pnpm run test-hermes-api-chat-minimal-boundary && pnpm run test-hermes-api-chat-proposal-draft-boundary && pnpm run test-hermes-operational-context-integration && pnpm run build",

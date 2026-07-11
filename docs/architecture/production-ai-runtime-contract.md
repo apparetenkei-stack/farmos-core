@@ -60,7 +60,7 @@ prompt、response、read-only context、Secret、認証情報、DB 接続情報�
 
 ## Day97 Queue boundary
 
-Day96 は `queue_used: false` までを契約化する。Day97 の Queue は enqueue/dequeue、job persistence、retry を別境界として設計し、request ID の意味や既存同期 API の互換性を暗黙に変更してはならない。
+Day96 は `queue_used: false` までを契約化する。Day97では、同期Runtimeを変更せず、独立した `hermes.job.v1` Job Envelope、request/job ID分離、status遷移、payload分離、固定TTLを確定した。Redis接続、enqueue/dequeue、job persistence、retryは行わず、実Queue接続はDay98の別境界とする。
 
 ## Day100 Model Router boundary
 
