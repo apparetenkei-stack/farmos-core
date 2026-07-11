@@ -7,6 +7,10 @@
     "doc": "docs"
   },
   "scripts": {
+    "test-hermes-worker-protocol-boundary": "tsx scripts/hermes/test_hermes_worker_protocol_boundary.ts",
+    "run-hermes-worker-protocol-preview": "tsx scripts/hermes/run_hermes_worker_protocol_preview.ts",
+    "run-hermes-worker-registry-smoke-test": "node --env-file=.env --import tsx scripts/hermes/run_hermes_worker_registry_smoke_test.ts",
+    "check-hermes-worker-protocol-boundary": "pnpm run test-hermes-worker-protocol-boundary && pnpm run test-hermes-redis-queue-boundary && pnpm run test-hermes-job-envelope-boundary && pnpm run test-hermes-runtime-contract-boundary && pnpm run test-hermes-api-chat-minimal-boundary && pnpm run test-hermes-api-chat-proposal-draft-boundary && pnpm run test-hermes-operational-context-integration && pnpm run build",
     "test-hermes-redis-queue-boundary": "tsx scripts/hermes/test_hermes_redis_queue_boundary.ts",
     "run-hermes-redis-queue-smoke-test": "node --env-file=.env --import tsx scripts/hermes/run_hermes_redis_queue_smoke_test.ts",
     "check-hermes-redis-queue-boundary": "pnpm run test-hermes-redis-queue-boundary && pnpm run test-hermes-job-envelope-boundary && pnpm run test-hermes-runtime-contract-boundary && pnpm run test-hermes-api-chat-minimal-boundary && pnpm run test-hermes-api-chat-proposal-draft-boundary && pnpm run test-hermes-operational-context-integration && pnpm run build",

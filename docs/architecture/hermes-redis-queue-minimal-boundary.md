@@ -62,7 +62,7 @@ Day97 `hermes.job.v1` の型と意味は変更しない。Day98は外側に `her
 
 ## Day99 Worker Protocol boundary
 
-Day98は配送と状態参照までであり、常駐Worker、heartbeat、AI runtime、model実行を行わない。Day99はprocessing recordを入力としてWorker所有権と実行結果の契約を別途定義する。
+Day98は配送と状態参照までであり、常駐Worker、heartbeat、AI runtime、model実行を行わない。Day99ではQueueを変更せず、Mac mini/RTX capability、health/readiness、heartbeat、Redis registry、processing jobのclaim/result純粋契約を別境界として定義した。
 
 ## Day101 Retry boundary
 
