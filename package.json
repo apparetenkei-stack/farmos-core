@@ -7,6 +7,9 @@
     "doc": "docs"
   },
   "scripts": {
+    "test-hermes-model-router-boundary": "tsx scripts/hermes/test_hermes_model_router_boundary.ts",
+    "run-hermes-model-router-preview": "tsx scripts/hermes/run_hermes_model_router_preview.ts",
+    "check-hermes-model-router-boundary": "pnpm run test-hermes-model-router-boundary && pnpm run test-hermes-worker-protocol-boundary && pnpm run test-hermes-redis-queue-boundary && pnpm run test-hermes-job-envelope-boundary && pnpm run test-hermes-runtime-contract-boundary && pnpm run test-hermes-api-chat-minimal-boundary && pnpm run test-hermes-api-chat-proposal-draft-boundary && pnpm run test-hermes-operational-context-integration && pnpm run build",
     "test-hermes-worker-protocol-boundary": "tsx scripts/hermes/test_hermes_worker_protocol_boundary.ts",
     "run-hermes-worker-protocol-preview": "tsx scripts/hermes/run_hermes_worker_protocol_preview.ts",
     "run-hermes-worker-registry-smoke-test": "node --env-file=.env --import tsx scripts/hermes/run_hermes_worker_registry_smoke_test.ts",

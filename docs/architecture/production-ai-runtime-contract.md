@@ -66,7 +66,7 @@ Day98では既存同期RuntimeとAPIを変更せず、独立した `hermes.queue
 
 ## Day100 Model Router boundary
 
-Day96 は model class を `lightweight` に固定し、実ルーティングを行わない。Day100 の Model Router は routing policy、選択理由、fallback policy を独立した契約として追加し、ブラウザから model を指定可能にしてはならない。
+Day96 は model class を `lightweight` に固定し、実ルーティングを行わない。Day100ではDay99 Worker summaryを純粋入力とする `hermes.router.requirement.v1` と `hermes.router.decision.v1`、固定capability policy、eligibility、決定的ranking、fallback、failure分類を追加した。ブラウザやpromptからWorker/modelを選ばず、claimやmodel実行も行わない。
 
 ## Rollback
 

@@ -56,6 +56,8 @@ Worker capabilityはDay100 Model Routerの入力候補になるが、Day99はpro
 
 Day100 Routerが利用できるsummaryはworker type、明示capability、effective readiness、health、runtime availability、draining、`active_job_count / max_concurrency`、current job、heartbeat時刻である。Secret、model名、prompt、接続情報は含めない。
 
+Day100ではこのsummaryを純粋入力として固定task policy、eligibility、capacity、決定的ranking、軽量taskだけのfallback、failure分類を持つ `hermes.router.decision.v1` を追加した。RouterはWorker claimやregistry更新を行わない。
+
 ## Smoke cleanup
 
 smoke testは一意なDay99 prefixにMac mini/RTXの2 recordとworker setだけを作成し、その3 keyだけをcleanupする。広範な削除は行わない。
