@@ -7,6 +7,9 @@
     "doc": "docs"
   },
   "scripts": {
+    "test-hermes-runtime-contract-boundary": "tsx scripts/hermes/test_hermes_runtime_contract_boundary.ts",
+    "run-hermes-runtime-operational-baseline": "tsx scripts/hermes/run_hermes_runtime_operational_baseline.ts",
+    "check-hermes-runtime-contract-boundary": "pnpm run test-hermes-runtime-contract-boundary && pnpm run test-hermes-api-chat-minimal-boundary && pnpm run test-hermes-api-chat-proposal-draft-boundary && pnpm run test-hermes-operational-context-integration && pnpm run build",
     "test": "echo \"Error: no test specified\" && exit 1",
     "run-hermes-local-llm-runtime-smoke-test": "tsx scripts/hermes/run_hermes_local_llm_runtime_smoke_test.ts",
     "test-hermes-local-llm-runtime-smoke-test": "tsx scripts/hermes/test_hermes_local_llm_runtime_smoke_test.ts",

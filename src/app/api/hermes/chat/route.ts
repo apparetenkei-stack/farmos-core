@@ -12,6 +12,12 @@ import type {
 import type {
   HermesFarmosReadonlyContextEnvelope,
 } from "../../../../../scripts/hermes/llm_runtime/hermes_farmos_readonly_context";
+import {
+  createHermesRuntimeMetadata,
+  createHermesRuntimeRequestId,
+  readHermesRuntimeNowMs,
+  type HermesRuntimeMetadata,
+} from "../../../../../scripts/hermes/llm_runtime/hermes_runtime_contract";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -42,10 +48,28 @@ const FORBIDDEN_BODY_FIELDS = [
   "connectionString",
   "systemPrompt",
   "proposalBody",
+  "requestId",
+  "request_id",
+  "taskType",
+  "task_type",
+  "priority",
+  "modelClass",
+  "model_class",
 ] as const;
 
 type EnvMap = Record<string, string | undefined>;
 type JsonRecord = Record<string, unknown>;
+
+function runtimeErrorCode(
+  envelope: HermesCliChatResponseEnvelope,
+): string | null {
+  if (envelope.status === "ok" || envelope.status === "mock_fallback") return null;
+  if (envelope.status === "timeout") return "runtime_timeout";
+  if (envelope.status === "runtime_error") return "runtime_error";
+  if (envelope.status === "disabled_by_env") return "runtime_disabled";
+  if (envelope.status === "blocked") return "runtime_blocked";
+  return envelope.error_message;
+}
 
 type HermesProposalDraftCandidate = {
   id: "dry_run_day78_proposal_draft_candidate";
@@ -97,6 +121,7 @@ export type HermesApiChatMinimalBoundaryEnvelope =
     proposal_draft_persisted: false;
     proposal_draft_apply_ready: false;
     proposal_draft_candidate: HermesProposalDraftCandidate | null;
+    runtime_metadata: HermesRuntimeMetadata;
   };
 
 export type HermesApiChatMinimalBoundaryResult = {
@@ -251,6 +276,7 @@ function normalizeEnvelope(input: {
   requestBodyValid: boolean;
   requestJsonParseError: boolean;
   proposalDraftCandidate?: HermesProposalDraftCandidate | null;
+  runtimeMetadata: HermesRuntimeMetadata;
 }): HermesApiChatMinimalBoundaryEnvelope {
   return {
     ...input.envelope,
@@ -287,6 +313,7 @@ function normalizeEnvelope(input: {
     proposal_draft_persisted: false,
     proposal_draft_apply_ready: false,
     proposal_draft_candidate: input.proposalDraftCandidate ?? null,
+    runtime_metadata: input.runtimeMetadata,
   };
 }
 
@@ -301,6 +328,9 @@ async function makeStoppedEnvelope(input: {
   requestBodyReceived: boolean;
   requestBodyValid: boolean;
   requestJsonParseError: boolean;
+  runtimeMetadataFor: (
+    envelope: HermesCliChatResponseEnvelope,
+  ) => HermesRuntimeMetadata;
 }): Promise<HermesApiChatMinimalBoundaryEnvelope> {
   const seed = await runHermesCliChatRuntime({
     smokeTestEnabled: false,
@@ -312,8 +342,7 @@ async function makeStoppedEnvelope(input: {
     timeoutMs: input.env.HERMES_LLM_TIMEOUT_MS,
   });
 
-  return normalizeEnvelope({
-    envelope: {
+  const envelope: HermesCliChatResponseEnvelope = {
       ...seed,
       status: input.status,
       runtime_call_allowed: false,
@@ -336,11 +365,15 @@ async function makeStoppedEnvelope(input: {
       db_write_performed: false,
       farm_context_included: false,
       db_context_included: false,
-    },
+  };
+
+  return normalizeEnvelope({
+    envelope,
     apiBoundaryEnabled: input.apiBoundaryEnabled,
     requestBodyReceived: input.requestBodyReceived,
     requestBodyValid: input.requestBodyValid,
     requestJsonParseError: input.requestJsonParseError,
+    runtimeMetadata: input.runtimeMetadataFor(envelope),
   });
 }
 
@@ -350,10 +383,26 @@ export async function runHermesApiChatMinimalBoundary(input: {
   env?: EnvMap;
   fetchImpl?: typeof fetch;
   readonlyContextReader?: () => Promise<HermesFarmosReadonlyContextEnvelope>;
+  requestIdFactory?: () => string;
+  nowMs?: () => number;
 }): Promise<HermesApiChatMinimalBoundaryResult> {
   const env = input.env ?? process.env;
+  const requestId = (input.requestIdFactory ?? createHermesRuntimeRequestId)();
+  const nowMs = input.nowMs ?? readHermesRuntimeNowMs;
+  const startedAtMs = nowMs();
   const apiBoundaryEnabled =
     env.HERMES_API_CHAT_MINIMAL_BOUNDARY_ENABLED === "true";
+
+  const runtimeMetadata = (envelope: HermesCliChatResponseEnvelope) =>
+    createHermesRuntimeMetadata({
+      requestId,
+      providerStatus: envelope.status,
+      runtimeReachable: envelope.runtime_reachable,
+      timeoutMs: envelope.timeout_ms,
+      startedAtMs,
+      finishedAtMs: nowMs(),
+      errorCode: runtimeErrorCode(envelope),
+    });
 
   if (input.requestJsonParseError === true) {
     return {
@@ -369,6 +418,7 @@ export async function runHermesApiChatMinimalBoundary(input: {
         requestBodyReceived: true,
         requestBodyValid: false,
         requestJsonParseError: true,
+        runtimeMetadataFor: runtimeMetadata,
       }),
     };
   }
@@ -389,6 +439,7 @@ export async function runHermesApiChatMinimalBoundary(input: {
         requestBodyReceived: true,
         requestBodyValid: false,
         requestJsonParseError: false,
+        runtimeMetadataFor: runtimeMetadata,
       }),
     };
   }
@@ -407,21 +458,42 @@ export async function runHermesApiChatMinimalBoundary(input: {
         requestBodyReceived: true,
         requestBodyValid: true,
         requestJsonParseError: false,
+        runtimeMetadataFor: runtimeMetadata,
       }),
     };
   }
 
-  const runtimeEnvelope = await runHermesCliChatRuntime({
-    smokeTestEnabled: env.HERMES_LLM_SMOKE_TEST_ENABLED === "true",
-    provider: validation.provider,
-    message: validation.message,
-    includeReadonlyContext: validation.includeReadonlyContext,
-    baseUrl: env.HERMES_OLLAMA_BASE_URL,
-    model: env.HERMES_OLLAMA_MODEL,
-    timeoutMs: env.HERMES_LLM_TIMEOUT_MS,
-    fetchImpl: input.fetchImpl,
-    readonlyContextReader: input.readonlyContextReader,
-  });
+  let runtimeEnvelope: HermesCliChatResponseEnvelope;
+  try {
+    runtimeEnvelope = await runHermesCliChatRuntime({
+      smokeTestEnabled: env.HERMES_LLM_SMOKE_TEST_ENABLED === "true",
+      provider: validation.provider,
+      message: validation.message,
+      includeReadonlyContext: validation.includeReadonlyContext,
+      baseUrl: env.HERMES_OLLAMA_BASE_URL,
+      model: env.HERMES_OLLAMA_MODEL,
+      timeoutMs: env.HERMES_LLM_TIMEOUT_MS,
+      fetchImpl: input.fetchImpl,
+      readonlyContextReader: input.readonlyContextReader,
+    });
+  } catch {
+    return {
+      httpStatus: 200,
+      body: await makeStoppedEnvelope({
+        env,
+        provider: validation.provider,
+        message: validation.message,
+        includeReadonlyContext: validation.includeReadonlyContext,
+        status: "runtime_error",
+        errorMessage: "api_runtime_execution_failed",
+        apiBoundaryEnabled: true,
+        requestBodyReceived: true,
+        requestBodyValid: true,
+        requestJsonParseError: false,
+        runtimeMetadataFor: runtimeMetadata,
+      }),
+    };
+  }
 
   return {
     httpStatus: runtimeEnvelope.status === "bad_request" ? 400 : 200,
@@ -431,6 +503,7 @@ export async function runHermesApiChatMinimalBoundary(input: {
       requestBodyReceived: true,
       requestBodyValid: runtimeEnvelope.status !== "bad_request",
       requestJsonParseError: false,
+      runtimeMetadata: runtimeMetadata(runtimeEnvelope),
       proposalDraftCandidate:
         validation.provider === "mock" && runtimeEnvelope.status !== "bad_request"
           ? buildProposalDraftCandidate(validation.message)
