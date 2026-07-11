@@ -62,6 +62,8 @@ prompt、response、read-only context、Secret、認証情報、DB 接続情報�
 
 Day96 は `queue_used: false` までを契約化する。Day97では、同期Runtimeを変更せず、独立した `hermes.job.v1` Job Envelope、request/job ID分離、status遷移、payload分離、固定TTLを確定した。Redis接続、enqueue/dequeue、job persistence、retryは行わず、実Queue接続はDay98の別境界とする。
 
+Day98では既存同期RuntimeとAPIを変更せず、独立した `hermes.queue.v1` でRedisへの最小配送境界を追加した。Queueは明示runner/serviceからのみ利用し、Worker/model実行と自動retryは行わない。
+
 ## Day100 Model Router boundary
 
 Day96 は model class を `lightweight` に固定し、実ルーティングを行わない。Day100 の Model Router は routing policy、選択理由、fallback policy を独立した契約として追加し、ブラウザから model を指定可能にしてはならない。

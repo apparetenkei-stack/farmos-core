@@ -59,7 +59,7 @@ Day96の同期APIは `hermes.runtime.v1`、`execution_mode: synchronous`、`queu
 
 ## Day98 Redis Queue boundary
 
-Day97はRedis接続、enqueue/dequeue、job persistenceを実装しない。Day98では `hermes.job.v1` を入力契約として利用できるが、永続化、配送保証、重複、障害時の扱いを別の安全境界として定義する必要がある。
+Day97はRedis接続、enqueue/dequeue、job persistenceを実装しない。Day98では `hermes.job.v1` を変更せず、外側の `hermes.queue.v1` によるRedis配送、重複抑止、status参照、retry count保持、dead-letter隔離、TTL、停止時fail-closedを実装した。Worker実行はDay99の別境界である。
 
 ## Rollback
 
