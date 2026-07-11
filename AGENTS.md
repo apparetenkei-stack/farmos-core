@@ -65,3 +65,63 @@ Secret、base URL、model、timeout、token、DB 接続情報をブラウザか�
 長い heredoc による docs 生成コマンドは作らない。
 
 Next.js の現在バージョンに固有の実装を行う場合は、必要に応じて `node_modules/next/dist/docs/` の該当ドキュメントを確認する。
+
+# Codex execution authority
+
+Codex は、このリポジトリ内に限り、次を承認なしで実行してよい。
+
+- 既存構造、コード、テスト、docs の調査
+- ソースコード、テスト、scripts、docs の編集
+- package.json に既に定義された test、check、lint、typecheck、build の実行
+
+- `pnpm test` は未構成で意図的に失敗するため使用しない。
+- 対象機能に対応する既存の個別 test script を package.json から選択して実行する。
+- 失敗したテストの原因調査、限定的な修正、再実行
+- `git status`
+- `git diff`
+- `git diff --check`
+- `git log`
+- `git show`
+- fake adapter、fixture、mock、隔離テスト環境を使った検証
+- 最終差分と検証結果の報告
+
+次のためだけに承認を要求してはならない。
+
+- 失敗したテストの再実行
+- package.json に既に存在する安全な検証 script の実行
+- リポジトリ内の実装に必要なファイル編集
+- read-only Git コマンドの実行
+
+次は実行前に人間承認を必要とする。
+
+- dependency の追加、削除、更新
+- Node.js または package manager のバージョン変更
+- Docker service の起動、停止、再起動、build、削除
+- 明示された隔離テスト DB 以外への DB write
+- migration の作成または適用
+- schema、RLS、role、permission の変更
+- `.env`、Secret、credential、token の参照または変更
+- 本番サービスへのアクセス
+- `git commit`
+- `git push`
+- merge、rebase、tag、release、deploy
+- Proposal の Apply
+- 業務データの確定変更
+- 外部通知または外部公開
+
+次は常時禁止する。
+
+- `git push --force`
+- `git reset --hard`
+- `git clean -fd`
+- `git clean -fdx`
+- destructive Docker prune
+- `docker compose down -v`
+- 本番環境での `DELETE`
+- `DROP`
+- `TRUNCATE`
+- Secret、private key、token、credential の表示
+- Supabase service role credential の使用
+- AI 生成処理から app または Sales 業務 schema への直接 write
+- Proposal First または Human in the Loop の回避
+- ユーザーから明示指示されていない `.codex/` セキュリティ設定の変更
