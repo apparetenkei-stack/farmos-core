@@ -53,7 +53,7 @@ prompt、message、conversation、Redis URL、credentials、hostname、IP、mode
 
 ## Day101 retry and cancellation boundary
 
-Day100はretry、cancel、claim release、capacity解放を行わない。Day101はrouting decisionとは別のpolicy境界として定義する。
+Day100はretry、cancel、claim release、capacity解放を行わない。Day101はrouting decisionとは別にtimeout/retry/cancel policyとatomic recovery storeを追加した。Routerのdecision、ranking、fallbackに副作用は追加していない。
 
 ## Day102 WOL and RTX startup boundary
 

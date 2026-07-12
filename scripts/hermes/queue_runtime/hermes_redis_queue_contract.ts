@@ -9,8 +9,10 @@ export const HERMES_QUEUE_MAX_RETRY_COUNT = 1;
 export type HermesQueueRecordStatus =
   | "queued"
   | "processing"
+  | "retry_scheduled"
   | "succeeded"
   | "failed"
+  | "cancelled"
   | "dead_letter";
 
 export type HermesQueuedJobRecord = {

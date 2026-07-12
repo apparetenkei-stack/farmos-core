@@ -68,6 +68,10 @@ Day98では既存同期RuntimeとAPIを変更せず、独立した `hermes.queue
 
 Day96 は model class を `lightweight` に固定し、実ルーティングを行わない。Day100ではDay99 Worker summaryを純粋入力とする `hermes.router.requirement.v1` と `hermes.router.decision.v1`、固定capability policy、eligibility、決定的ranking、fallback、failure分類を追加した。ブラウザやpromptからWorker/modelを選ばず、claimやmodel実行も行わない。
 
+## Day101 Recovery boundary
+
+Day101では同期APIとブラウザrequest bodyを変更せず、server-side timeout判定、固定retry分類、exponential backoff、schedule-only retry、user cancellation、claim/capacity解放を追加した。AI/model、DB、Proposal、Audit、公開APIは実行しない。
+
 ## Rollback
 
 Day96 の rollback は次の追加だけを取り除く。

@@ -4,6 +4,7 @@ import { createHermesJobEnvelope } from "./job_runtime/hermes_job_envelope";
 import type { HermesRedisQueueStore } from "./queue_runtime/hermes_redis_client";
 import {
   createHermesRedisQueueKeys,
+  type HermesQueueRecordStatus,
   type HermesRedisQueueKeys,
 } from "./queue_runtime/hermes_redis_queue_contract";
 import {
@@ -131,6 +132,8 @@ function context(store: FakeRedisStore, keys: HermesRedisQueueKeys, enabled = tr
 }
 
 async function main(): Promise<void> {
+  const day101QueueStatuses: readonly HermesQueueRecordStatus[] = ["retry_scheduled", "cancelled"];
+  assert.deepEqual(day101QueueStatuses, ["retry_scheduled", "cancelled"]);
   const keys = createHermesRedisQueueKeys(PREFIX);
   assert.equal(keys.pending, `${PREFIX}:queue:pending`);
   assert.equal(keys.processing, `${PREFIX}:queue:processing`);

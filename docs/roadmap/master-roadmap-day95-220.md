@@ -29,3 +29,5 @@ Day98では `hermes.job.v1` を維持したまま、Redis primitiveによる `he
 Day99では `hermes.worker.v1`、Mac mini/RTX capability、health/readiness、heartbeat、Redis Worker registry、job claim/resultを確定する。常駐Worker、AI/model実行、WOL、SSH、GPU検出、worker routingは実装しない。
 
 Day100では `hermes.router.requirement.v1` と `hermes.router.decision.v1`、固定task/capability policy、effective readiness、capacity filtering、決定的ranking、軽量task fallback、failure分類を確定する。claim、Queue更新、model実行は行わない。
+
+Day101では `hermes.timeout.policy.v1`、`hermes.retry.policy.v1`、`hermes.retry.schedule.v1`、`hermes.cancel.request.v1`、固定retry分類、exponential backoff、duplicate防止、user cancellation、claim/capacityのatomic解放を確定する。常駐scheduler、自動retry、Worker signal、model実行、公開APIは行わない。

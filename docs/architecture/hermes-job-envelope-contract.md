@@ -17,21 +17,23 @@
 - `running`: workerが処理開始済み
 - `succeeded`: 正常完了
 - `failed`: 実行失敗。Day97では自動retryしない
+- `retry_scheduled`: 一時障害後のretry schedule待機中で、Workerは実行していない
 - `cancelled`: 実行開始前または実行中にキャンセル済み。キャンセル機能自体は未実装
 - `expired`: 期限切れで実行対象外
 
-`succeeded`、`failed`、`cancelled`、`expired` はterminal statusである。
+`succeeded`、`failed`、`cancelled`、`expired` はJob attemptのterminal statusである。ただしfailedのterminal判定はRecovery retry禁止を意味しない。retry可否はDay101の独立したeligibility policyが判定する。`retry_scheduled` はWorker未実行の非terminal待機状態である。
 
 ## Allowed transitions
 
 - `queued` → `running`, `cancelled`, `expired`
 - `running` → `succeeded`, `failed`, `cancelled`, `expired`
+- `retry_scheduled` → `cancelled`, `expired`
 
 遷移時に変更するのは `status` と `updated_at` だけである。
 
 ## Forbidden transitions
 
-直接の `queued` → `succeeded` / `failed`、`running` → `queued`、terminal statusからの全遷移を禁止する。不正遷移は状態を変更せず拒否する。
+通常のJob lifecycleでは、直接の `queued` → `succeeded` / `failed` / `retry_scheduled`、`running` / `failed` → `retry_scheduled`、`retry_scheduled` → `queued` / `running` を禁止する。failedからのscheduleはeligibility承認済み入力を要求するRecovery専用transitionまたはRedis atomic処理だけが行う。後続schedulerも既存Jobをrunningへ戻さず、新attemptを生成する。
 
 ## Payload and runtime metadata
 
@@ -60,6 +62,10 @@ Day96の同期APIは `hermes.runtime.v1`、`execution_mode: synchronous`、`queu
 ## Day98 Redis Queue boundary
 
 Day97はRedis接続、enqueue/dequeue、job persistenceを実装しない。Day98では `hermes.job.v1` を変更せず、外側の `hermes.queue.v1` によるRedis配送、重複抑止、status参照、retry count保持、dead-letter隔離、TTL、停止時fail-closedを実装した。Worker実行はDay99の別境界である。
+
+## Day101 recovery boundary
+
+Day101はtimeout/retry/cancelを外側のpolicyとQueue atomic transitionとして追加した。failedはattempt terminalのまま、retry可能なfailedまたはrunningだけをRecovery専用処理で `retry_scheduled` へ移す。`retry_scheduled` はcancelまたはexpireできるがqueued/runningへ直接戻さない。IDとabsolute `expires_at` は変更しない。
 
 ## Rollback
 

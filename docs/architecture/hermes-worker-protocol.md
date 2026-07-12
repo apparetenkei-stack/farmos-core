@@ -58,6 +58,10 @@ Day100 Routerが利用できるsummaryはworker type、明示capability、effect
 
 Day100ではこのsummaryを純粋入力として固定task policy、eligibility、capacity、決定的ranking、軽量taskだけのfallback、failure分類を持つ `hermes.router.decision.v1` を追加した。RouterはWorker claimやregistry更新を行わない。
 
+## Day101 recovery boundary
+
+Day101はretry schedule/cancel時にDay99 claimを削除し、対象jobを保持するWorkerだけを原子的に解放する。active countは0未満にせず、別jobのcapacityを変更しない。Worker signalやmodel interruptは行わない。
+
 ## Smoke cleanup
 
 smoke testは一意なDay99 prefixにMac mini/RTXの2 recordとworker setだけを作成し、その3 keyだけをcleanupする。広範な削除は行わない。

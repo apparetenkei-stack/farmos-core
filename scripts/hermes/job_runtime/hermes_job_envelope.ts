@@ -8,6 +8,7 @@ export type HermesJobStatus =
   | "running"
   | "succeeded"
   | "failed"
+  | "retry_scheduled"
   | "cancelled"
   | "expired";
 
@@ -63,6 +64,7 @@ const ALLOWED_TRANSITIONS: Readonly<Record<HermesJobStatus, readonly HermesJobSt
   running: ["succeeded", "failed", "cancelled", "expired"],
   succeeded: [],
   failed: [],
+  retry_scheduled: ["cancelled", "expired"],
   cancelled: [],
   expired: [],
 };
@@ -154,6 +156,10 @@ export function canTransitionHermesJobStatus(
   to: HermesJobStatus,
 ): boolean {
   return ALLOWED_TRANSITIONS[from].includes(to);
+}
+
+export function isHermesJobTerminalStatus(status: HermesJobStatus): boolean {
+  return status === "succeeded" || status === "failed" || status === "cancelled" || status === "expired";
 }
 
 export function transitionHermesJobEnvelope(

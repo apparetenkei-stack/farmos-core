@@ -66,7 +66,7 @@ Day98は配送と状態参照までであり、常駐Worker、heartbeat、AI run
 
 ## Day101 Retry boundary
 
-Day98はretry countの保持と明示incrementだけを提供する。対象判定、自動retry、backoff、再enqueueはDay101で定義する。
+Day98はretry countの保持と明示incrementだけを提供する。Day101はJob/Queue共通のWorker未実行status `retry_scheduled` とterminalのQueue status `cancelled`、Luaによるclaim/capacity解放を追加した。failedはattempt terminalだがRecovery policyでretry可能であり、runningまたはretry可能なfailedだけをscheduleする。retry_scheduledはcancel/expire可能で、cancel時は対応retry keyを原子的に削除する。queued/runningへ直接戻さず、後続schedulerが新attemptを生成する。backoff中はpendingへ戻さず、cancelをdead-letterへ入れず、record期限をJobのabsolute deadlineへ揃える。
 
 ## Smoke test cleanup
 

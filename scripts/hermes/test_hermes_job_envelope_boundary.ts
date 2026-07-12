@@ -7,6 +7,7 @@ import {
   createHermesJobEnvelope,
   createHermesJobPayload,
   isHermesJobExpired,
+  isHermesJobTerminalStatus,
   transitionHermesJobEnvelope,
   type HermesJobStatus,
 } from "./job_runtime/hermes_job_envelope";
@@ -42,9 +43,11 @@ function assertSafety(envelope: ReturnType<typeof createEnvelope>): void {
 
 function assertTransition(from: HermesJobStatus, to: HermesJobStatus): void {
   const queued = createEnvelope();
-  const source = from === "queued"
-    ? queued
-    : transitionHermesJobEnvelope(queued, "running", "2026-07-11T06:00:01.000Z");
+  const running = transitionHermesJobEnvelope(queued, "running", "2026-07-11T06:00:01.000Z");
+  const source = from === "queued" ? queued
+    : from === "failed" ? transitionHermesJobEnvelope(running, "failed", "2026-07-11T06:00:01.500Z")
+    : from === "retry_scheduled" ? { ...running, runtime: { ...running.runtime, status: "retry_scheduled" as const } }
+    : running;
   assert.equal(source.runtime.status, from);
 
   const before = structuredClone(source);
@@ -159,6 +162,8 @@ function main(): void {
     ["running", "failed"],
     ["running", "cancelled"],
     ["running", "expired"],
+    ["retry_scheduled", "cancelled"],
+    ["retry_scheduled", "expired"],
   ];
   for (const [from, to] of allowedTransitions) {
     assert.equal(canTransitionHermesJobStatus(from, to), true);
@@ -171,6 +176,9 @@ function main(): void {
     ["running", "queued"],
     ["succeeded", "running"],
     ["failed", "queued"],
+    ["failed", "retry_scheduled"],
+    ["retry_scheduled", "running"],
+    ["retry_scheduled", "queued"],
     ["cancelled", "running"],
     ["expired", "queued"],
   ];
@@ -183,6 +191,7 @@ function main(): void {
     "running",
     "succeeded",
     "failed",
+    "retry_scheduled",
     "cancelled",
     "expired",
   ];
@@ -194,6 +203,11 @@ function main(): void {
       assert.equal(canTransitionHermesJobStatus(from, to), expected);
     }
   }
+  assert.equal(isHermesJobTerminalStatus("succeeded"), true);
+  assert.equal(isHermesJobTerminalStatus("cancelled"), true);
+  assert.equal(isHermesJobTerminalStatus("expired"), true);
+  assert.equal(isHermesJobTerminalStatus("failed"), true);
+  assert.equal(isHermesJobTerminalStatus("retry_scheduled"), false);
 
   const createdMs = Date.parse(envelope.runtime.created_at);
   const expiresMs = Date.parse(envelope.runtime.expires_at);
@@ -207,7 +221,7 @@ function main(): void {
     result: "ok",
     checked: "hermes_job_envelope_boundary",
     schema_version: envelope.schema_version,
-    statuses_defined: 6,
+    statuses_defined: 7,
     allowed_transitions_checked: allowedTransitions.length,
     terminal_statuses_fail_closed: true,
     redis_connection_performed: false,
