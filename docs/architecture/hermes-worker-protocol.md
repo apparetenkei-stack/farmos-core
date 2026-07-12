@@ -62,6 +62,10 @@ Day100ではこのsummaryを純粋入力として固定task policy、eligibility
 
 Day101はretry schedule/cancel時にDay99 claimを削除し、対象jobを保持するWorkerだけを原子的に解放する。active countは0未満にせず、別jobのcapacityを変更しない。Worker signalやmodel interruptは行わない。
 
+## Day102 RTX startup request boundary
+
+Day102はDay99の安全なWorker summaryを読み取り、RTXのoffline/not-ready/runtime-unavailable/missingを分類してwake request候補にする。registry、heartbeat、claim、capacityは変更せず、unhealthy、draining、capacity fullを起動対象にしない。
+
 ## Smoke cleanup
 
 smoke testは一意なDay99 prefixにMac mini/RTXの2 recordとworker setだけを作成し、その3 keyだけをcleanupする。広範な削除は行わない。

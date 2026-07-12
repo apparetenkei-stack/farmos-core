@@ -57,7 +57,7 @@ Day100はretry、cancel、claim release、capacity解放を行わない。Day101
 
 ## Day102 WOL and RTX startup boundary
 
-Day100はoffline RTXを起動せず、WOL、SSH、HTTP、GPU検出を行わない。Day102で必要な場合も明示的な運用・承認境界として分離する。
+Day100はoffline RTXを起動せず、network起動、remote接続、GPU検出を行わない。Day102はRTX必須taskの `no_ready_worker` decisionだけを読み取り、required capabilityを持つRTX集合を再検証して別のatomic storeへwake requestを保存する。capable ready Workerと `no_ready_worker` の矛盾はfail-closed、heartbeat staleは古いcapacityより優先する。Router schemaと副作用なし契約は変更せず、`no_capacity` はstartupへ変換しない。decision canonical replayはrequest有効期間内だけで、失効後のcooldown中は同一decisionも拒否する。
 
 ## Rollback
 

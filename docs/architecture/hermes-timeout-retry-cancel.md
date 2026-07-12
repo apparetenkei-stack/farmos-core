@@ -44,6 +44,8 @@ JobとWorker更新は `KEEPTTL` を使用する。retry/cancel recordは `PEXPIR
 
 Day98 Queueのdedupe、pending/processing/dead-letter keyと `max_retry_count=1` を維持する。Day99 claim keyとregistry schemaを再利用し、capacityを負数にしない。Day100 Routerは変更せず、Routerからrecoveryを呼ばない。Day102 WOL境界にもWOL、SSH、RTX起動、GPU検出を先行実装しない。
 
+Day102はRecoveryとは独立したRTX wake request保存境界である。retry/cancelからstartupを呼ばず、`retry_scheduled` Jobを暗黙実行しない。
+
 ## Rollback
 
 `recovery_runtime`、Day101 test/preview/smoke、package scripts、本書と各文書のDay101追記を取り除き、Queue statusの `retry_scheduled` と `cancelled` 追加を戻す。DB、migration、RLS、API、Proposal、Audit、業務データのrollbackは不要である。

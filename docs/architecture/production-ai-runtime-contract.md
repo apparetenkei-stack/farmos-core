@@ -72,6 +72,10 @@ Day96 は model class を `lightweight` に固定し、実ルーティングを�
 
 Day101では同期APIとブラウザrequest bodyを変更せず、server-side timeout判定、固定retry分類、exponential backoff、schedule-only retry、user cancellation、claim/capacity解放を追加した。AI/model、DB、Proposal、Audit、公開APIは実行しない。
 
+## Day102 RTX startup request boundary
+
+Day102では既存同期APIとrequest bodyを変更せず、RTX必須taskの `no_ready_worker` をserver-sideで分類し、実行前のwake requestだけをRedisへ原子的に保存する。起動信号、remote接続、GPU/model実行、DB writeは行わない。
+
 ## Rollback
 
 Day96 の rollback は次の追加だけを取り除く。
