@@ -55,7 +55,7 @@ export type HermesWorkerWakeRequest = {
   requested_at: string;
   expires_at: string;
   cooldown_until: string;
-  status: "requested";
+  status: HermesWorkerWakeRequestStatus;
   requested_by: "server_policy";
   safety: {
     wol_packet_sent: false; ssh_connection_performed: false; gpu_detection_performed: false;

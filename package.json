@@ -7,6 +7,11 @@
     "doc": "docs"
   },
   "scripts": {
+    "test-hermes-wake-execution-boundary": "tsx scripts/hermes/test_hermes_wake_execution_boundary.ts",
+    "run-hermes-wake-execution-preview": "tsx scripts/hermes/run_hermes_wake_execution_preview.ts",
+    "run-hermes-wake-execution-smoke-test": "node --env-file=.env --import tsx scripts/hermes/run_hermes_wake_execution_smoke_test.ts",
+    "run-hermes-wake-execution-real-smoke-test": "node --env-file=.env --import tsx scripts/hermes/run_hermes_wake_execution_real_smoke_test.ts",
+    "check-hermes-wake-execution-boundary": "pnpm run test-hermes-wake-execution-boundary && pnpm run test-hermes-worker-startup-boundary && pnpm run test-hermes-job-recovery-boundary && pnpm run test-hermes-model-router-boundary && pnpm run test-hermes-worker-protocol-boundary && pnpm run test-hermes-redis-queue-boundary && pnpm run test-hermes-job-envelope-boundary && pnpm run test-hermes-runtime-contract-boundary && pnpm run test-hermes-api-chat-minimal-boundary && pnpm run test-hermes-api-chat-proposal-draft-boundary && pnpm run test-hermes-operational-context-integration && pnpm run build",
     "test-hermes-worker-startup-boundary": "tsx scripts/hermes/test_hermes_worker_startup_boundary.ts",
     "run-hermes-worker-startup-preview": "tsx scripts/hermes/run_hermes_worker_startup_preview.ts",
     "run-hermes-worker-startup-smoke-test": "node --env-file=.env --import tsx scripts/hermes/run_hermes_worker_startup_smoke_test.ts",

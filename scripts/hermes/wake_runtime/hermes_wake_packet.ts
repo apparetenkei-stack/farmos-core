@@ -1,0 +1,1 @@
+export function createHermesWakeMagicPacket(normalizedMac:string):Buffer{if(!/^[0-9a-f]{12}$/u.test(normalizedMac))throw new Error("wake_mac_invalid");const mac=Buffer.from(normalizedMac,"hex"),packet=Buffer.alloc(102,0xff);for(let i=0;i<16;i++)mac.copy(packet,6+i*6);return packet}

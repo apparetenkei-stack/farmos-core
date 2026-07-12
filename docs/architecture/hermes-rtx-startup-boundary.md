@@ -40,7 +40,7 @@ Day99 Worker registry、heartbeat、claim、capacityは読み取り入力であ�
 
 ## Day103 execution boundary
 
-実際の起動信号、network target解決、起動確認はDay103以降の明示的な承認・実行境界で扱う。Day102の `requested` は実行済みを意味しない。
+Day103は2分以内のoperator approval、server-side target照合、atomic reservationを経た明示runnerだけで1 packetを送る。成功時にrequestをacknowledgedへ更新する。Day102の `requested` は実行済みを意味しない。
 
 ## Rollback
 

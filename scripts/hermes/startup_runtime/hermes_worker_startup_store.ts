@@ -47,7 +47,7 @@ export function parseHermesWorkerWakeRequest(value: string): HermesWorkerWakeReq
       !/^[0-9a-z]+(?:-[0-9a-z]+)*$/iu.test(r.routing_decision_id) || !(["heavy_reasoning", "large_context", "gpu_inference"] as unknown[]).includes(r.required_capability) ||
       !(["required_worker_offline", "required_worker_not_ready", "required_worker_runtime_unavailable", "required_worker_missing"] as unknown[]).includes(r.reason_code) ||
       !Number.isFinite(requested) || new Date(requested).toISOString() !== r.requested_at || expires - requested !== 300000 || cooldown - requested !== 600000 ||
-      r.status !== "requested" || r.requested_by !== "server_policy" || r.safety?.wol_packet_sent !== false ||
+      !(["requested", "acknowledged", "expired", "cancelled"] as unknown[]).includes(r.status) || r.requested_by !== "server_policy" || r.safety?.wol_packet_sent !== false ||
       r.safety.ssh_connection_performed !== false || r.safety.gpu_detection_performed !== false || r.safety.worker_execution_performed !== false ||
       r.safety.model_execution_performed !== false || r.safety.secret_stored !== false || r.safety.db_write_performed !== false || r.safety.fail_closed !== true) return null;
     return r;

@@ -76,6 +76,10 @@ Day101では同期APIとブラウザrequest bodyを変更せず、server-side ti
 
 Day102では既存同期APIとrequest bodyを変更せず、RTX必須taskの `no_ready_worker` をserver-sideで分類し、実行前のwake requestだけをRedisへ原子的に保存する。起動信号、remote接続、GPU/model実行、DB writeは行わない。
 
+## Day103 Approved Wake Execution boundary
+
+Day103は公開APIを追加せず、明示operator approvalとatomic reservationを通る専用runnerだけに1回のwake送信を限定する。送信後もremote接続、GPU/model実行、DB writeを行わない。
+
 ## Rollback
 
 Day96 の rollback は次の追加だけを取り除く。

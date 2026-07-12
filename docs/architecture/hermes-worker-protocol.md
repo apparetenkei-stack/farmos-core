@@ -66,6 +66,10 @@ Day101はretry schedule/cancel時にDay99 claimを削除し、対象jobを保持
 
 Day102はDay99の安全なWorker summaryを読み取り、RTXのoffline/not-ready/runtime-unavailable/missingを分類してwake request候補にする。registry、heartbeat、claim、capacityは変更せず、unhealthy、draining、capacity fullを起動対象にしない。
 
+## Day103 approved wake execution
+
+Day103はapproved wake requestを実行するが、Worker registry、heartbeat、claim、capacityを変更せず、起動復帰確認はDay104へ分離する。
+
 ## Smoke cleanup
 
 smoke testは一意なDay99 prefixにMac mini/RTXの2 recordとworker setだけを作成し、その3 keyだけをcleanupする。広範な削除は行わない。
