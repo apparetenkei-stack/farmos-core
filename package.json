@@ -7,6 +7,8 @@
     "doc": "docs"
   },
   "scripts": {
+    "review:qwen": "tsx scripts/development_review/run_development_review.ts",
+    "test-development-review-boundary": "tsx scripts/development_review/test_development_review_boundary.ts",
     "test-hermes-wake-execution-boundary": "tsx scripts/hermes/test_hermes_wake_execution_boundary.ts",
     "run-hermes-wake-execution-preview": "tsx scripts/hermes/run_hermes_wake_execution_preview.ts",
     "run-hermes-wake-execution-smoke-test": "node --env-file=.env --import tsx scripts/hermes/run_hermes_wake_execution_smoke_test.ts",
