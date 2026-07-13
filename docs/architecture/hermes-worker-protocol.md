@@ -70,6 +70,8 @@ Day102はDay99の安全なWorker summaryを読み取り、RTXのoffline/not-read
 
 Day103はapproved wake requestを実行するが、Worker registry、heartbeat、claim、capacityを変更せず、起動復帰確認はDay104へ分離する。
 
+Day104はregistry recordをread-only観測し、対象RTX自身のexecution後かつfreshなheartbeatだけをboot確認へ利用する。capacity fullはboot失敗ではなくJob受入不可として分離し、heartbeatやcapacityを書き換えない。
+
 ## Smoke cleanup
 
 smoke testは一意なDay99 prefixにMac mini/RTXの2 recordとworker setだけを作成し、その3 keyだけをcleanupする。広範な削除は行わない。

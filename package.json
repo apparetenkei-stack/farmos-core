@@ -7,6 +7,10 @@
     "doc": "docs"
   },
   "scripts": {
+    "test-hermes-wake-confirmation-boundary": "tsx scripts/hermes/test_hermes_wake_confirmation_boundary.ts",
+    "run-hermes-wake-confirmation-preview": "tsx scripts/hermes/run_hermes_wake_confirmation_preview.ts",
+    "run-hermes-wake-confirmation-smoke-test": "node --env-file=.env --import tsx scripts/hermes/run_hermes_wake_confirmation_smoke_test.ts",
+    "check-hermes-wake-confirmation-boundary": "pnpm run test-hermes-wake-confirmation-boundary && pnpm run test-hermes-wake-execution-boundary && pnpm run test-hermes-worker-startup-boundary && pnpm run test-hermes-job-recovery-boundary && pnpm run test-hermes-model-router-boundary && pnpm run test-hermes-worker-protocol-boundary && pnpm run test-hermes-redis-queue-boundary && pnpm run test-hermes-job-envelope-boundary && pnpm run test-hermes-runtime-contract-boundary && pnpm run test-hermes-api-chat-minimal-boundary && pnpm run test-hermes-api-chat-proposal-draft-boundary && pnpm run test-hermes-operational-context-integration && pnpm run build",
     "review:qwen": "tsx scripts/development_review/run_development_review.ts",
     "test-development-review-boundary": "tsx scripts/development_review/test_development_review_boundary.ts",
     "test-hermes-wake-execution-boundary": "tsx scripts/hermes/test_hermes_wake_execution_boundary.ts",

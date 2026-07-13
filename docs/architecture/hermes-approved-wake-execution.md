@@ -30,6 +30,8 @@ Lua reservationはwake request、approval、status、ID、既存executionを検�
 
 Day102はwake request生成・duplicate・cooldownまでで、Day103はapproved executionだけを追加する。Worker registry、Router、Recoveryは変更しない。Day104はheartbeat復帰と実際の起動確認を扱い、Day103は起動成功そのものを判定しない。
 
+Day104はsent executionを成功根拠として直接利用せず、対象RTXのfresh post-wake heartbeat、health、readiness、runtime、capabilityを別confirmation recordで評価する。
+
 ## Rollback
 
 `wake_runtime`、Day103 test/preview/smoke、package scripts、本書とDay103文書追記、Day102 status validatorの4状態対応だけを取り除く。DB、API、Worker、Router、Recoveryのrollbackは不要である。

@@ -35,3 +35,5 @@ Day101では `hermes.timeout.policy.v1`、`hermes.retry.policy.v1`、`hermes.ret
 Day102では `hermes.worker.startup.requirement.v1`、`hermes.worker.startup.policy.v1`、`hermes.worker.wake.request.v1`、RTX-only eligibility、duplicate/cooldown、canonical replay、absolute TTL、atomic Redis persistenceを確定する。実際の起動信号、remote接続、GPU/model実行、公開APIは行わない。
 
 Day103では `hermes.wake.execution.approval.v1`、`hermes.wake.execution.policy.v1`、`hermes.wake.execution.v1`、server-side target resolver、magic packet、atomic reservation、sent/failed確定、request acknowledgmentを確定する。実行は明示runnerの1 packetに限定し、起動確認はDay104へ分離する。
+
+Day104では `hermes.wake.confirmation.policy.v1`、requirement、confirmation record、post-wake heartbeat、readiness/runtime/capability/capacity評価、atomic create/update、timeoutを確定する。Router/Queue再開はDay105以降へ分離する。

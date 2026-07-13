@@ -80,6 +80,10 @@ Day102では既存同期APIとrequest bodyを変更せず、RTX必須taskの `no
 
 Day103は公開APIを追加せず、明示operator approvalとatomic reservationを通る専用runnerだけに1回のwake送信を限定する。送信後もremote接続、GPU/model実行、DB writeを行わない。
 
+## Day104 Wake Confirmation boundary
+
+Day104はsent executionとacknowledged requestから3分のconfirmationを作成し、対象RTXのfresh heartbeat、health、readiness、runtime、capability、capacityをread-only評価する。Router、Queue、retry、remote接続、model、DBへ副作用を持たない。
+
 ## Rollback
 
 Day96 の rollback は次の追加だけを取り除く。
