@@ -97,3 +97,6 @@ DB migration、RLS、永続データ変更はないため、DB rollback は不�
 ## Day105 phase gate
 
 Post-wake routing resumeはDay96〜105 Phase Aの最終gateである。confirmed RTXを既存Routerへ再提示するが、Queue write、Worker claim、model execution、業務DB writeは行わない。
+## Day106 Daily Farm Brief production boundary
+
+Day106 adds isolated, read-only snapshot and brief contracts with explicit freshness, empty, unavailable, unknown, provenance, limitation, and deterministic truncation semantics. It does not connect the brief to Runtime dispatch, models, APIs, notifications, or business databases.

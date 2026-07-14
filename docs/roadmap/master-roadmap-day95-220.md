@@ -40,3 +40,6 @@ Day104では `hermes.wake.confirmation.policy.v1`、requirement、confirmation r
 ### Day105 complete candidate
 
 Hermes Post-Wake Routing ResumeとRuntime Phase Gateを追加し、current Worker再検証、既存Router再利用、atomic duplicate/concurrent preventionを固定した。dispatch/claim/model executionはDay106以降へ分離する。
+### Day106 — Hermes Daily Farm Brief Production Contract
+
+Production snapshot, source-state freshness, deterministic fact, provenance, limitation, strict parser, preview, and regression boundaries are implemented without external connections or writes. The Day90 prototype remains intact.
