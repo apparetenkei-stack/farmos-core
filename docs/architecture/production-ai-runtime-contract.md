@@ -108,3 +108,7 @@ Day107 reuses the existing Operational Read-only and Memory Context readers thro
 ## Day108 Daily Farm Brief scoped role projection
 
 Day108 derives deterministic crop, redacted field, and redacted Crop Cycle scope indexes from explicit references only, then applies a server-owned administrator/general_staff disclosure boundary. General staff receives only exact server-owned allow-list matches; an empty list yields zero scopes. Raw identifiers, source bodies, internal diagnostics, writes, persistence, notifications, and model or Runtime operations remain outside the boundary.
+
+## Day109 Daily Farm Brief generation orchestration
+
+Day109 adds a fixture-only, read-only decision boundary for Asia/Tokyo business dates, server-owned scheduled/manual requests, same-day duplicate prevention, bounded failed-state retry, and explicit stale display. The production schedule remains unconfigured and fails closed; no Brief persistence, scheduler, API, notification, Queue/Worker, model, or database operation is added.

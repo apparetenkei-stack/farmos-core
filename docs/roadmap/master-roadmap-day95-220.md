@@ -51,3 +51,7 @@ The existing read-only Operational and Memory Context paths are integrated with 
 ### Day108 — Hermes Daily Farm Brief Scoped and Role-aware Projection Boundary
 
 The unchanged canonical snapshot and brief now feed deterministic crop, redacted field, and redacted Crop Cycle scope indexes. Server-owned administrator/general_staff projection, strict allow-list filtering, explicit unresolved/unscoped semantics, fixture-only safe preview, and fail-closed parsers are implemented without API, UI, persistence, notification, model, Queue, Worker, migration, or RLS work. Day109 retains scheduling, manual regeneration, same-day duplicate prevention, and stale-brief display.
+
+### Day109 — Hermes Daily Farm Brief Generation Orchestration Boundary
+
+Server-owned request normalization, Asia/Tokyo business-date derivation, strict injected existing-state parsing, same-day duplicate/in-progress protection, bounded failed-state retry, and explicit stale display are implemented as deterministic fixture-only decisions. The formal schedule remains unconfigured and fail-closed; persistence, cron, API/UI, notification, Queue/Worker, model execution, and DB writes remain Day110-or-later concerns.
