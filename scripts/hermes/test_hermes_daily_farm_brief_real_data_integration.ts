@@ -5,6 +5,7 @@ import {
 } from "./brief_runtime/hermes_daily_farm_brief_policy";
 import {
   integrateHermesDailyFarmBriefRealData,
+  parseHermesDailyFarmBriefRealDataIntegrationResult,
 } from "./brief_runtime/hermes_daily_farm_brief_integration";
 import {
   createHermesDailyFarmBriefIntegrationInput,
@@ -226,6 +227,23 @@ async function main(): Promise<void> {
   assert.equal(day91Fixture.snapshot.sources.inventory.record_count, 0);
   assert.equal(day91Fixture.snapshot.sources.work_log.record_count, 2);
   assert.equal(day91Fixture.safe_preview.timezone, "Asia/Tokyo");
+  assert(parseHermesDailyFarmBriefRealDataIntegrationResult(day91Fixture));
+  assert.equal(Object.hasOwn(day91Fixture, "scope_reference_input"), false);
+  assert.doesNotMatch(
+    JSON.stringify(day91Fixture),
+    /scope_reference_input|crop_cycle_id/iu,
+  );
+  assert.equal(
+    parseHermesDailyFarmBriefRealDataIntegrationResult({
+      ...day91Fixture,
+      scope_reference_input: {
+        schema_version: "hermes.daily_farm_brief.scope_reference_input.v1",
+        workLogs: [],
+        cropCycles: [],
+      },
+    }),
+    null,
+  );
   assert.ok(
     day91Fixture.safe_preview.limitations.includes(
       "today_work_candidate_source_unavailable",

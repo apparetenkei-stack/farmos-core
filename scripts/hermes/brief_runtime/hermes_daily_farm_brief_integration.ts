@@ -11,6 +11,14 @@ import {
   buildHermesDailyFarmBrief,
   parseHermesDailyFarmBrief,
 } from "./hermes_daily_farm_brief_builder";
+import type {
+  HermesDailyFarmBriefScopeCropCycleInput,
+  HermesDailyFarmBriefScopeWorkLogInput,
+} from "./hermes_daily_farm_brief_scope_builder";
+import {
+  normalizeHermesDailyFarmBriefScopeCrop,
+  normalizeHermesDailyFarmBriefScopeId,
+} from "./hermes_daily_farm_brief_scope_builder";
 import type { HermesDailyFarmSnapshot } from "./hermes_daily_farm_snapshot_contract";
 import {
   createHermesDailyFarmSnapshot,
@@ -62,8 +70,147 @@ export type HermesDailyFarmBriefRealDataIntegrationResult = {
   safe_preview: HermesDailyFarmBriefRealDataSafePreview;
 };
 
+export type HermesDailyFarmBriefScopeReferenceInput = {
+  schema_version: "hermes.daily_farm_brief.scope_reference_input.v1";
+  workLogs: HermesDailyFarmBriefScopeWorkLogInput[];
+  cropCycles: HermesDailyFarmBriefScopeCropCycleInput[];
+};
+
+export type HermesDailyFarmBriefExecutionIntegrationBundle = {
+  integration_result: HermesDailyFarmBriefRealDataIntegrationResult;
+  scope_reference_input: HermesDailyFarmBriefScopeReferenceInput;
+};
+
 function isRecord(value: unknown): value is JsonRecord {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function hasExactKeys(value: JsonRecord, keys: readonly string[]): boolean {
+  return Object.keys(value).length === keys.length && keys.every((key) => Object.hasOwn(value, key));
+}
+
+export function parseHermesDailyFarmBriefScopeReferenceInput(
+  value: unknown,
+): HermesDailyFarmBriefScopeReferenceInput | null {
+  if (!isRecord(value) || !hasExactKeys(value, ["schema_version", "workLogs", "cropCycles"]) || value.schema_version !== "hermes.daily_farm_brief.scope_reference_input.v1" || !Array.isArray(value.workLogs) || value.workLogs.length > 1_000 || !Array.isArray(value.cropCycles) || value.cropCycles.length > 1_000) return null;
+  const validWorkLog = (item: unknown) => isRecord(item) && hasExactKeys(item, ["id", "field_id", "target_crop", "crop_cycle_id"]) && (item.id === null || normalizeHermesDailyFarmBriefScopeId(item.id) === item.id) && (item.field_id === null || normalizeHermesDailyFarmBriefScopeId(item.field_id) === item.field_id) && (item.target_crop === null || normalizeHermesDailyFarmBriefScopeCrop(item.target_crop) === item.target_crop) && (item.crop_cycle_id === null || normalizeHermesDailyFarmBriefScopeId(item.crop_cycle_id) === item.crop_cycle_id);
+  const validCropCycle = (item: unknown) => isRecord(item) && hasExactKeys(item, ["id", "crop", "field_id"]) && (item.id === null || normalizeHermesDailyFarmBriefScopeId(item.id) === item.id) && (item.crop === null || normalizeHermesDailyFarmBriefScopeCrop(item.crop) === item.crop) && (item.field_id === null || normalizeHermesDailyFarmBriefScopeId(item.field_id) === item.field_id);
+  if (!value.workLogs.every(validWorkLog) || !value.cropCycles.every(validCropCycle)) return null;
+  return structuredClone(value) as HermesDailyFarmBriefScopeReferenceInput;
+}
+
+export function parseHermesDailyFarmBriefRealDataIntegrationResult(
+  value: unknown,
+): HermesDailyFarmBriefRealDataIntegrationResult | null {
+  if (
+    !isRecord(value) ||
+    !hasExactKeys(value, [
+      "schema_version",
+      "result",
+      "snapshot",
+      "brief",
+      "brief_summary",
+      "safe_preview",
+    ]) ||
+    value.schema_version !== "hermes.daily_farm_brief.real_data.integration.v1" ||
+    !["ready", "partial", "unavailable"].includes(String(value.result))
+  ) {
+    return null;
+  }
+  const snapshot = parseHermesDailyFarmSnapshot(value.snapshot);
+  const brief = parseHermesDailyFarmBrief(value.brief);
+  if (
+    snapshot === null ||
+    brief === null ||
+    value.result !== snapshot.status ||
+    brief.status !== snapshot.status ||
+    brief.snapshot_id !== snapshot.snapshot_id ||
+    brief.generated_at !== snapshot.generated_at ||
+    !isRecord(value.brief_summary) ||
+    !isRecord(value.safe_preview)
+  ) {
+    return null;
+  }
+  return structuredClone(value) as HermesDailyFarmBriefRealDataIntegrationResult;
+}
+
+export function parseHermesDailyFarmBriefExecutionIntegrationBundle(
+  value: unknown,
+): HermesDailyFarmBriefExecutionIntegrationBundle | null {
+  if (
+    !isRecord(value) ||
+    !hasExactKeys(value, ["integration_result", "scope_reference_input"])
+  ) {
+    return null;
+  }
+  const integrationResult = value.integration_result;
+  const scopeReferenceInput = parseHermesDailyFarmBriefScopeReferenceInput(
+    value.scope_reference_input,
+  );
+  if (
+    !isRecord(integrationResult) ||
+    !hasExactKeys(integrationResult, [
+      "schema_version",
+      "result",
+      "snapshot",
+      "brief",
+      "brief_summary",
+      "safe_preview",
+    ]) ||
+    integrationResult.schema_version !==
+      "hermes.daily_farm_brief.real_data.integration.v1" ||
+    !["ready", "partial", "unavailable"].includes(
+      String(integrationResult.result),
+    ) ||
+    scopeReferenceInput === null
+  ) {
+    return null;
+  }
+  return {
+    integration_result:
+      structuredClone(integrationResult) as HermesDailyFarmBriefRealDataIntegrationResult,
+    scope_reference_input: scopeReferenceInput,
+  };
+}
+
+function createScopeReferenceInput(input: {
+  operationalOutcome: ReaderOutcome;
+  memoryOutcome: ReaderOutcome;
+  snapshot: HermesDailyFarmSnapshot;
+}): HermesDailyFarmBriefScopeReferenceInput {
+  const workLogs: HermesDailyFarmBriefScopeWorkLogInput[] = [];
+  if ((input.snapshot.sources.work_log.status === "available" || input.snapshot.sources.work_log.status === "empty") && input.operationalOutcome.status === "returned" && isRecord(input.operationalOutcome.value) && isRecord(input.operationalOutcome.value.work_log) && Array.isArray(input.operationalOutcome.value.work_log.records)) {
+    for (const item of input.operationalOutcome.value.work_log.records) {
+      if (!isRecord(item)) continue;
+      workLogs.push({
+        id: normalizeHermesDailyFarmBriefScopeId(item.id),
+        field_id: normalizeHermesDailyFarmBriefScopeId(item.fieldId),
+        target_crop: normalizeHermesDailyFarmBriefScopeCrop(item.targetCrop),
+        crop_cycle_id: normalizeHermesDailyFarmBriefScopeId(item.cropCycleId),
+      });
+    }
+  }
+  const cropCycles: HermesDailyFarmBriefScopeCropCycleInput[] = [];
+  if ((input.snapshot.sources.crop_cycle.status === "available" || input.snapshot.sources.crop_cycle.status === "empty") && input.memoryOutcome.status === "returned" && isRecord(input.memoryOutcome.value) && memorySafetyValid(input.memoryOutcome.value)) {
+    const context = input.memoryOutcome.value.context as JsonRecord;
+    const safeAppContext = context.safe_app_context as JsonRecord;
+    for (const item of safeAppContext.crop_cycles_summary as unknown[]) {
+      if (!isRecord(item)) continue;
+      cropCycles.push({
+        id: normalizeHermesDailyFarmBriefScopeId(item.id),
+        crop: normalizeHermesDailyFarmBriefScopeCrop(item.crop ?? item.crop_name ?? item.crop_type),
+        field_id: normalizeHermesDailyFarmBriefScopeId(item.field_id),
+      });
+    }
+  }
+  const references: HermesDailyFarmBriefScopeReferenceInput = {
+    schema_version: "hermes.daily_farm_brief.scope_reference_input.v1",
+    workLogs,
+    cropCycles,
+  };
+  const parsed = parseHermesDailyFarmBriefScopeReferenceInput(references);
+  if (parsed === null) throw new Error("daily_farm_brief_scope_reference_invalid");
+  return parsed;
 }
 
 async function readOnce(
@@ -273,7 +420,7 @@ function createSafePreview(input: {
   };
 }
 
-export async function integrateHermesDailyFarmBriefRealData(input: {
+type HermesDailyFarmBriefRealDataIntegrationOptions = {
   readOperationalSources: () => Promise<unknown>;
   readMemoryContext: () => Promise<unknown>;
   now?: () => string;
@@ -281,7 +428,11 @@ export async function integrateHermesDailyFarmBriefRealData(input: {
   snapshotIdFactory?: () => string;
   briefIdFactory?: () => string;
   factIdFactory?: (index: number) => string;
-}): Promise<HermesDailyFarmBriefRealDataIntegrationResult> {
+};
+
+export async function integrateHermesDailyFarmBriefExecutionBundle(
+  input: HermesDailyFarmBriefRealDataIntegrationOptions,
+): Promise<HermesDailyFarmBriefExecutionIntegrationBundle> {
   const [operationalOutcome, memoryOutcome] = await Promise.all([
     readOnce(
       input.readOperationalSources,
@@ -332,7 +483,13 @@ export async function integrateHermesDailyFarmBriefRealData(input: {
     throw new Error("daily_farm_brief_integration_brief_invalid");
   }
 
-  return {
+  const scopeReferenceInput = createScopeReferenceInput({
+    operationalOutcome,
+    memoryOutcome,
+    snapshot,
+  });
+
+  const integrationResult: HermesDailyFarmBriefRealDataIntegrationResult = {
     schema_version: "hermes.daily_farm_brief.real_data.integration.v1",
     result: snapshot.status,
     snapshot,
@@ -344,4 +501,20 @@ export async function integrateHermesDailyFarmBriefRealData(input: {
       brief: built.brief,
     }),
   };
+  const bundle = {
+    integration_result: integrationResult,
+    scope_reference_input: scopeReferenceInput,
+  };
+  const parsed = parseHermesDailyFarmBriefExecutionIntegrationBundle(bundle);
+  if (parsed === null) {
+    throw new Error("daily_farm_brief_execution_integration_bundle_invalid");
+  }
+  return parsed;
+}
+
+export async function integrateHermesDailyFarmBriefRealData(
+  input: HermesDailyFarmBriefRealDataIntegrationOptions,
+): Promise<HermesDailyFarmBriefRealDataIntegrationResult> {
+  const bundle = await integrateHermesDailyFarmBriefExecutionBundle(input);
+  return bundle.integration_result;
 }

@@ -55,3 +55,7 @@ The unchanged canonical snapshot and brief now feed deterministic crop, redacted
 ### Day109 — Hermes Daily Farm Brief Generation Orchestration Boundary
 
 Server-owned request normalization, Asia/Tokyo business-date derivation, strict injected existing-state parsing, same-day duplicate/in-progress protection, bounded failed-state retry, and explicit stale display are implemented as deterministic fixture-only decisions. The formal schedule remains unconfigured and fail-closed; persistence, cron, API/UI, notification, Queue/Worker, model execution, and DB writes remain Day110-or-later concerns.
+
+### Day110 — Hermes Daily Farm Brief Generation Execution Adapter and Latest Read Boundary
+
+The strictly parsed Day109 decision authorizes at most one Day107 integration and one Day108 scope/role projection pass. Canonical completed/skipped/failed-closed results and injected-state latest candidates distinguish current, stale, in-progress, failed, and unavailable display states without persistence, API/UI, scheduler, retry, notification, Queue/Worker, model, Redis, or DB writes.

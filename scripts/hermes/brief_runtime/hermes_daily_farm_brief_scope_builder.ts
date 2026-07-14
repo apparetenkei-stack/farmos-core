@@ -47,7 +47,7 @@ function canonicalIso(value: string): boolean {
   return Number.isFinite(timestamp) && new Date(timestamp).toISOString() === value;
 }
 
-function normalizeId(value: unknown): string | null {
+export function normalizeHermesDailyFarmBriefScopeId(value: unknown): string | null {
   if (typeof value !== "string" && typeof value !== "number") return null;
   const normalized = String(value).trim();
   return ID_PATTERN.test(normalized) ? normalized : null;
@@ -66,13 +66,13 @@ function scopeKey(type: HermesDailyFarmBriefScopeType, explicitValue: string): s
 function validateWorkLog(value: unknown): value is HermesDailyFarmBriefScopeWorkLogInput {
   if (typeof value !== "object" || value === null || Array.isArray(value)) return false;
   const record = value as Record<string, unknown>;
-  return Object.keys(record).length === 4 && ["id", "field_id", "target_crop", "crop_cycle_id"].every((key) => Object.hasOwn(record, key)) && (record.id === null || normalizeId(record.id) !== null) && (record.field_id === null || normalizeId(record.field_id) !== null) && (record.target_crop === null || typeof record.target_crop === "string") && (record.crop_cycle_id === null || normalizeId(record.crop_cycle_id) !== null);
+  return Object.keys(record).length === 4 && ["id", "field_id", "target_crop", "crop_cycle_id"].every((key) => Object.hasOwn(record, key)) && (record.id === null || normalizeHermesDailyFarmBriefScopeId(record.id) !== null) && (record.field_id === null || normalizeHermesDailyFarmBriefScopeId(record.field_id) !== null) && (record.target_crop === null || typeof record.target_crop === "string") && (record.crop_cycle_id === null || normalizeHermesDailyFarmBriefScopeId(record.crop_cycle_id) !== null);
 }
 
 function validateCropCycle(value: unknown): value is HermesDailyFarmBriefScopeCropCycleInput {
   if (typeof value !== "object" || value === null || Array.isArray(value)) return false;
   const record = value as Record<string, unknown>;
-  return Object.keys(record).length === 3 && ["id", "crop", "field_id"].every((key) => Object.hasOwn(record, key)) && (record.id === null || normalizeId(record.id) !== null) && (record.crop === null || typeof record.crop === "string") && (record.field_id === null || normalizeId(record.field_id) !== null);
+  return Object.keys(record).length === 3 && ["id", "crop", "field_id"].every((key) => Object.hasOwn(record, key)) && (record.id === null || normalizeHermesDailyFarmBriefScopeId(record.id) !== null) && (record.crop === null || typeof record.crop === "string") && (record.field_id === null || normalizeHermesDailyFarmBriefScopeId(record.field_id) !== null);
 }
 
 function addScope(map: Map<string, MutableScope>, input: { type: HermesDailyFarmBriefScopeType; explicitValue: string; source: "work_log" | "crop_cycle"; recordId: string | null }): MutableScope {
@@ -119,17 +119,17 @@ export function buildHermesDailyFarmBriefScopeIndex(input: {
   if (!snapshot || !brief || brief.snapshot_id !== snapshot.snapshot_id || brief.status !== snapshot.status || !canonicalIso(input.generatedAt) || input.generatedAt !== brief.generated_at || !isSupportedHermesDailyFarmBriefTimezone(input.timezone) || !Array.isArray(input.workLogs) || input.workLogs.length > 1_000 || !input.workLogs.every(validateWorkLog) || !Array.isArray(input.cropCycles) || input.cropCycles.length > 1_000 || !input.cropCycles.every(validateCropCycle)) throw new Error("daily_farm_brief_scope_input_invalid");
 
   const scopes = new Map<string, MutableScope>();
-  const cycleIds = new Set(input.cropCycles.map((record) => normalizeId(record.id)).filter((value): value is string => value !== null));
+  const cycleIds = new Set(input.cropCycles.map((record) => normalizeHermesDailyFarmBriefScopeId(record.id)).filter((value): value is string => value !== null));
   let unscopedWorkLogs = 0;
   let unscopedCropCycles = 0;
   let unresolvedFields = 0;
   let unresolvedCycles = 0;
 
   for (const record of input.workLogs) {
-    const recordId = normalizeId(record.id);
+    const recordId = normalizeHermesDailyFarmBriefScopeId(record.id);
     const crop = normalizeHermesDailyFarmBriefScopeCrop(record.target_crop);
-    const fieldId = normalizeId(record.field_id);
-    const cycleId = normalizeId(record.crop_cycle_id);
+    const fieldId = normalizeHermesDailyFarmBriefScopeId(record.field_id);
+    const cycleId = normalizeHermesDailyFarmBriefScopeId(record.crop_cycle_id);
     if (crop === null || fieldId === null || cycleId === null) unscopedWorkLogs += 1;
     const derived: MutableScope[] = [];
     if (crop !== null) derived.push(addScope(scopes, { type: "crop", explicitValue: crop, source: "work_log", recordId }));
@@ -149,9 +149,9 @@ export function buildHermesDailyFarmBriefScopeIndex(input: {
   }
 
   for (const record of input.cropCycles) {
-    const recordId = normalizeId(record.id);
+    const recordId = normalizeHermesDailyFarmBriefScopeId(record.id);
     const crop = normalizeHermesDailyFarmBriefScopeCrop(record.crop);
-    const fieldId = normalizeId(record.field_id);
+    const fieldId = normalizeHermesDailyFarmBriefScopeId(record.field_id);
     if (recordId === null || crop === null || fieldId === null) unscopedCropCycles += 1;
     if (crop !== null) addScope(scopes, { type: "crop", explicitValue: crop, source: "crop_cycle", recordId });
     if (fieldId !== null) {

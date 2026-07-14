@@ -112,3 +112,7 @@ Day108 derives deterministic crop, redacted field, and redacted Crop Cycle scope
 ## Day109 Daily Farm Brief generation orchestration
 
 Day109 adds a fixture-only, read-only decision boundary for Asia/Tokyo business dates, server-owned scheduled/manual requests, same-day duplicate prevention, bounded failed-state retry, and explicit stale display. The production schedule remains unconfigured and fails closed; no Brief persistence, scheduler, API, notification, Queue/Worker, model, or database operation is added.
+
+## Day110 Daily Farm Brief execution and latest read
+
+Day110 enforces the strict Day109 decision before one Day107 integration and one Day108 scope/role projection pass. It returns a canonical execution result and injected-state latest candidate without persistence, API/UI, retry, notification, Queue/Worker, model, scheduler, Redis, or database operations.
