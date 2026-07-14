@@ -37,3 +37,6 @@ Day102では `hermes.worker.startup.requirement.v1`、`hermes.worker.startup.pol
 Day103では `hermes.wake.execution.approval.v1`、`hermes.wake.execution.policy.v1`、`hermes.wake.execution.v1`、server-side target resolver、magic packet、atomic reservation、sent/failed確定、request acknowledgmentを確定する。実行は明示runnerの1 packetに限定し、起動確認はDay104へ分離する。
 
 Day104では `hermes.wake.confirmation.policy.v1`、requirement、confirmation record、post-wake heartbeat、readiness/runtime/capability/capacity評価、atomic create/update、timeoutを確定する。Router/Queue再開はDay105以降へ分離する。
+### Day105 complete candidate
+
+Hermes Post-Wake Routing ResumeとRuntime Phase Gateを追加し、current Worker再検証、既存Router再利用、atomic duplicate/concurrent preventionを固定した。dispatch/claim/model executionはDay106以降へ分離する。

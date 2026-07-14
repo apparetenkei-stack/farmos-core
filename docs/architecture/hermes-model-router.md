@@ -62,3 +62,6 @@ Day100はoffline RTXを起動せず、network起動、remote接続、GPU検出�
 ## Rollback
 
 Router runtime、unit test、preview、package scripts、Day100文書追記だけを取り除く。Worker、Queue、Job、API、DB、RLS、Proposal、Applyのrollbackは不要である。
+## Day105 post-wake resume
+
+Day105は既存`routeHermesJob()`へcanonical original requirementとcurrent target Worker snapshotを再提示する。新しいranking algorithmやfallback overrideは追加せず、wake-confirmed target以外が選択された場合はfail-closedとする。

@@ -31,3 +31,7 @@ safe queryはconfirmation/Worker観測metadataだけを返し、network target�
 ## Rollback
 
 `confirmation_runtime`、Day104 test/preview/smoke、package scripts、本書とDay104追記だけを除去する。Worker、Startup、Wake、Router、Queue、Job、API、DBのrollbackは不要である。
+
+## Day105 relationship
+
+Day105はterminal `worker_ready`を変更せず参照し、routing直前にcurrent Worker registryのfreshness/readiness/capacityを再検証する。Confirmation単独ではQueue投入やWorker claimを許可しない。

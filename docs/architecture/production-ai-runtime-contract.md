@@ -94,3 +94,6 @@ Day96 の rollback は次の追加だけを取り除く。
 4. Day96 の roadmap と architecture 文書
 
 DB migration、RLS、永続データ変更はないため、DB rollback は不要である。既存 Hermes provider status と request body 契約は変更前のまま残る。
+## Day105 phase gate
+
+Post-wake routing resumeはDay96〜105 Phase Aの最終gateである。confirmed RTXを既存Routerへ再提示するが、Queue write、Worker claim、model execution、業務DB writeは行わない。
