@@ -100,3 +100,7 @@ Post-wake routing resumeはDay96〜105 Phase Aの最終gateである。confirmed
 ## Day106 Daily Farm Brief production boundary
 
 Day106 adds isolated, read-only snapshot and brief contracts with explicit freshness, empty, unavailable, unknown, provenance, limitation, and deterministic truncation semantics. It does not connect the brief to Runtime dispatch, models, APIs, notifications, or business databases.
+
+## Day107 Daily Farm Brief real-data integration
+
+Day107 reuses the existing Operational Read-only and Memory Context readers through an injected integration boundary. It normalizes reader failure, preserves unknown source timestamps, and emits only a count/status safe preview without persistence, notification, LLM execution, Queue/Worker activity, or database writes.

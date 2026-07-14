@@ -43,3 +43,7 @@ Hermes Post-Wake Routing ResumeとRuntime Phase Gateを追加し、current Worke
 ### Day106 — Hermes Daily Farm Brief Production Contract
 
 Production snapshot, source-state freshness, deterministic fact, provenance, limitation, strict parser, preview, and regression boundaries are implemented without external connections or writes. The Day90 prototype remains intact.
+
+### Day107 — Hermes Daily Farm Brief Real Data Integration Boundary
+
+The existing read-only Operational and Memory Context paths are integrated with the Day106 canonical snapshot and brief builder. Unit and fixture preview remain connection-free; real read-only smoke is separately opt-in and outputs only safe aggregate metadata.

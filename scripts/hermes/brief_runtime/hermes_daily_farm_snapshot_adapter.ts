@@ -17,11 +17,13 @@ import type {
 
 type JsonRecord = Record<string, unknown>;
 
-type MemoryInput = {
+export type HermesDailyFarmSnapshotMemoryInput = {
   crop_cycles: unknown[];
   hermes_notes: unknown[];
   crop_cycle_generated_at: string | null;
   hermes_note_generated_at: string | null;
+  crop_cycle_available?: boolean;
+  hermes_note_available?: boolean;
 };
 
 const ID_PATTERN = /^[0-9A-Za-z][0-9A-Za-z._:-]{0,127}$/u;
@@ -485,6 +487,7 @@ function normalizeMemorySource(input: {
   sourceType: "crop_cycle" | "hermes_note";
   values: unknown;
   generatedAt: unknown;
+  available: boolean;
   nowIso: string;
 }): HermesDailyFarmSource<HermesDailyFarmMemoryRecord> {
   if (
@@ -507,7 +510,7 @@ function normalizeMemorySource(input: {
     HERMES_DAILY_FARM_BRIEF_POLICY.source_record_limits[input.sourceType];
   return createSource({
     sourceType: input.sourceType,
-    available: true,
+    available: input.available,
     generatedAt: input.generatedAt,
     records: normalizeMemoryRecords(input.values, limit),
     recordCount: input.values.length,
@@ -547,7 +550,7 @@ export function calculateHermesDailyFarmSnapshotStatus(
 
 export function createHermesDailyFarmSnapshot(input: {
   operationalSources: unknown;
-  memory: MemoryInput;
+  memory: HermesDailyFarmSnapshotMemoryInput;
   nowIso: string;
   snapshotIdFactory?: () => string;
 }): HermesDailyFarmSnapshot {
@@ -582,12 +585,14 @@ export function createHermesDailyFarmSnapshot(input: {
     sourceType: "crop_cycle",
     values: input.memory?.crop_cycles,
     generatedAt: input.memory?.crop_cycle_generated_at,
+    available: input.memory?.crop_cycle_available !== false,
     nowIso: input.nowIso,
   });
   const hermesNote = normalizeMemorySource({
     sourceType: "hermes_note",
     values: input.memory?.hermes_notes,
     generatedAt: input.memory?.hermes_note_generated_at,
+    available: input.memory?.hermes_note_available !== false,
     nowIso: input.nowIso,
   });
   const sources: HermesDailyFarmSnapshot["sources"] = {
