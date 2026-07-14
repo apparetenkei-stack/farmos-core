@@ -104,3 +104,7 @@ Day106 adds isolated, read-only snapshot and brief contracts with explicit fresh
 ## Day107 Daily Farm Brief real-data integration
 
 Day107 reuses the existing Operational Read-only and Memory Context readers through an injected integration boundary. It normalizes reader failure, preserves unknown source timestamps, and emits only a count/status safe preview without persistence, notification, LLM execution, Queue/Worker activity, or database writes.
+
+## Day108 Daily Farm Brief scoped role projection
+
+Day108 derives deterministic crop, redacted field, and redacted Crop Cycle scope indexes from explicit references only, then applies a server-owned administrator/general_staff disclosure boundary. General staff receives only exact server-owned allow-list matches; an empty list yields zero scopes. Raw identifiers, source bodies, internal diagnostics, writes, persistence, notifications, and model or Runtime operations remain outside the boundary.

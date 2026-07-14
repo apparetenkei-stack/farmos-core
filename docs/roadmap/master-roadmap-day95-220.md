@@ -47,3 +47,7 @@ Production snapshot, source-state freshness, deterministic fact, provenance, lim
 ### Day107 — Hermes Daily Farm Brief Real Data Integration Boundary
 
 The existing read-only Operational and Memory Context paths are integrated with the Day106 canonical snapshot and brief builder. Unit and fixture preview remain connection-free; real read-only smoke is separately opt-in and outputs only safe aggregate metadata.
+
+### Day108 — Hermes Daily Farm Brief Scoped and Role-aware Projection Boundary
+
+The unchanged canonical snapshot and brief now feed deterministic crop, redacted field, and redacted Crop Cycle scope indexes. Server-owned administrator/general_staff projection, strict allow-list filtering, explicit unresolved/unscoped semantics, fixture-only safe preview, and fail-closed parsers are implemented without API, UI, persistence, notification, model, Queue, Worker, migration, or RLS work. Day109 retains scheduling, manual regeneration, same-day duplicate prevention, and stale-brief display.
