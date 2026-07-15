@@ -21,3 +21,7 @@ Day115 changes neither the farming application nor browser UI. Production DB con
 ## Rollback
 
 Rollback is removal of the Day115 TypeScript/docs/package-script changes. There is no database, schema, credential, remote service, or farming-application state to reverse.
+
+## Day116 handoff completed
+
+Day116 uses only the Day115 fixture authentication provider and actor directory to complete manual generation → isolated persistence → authenticated latest read. Production providers and the production reader remain unconnected and deny by default. Day117 is the farming-application display handoff; Day118 scheduler consideration remains a separate gate.

@@ -17,3 +17,5 @@ Production adapters remain deny-by-default. No production migration/write, produ
 Rollback is migration-transaction rollback before application and repository transaction rollback per operation. Destructive schema rollback after any future production application requires a separate Day115-or-later approval gate; no down migration, DROP, TRUNCATE, or DELETE is provided.
 
 Day115 begins production-readiness, authentication/provider, and farming-application Proxy evaluation. Production RLS/roles, retention, backup, migration approval, and write readiness remain explicit gates.
+
+Day116 reuses this exact classifier, local-socket executor, atomic write repository, rollback injection, and read repository for a manual fixture-authenticated E2E. It adds no migration and does not alter existing Day114 data. Day116-specific business-date chains and deterministic receipts make reruns idempotent without DELETE, TRUNCATE, or DROP.

@@ -76,7 +76,7 @@ FarmOS Core now owns the future Daily Brief store. Strict server-owned projectab
 
 - Day114: local isolated DB persistence vertical slice, after explicit schema ownership, transaction, idempotency, permissions/RLS, retention, rollback, and test-isolation review.
 - Day115: production-readiness contracts and fixture wiring are complete; actual production DB/authentication/actor-directory connections remain approval-gated and deny by default.
-- Day116: manual generation → persist → authenticated read E2E.
+- Day116: local isolated DB and fixture-authenticated manual generation → atomic persist → latest read E2E complete; production remains unconnected.
 - Day117: farming-application Daily Brief display without transferring storage ownership.
 - Day118: minimal scheduled generation with explicit operational controls.
 - Day119: feedback and operational validation.
@@ -91,3 +91,7 @@ The server-owned Day113 command now completes an atomic write/read cycle in `far
 ### Day115 — Production Read Repository Readiness, Server Authentication Provider, and Farming Application Proxy
 
 Strict safe configuration and target classification now isolate production-candidate reads from Day114/local targets. A lazy read-only `pg` repository, server authentication/principal bridge, server-owned role/scope resolver, Day112-to-Day111 dependency factory, and fixed server-side farming-application proxy contract are fixture-verified with bounded timeouts, exact parsing, and zero retry. Production DB/authentication/actor-directory connections, migration, RLS/role changes, farming-application changes, and browser UI remain unperformed. Day116 targets the approval-gated manual generation → persist → authenticated read E2E; Day117 targets farming-application display.
+
+### Day116 — Manual Generation, Atomic Persistence, and Authenticated Latest Read E2E
+
+A deterministic administrator-only manual request now traverses Day109–115 through one Day110 fixture execution, the Day113 server command, the Day114 isolated PostgreSQL transaction, Day112 selection, Day115 fixture identity, and the Day111 200/no-store response. Day116-specific chains verify v1, replay reuse, distinct-execution v2, rollback after supersede, canonical/receipt uniqueness, authorization failures with zero reads, and safe output. Production DB/authentication/actor directory, production migration/write permission, scheduler, and farming-application code remain unchanged. Day117 implements Daily Brief display; Day118 scheduler consideration remains separately gated.
