@@ -50,3 +50,7 @@ Rollback removes the Day110 contract, adapter, latest read boundary, unit/previe
 ## Day111 handoff
 
 Day111 may define an authenticated latest-Brief server read API, server-side role resolution, and a safe UI data contract. Day110 grants no persistence, endpoint, UI, or scheduler authority.
+
+## Day113 persistence provenance handoff
+
+Completed Day110 results include an internal canonical fingerprint of the exact generated snapshot and scope index. Day113 compares that fingerprint with the projectable persistence source before building a command, preventing another valid snapshot or scope index with the same generated timestamp from being substituted. Skipped and failed-closed executions carry no persistence fingerprint. This metadata grants no write authority and is not exposed by the Day111 API.

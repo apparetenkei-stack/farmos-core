@@ -22,6 +22,7 @@ import { buildHermesDailyFarmBriefScopeIndex } from "./hermes_daily_farm_brief_s
 import { buildHermesDailyFarmBriefRoleProjection } from "./hermes_daily_farm_brief_role_projection";
 import { parseHermesDailyFarmSnapshot } from "./hermes_daily_farm_snapshot_adapter";
 import type { HermesDailyFarmSnapshot } from "./hermes_daily_farm_snapshot_contract";
+import { fingerprintHermesDailyFarmBriefProjectableSource } from "./hermes_daily_farm_brief_persistence_fingerprint";
 
 export type HermesDailyFarmBriefExecutionDependencies = {
   integrate: () => Promise<unknown>;
@@ -138,6 +139,7 @@ function result(input: {
   failureCode: HermesDailyFarmBriefExecutionFailureCode | null;
   projection?: HermesDailyFarmBriefRoleProjection;
   candidate?: HermesDailyFarmBriefLatestCandidate;
+  persistenceSourceFingerprint?: string;
 }): HermesDailyFarmBriefExecutionResult | null {
   const projection = input.projection;
   const value: HermesDailyFarmBriefExecutionResult = {
@@ -160,6 +162,7 @@ function result(input: {
     limitations: input.status === "completed" && projection ? [...new Set(projection.limitations)].sort() : [],
     failure_code: input.failureCode,
     latest_candidate: input.candidate ?? null,
+    persistence_source_fingerprint: input.persistenceSourceFingerprint ?? null,
     safety: HERMES_DAILY_FARM_BRIEF_EXECUTION_SAFETY,
   };
   return parseHermesDailyFarmBriefExecutionResult(value);
@@ -245,5 +248,5 @@ export async function executeHermesDailyFarmBriefGeneration(input: {
   if (executedAt === null || Date.parse(request.execution_requested_at) > Date.parse(executedAt) || Date.parse(snapshot.generated_at) < Date.parse(request.execution_requested_at) || Date.parse(snapshot.generated_at) > Date.parse(executedAt)) return executedAt === null ? null : result({ request, executedAt, status: "failed_closed", flags: [true, true, true, true], failureCode: "timestamp_invalid" });
   const candidate = createHermesDailyFarmBriefLatestCandidateFromRoleProjection({ businessDate: request.business_date, roleProjection: projection });
   if (candidate === null || Date.parse(candidate.generated_at as string) > Date.parse(executedAt)) return result({ request, executedAt, status: "failed_closed", flags: [true, true, true, true], failureCode: "latest_candidate_invalid" });
-  return result({ request, executedAt, status: "completed", flags: [true, true, true, true], failureCode: null, projection, candidate });
+  return result({ request, executedAt, status: "completed", flags: [true, true, true, true], failureCode: null, projection, candidate, persistenceSourceFingerprint: fingerprintHermesDailyFarmBriefProjectableSource({ snapshot, scopeIndex }) });
 }

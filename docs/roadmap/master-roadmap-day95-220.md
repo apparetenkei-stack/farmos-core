@@ -68,4 +68,18 @@ A GET-only, no-store API service now gates a strict latest-source union behind s
 
 A strict `projectable_brief` / `generation_state` persisted-record union, exact Safety parser, version-chain validator, read-only repository result, and deterministic latest-source selector now define the future Day111 storage handoff. Current completed, current in-progress, current failed, latest previous completed, and unavailable are ordered explicitly; invalid/future records, duplicates, version conflicts, and same-priority ambiguity fail closed without fallback selection. Fixture repositories read at most once without retry, while the production repository remains unavailable by default. No table, migration, RLS change, Brief persistence, production DB/auth connection, API/UI change, scheduler, Queue/Worker, Redis, LLM, notification, Proposal/Audit write, or farm-application change is implemented.
 
-Day113 candidate: Daily Farm Brief Persistence Write Command Boundary. Before any table, migration, or write is implemented, storage ownership, transaction semantics, idempotency, RLS, retention, rollback, and production readiness require separate review.
+### Day113 — Hermes Daily Farm Brief Persistence Storage Decision and Idempotent Write Command Boundary
+
+FarmOS Core now owns the future Daily Brief store. Strict server-owned projectable and generation-state commands reuse Day109/110 provenance and Day112 record parsing, while a one-call atomic fixture transaction enforces idempotency, expected versions, unique canonical state, v1→v2 transition, and rollback. Read-after-write reaches the Day112 selector and Day111 display. The production repository remains deny-by-default; no table, migration, RLS, SQL, production DB write, API/UI, scheduler, notification, Queue/Worker, LLM, Proposal/Audit write, or farming-application change is included.
+
+### Daily Brief delivery path: Day114–120
+
+- Day114: local isolated DB persistence vertical slice, after explicit schema ownership, transaction, idempotency, permissions/RLS, retention, rollback, and test-isolation review.
+- Day115: production read adapter and server authentication connection.
+- Day116: manual generation → persist → authenticated read E2E.
+- Day117: farming-application Daily Brief display without transferring storage ownership.
+- Day118: minimal scheduled generation with explicit operational controls.
+- Day119: feedback and operational validation.
+- Day120: farm-owner pilot start decision.
+
+This schedule does not pre-authorize migrations, production writes, RLS changes, scheduler registration, UI changes, or external publication; each boundary retains its own readiness and approval gates.

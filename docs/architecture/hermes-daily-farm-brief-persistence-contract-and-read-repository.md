@@ -48,6 +48,8 @@ The unit boundary covers all five display semantics, strict union parsing, inval
 
 Rollback removes the Day112 contract, selection boundary, fixture repository, deny-by-default production factory, unit/preview scripts, package scripts, and Day112 documentation. Because no table, migration, RLS policy, or stored data was created, no database rollback is needed. The small Day111 stale-date handoff can be reverted with the Day112 adapter if Day112 is removed.
 
-Day113 candidate: Daily Farm Brief Persistence Write Command Boundary.
+## Day113 write-command handoff
 
-ただし実際のtable・migration・writeへ進む前に、storage ownership、transaction、idempotency、RLS、retention、rollback、production readinessを別途確認する。
+Day113 assigns Daily Brief storage ownership to FarmOS Core and adds strict server-owned command builders, idempotency and optimistic-concurrency contracts, one-call atomic transaction semantics, and a fixture-only write repository. The fixture transitions canonical v1 to superseded v1 plus canonical v2 and feeds the unchanged Day112 selector. No table, migration, RLS change, SQL, production repository connection, or production database write is added.
+
+Day114 considers a local isolated DB persistence vertical slice. Storage schema ownership, transaction/locking, idempotency constraints, RLS and local role permissions, retention, rollback, and production readiness remain separate approval gates.
