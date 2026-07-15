@@ -8,12 +8,57 @@ import {
 import {
   deriveHermesDailyFarmBusinessDate,
   isCanonicalIso,
+  isHermesDailyFarmBusinessDate,
   parseHermesDailyFarmBriefExistingState,
   type HermesDailyFarmBriefExistingState,
 } from "./hermes_daily_farm_brief_generation_contract";
 import { HERMES_DAILY_FARM_BRIEF_GENERATION_POLICY } from "./hermes_daily_farm_brief_generation_policy";
 import { HERMES_DAILY_FARM_SOURCE_ORDER } from "./hermes_daily_farm_brief_policy";
-import type { HermesDailyFarmBriefRole } from "./hermes_daily_farm_brief_scope_contract";
+import {
+  createHermesDailyFarmBriefLatestCandidateFromRoleProjection,
+  buildHermesDailyFarmBriefExecutionRoleProjection,
+} from "./hermes_daily_farm_brief_execution_adapter";
+import {
+  parseHermesDailyFarmBriefAllowedScopeKeys,
+  parseHermesDailyFarmBriefScopeIndex,
+  type HermesDailyFarmBriefRole,
+} from "./hermes_daily_farm_brief_scope_contract";
+import { parseHermesDailyFarmSnapshot } from "./hermes_daily_farm_snapshot_adapter";
+
+export function createHermesDailyFarmBriefRoleAwareLatestCandidate(input: {
+  businessDate: string;
+  scopeIndex: unknown;
+  snapshot: unknown;
+  role: HermesDailyFarmBriefRole;
+  allowedScopeKeys: unknown;
+}): HermesDailyFarmBriefLatestCandidate | null {
+  const scopeIndex = parseHermesDailyFarmBriefScopeIndex(input.scopeIndex);
+  const snapshot = parseHermesDailyFarmSnapshot(input.snapshot);
+  const allowedScopeKeys = parseHermesDailyFarmBriefAllowedScopeKeys(input.allowedScopeKeys);
+  if (
+    scopeIndex === null ||
+    snapshot === null ||
+    allowedScopeKeys === null ||
+    JSON.stringify(allowedScopeKeys) !== JSON.stringify(input.allowedScopeKeys) ||
+    !["administrator", "general_staff"].includes(input.role) ||
+    (input.role === "administrator" && allowedScopeKeys.length !== 0)
+  ) return null;
+  try {
+    const projection = buildHermesDailyFarmBriefExecutionRoleProjection({
+      scopeIndex,
+      snapshot,
+      role: input.role,
+      allowedScopeKeys,
+    });
+    if (input.role === "general_staff" && projection.scopes.some((scope) => !allowedScopeKeys.includes(scope.scope_key))) return null;
+    return createHermesDailyFarmBriefLatestCandidateFromRoleProjection({
+      businessDate: input.businessDate,
+      roleProjection: projection,
+    });
+  } catch {
+    return null;
+  }
+}
 
 function emptyCandidate(input: {
   businessDate: string;
@@ -34,6 +79,18 @@ function emptyCandidate(input: {
     limitations: [...input.limitations].sort(),
     display_state: input.displayState,
   });
+}
+
+export function createHermesDailyFarmBriefGenerationStateLatestCandidate(input: {
+  businessDate: string;
+  role: HermesDailyFarmBriefRole;
+  generationState: "in_progress" | "failed" | "unavailable";
+}): HermesDailyFarmBriefLatestCandidate | null {
+  if (!isHermesDailyFarmBusinessDate(input.businessDate) || !["administrator", "general_staff"].includes(input.role)) return null;
+  if (input.generationState === "in_progress") return emptyCandidate({ businessDate: input.businessDate, role: input.role, displayState: "generation_in_progress", limitations: ["generation_in_progress"] });
+  if (input.generationState === "failed") return emptyCandidate({ businessDate: input.businessDate, role: input.role, displayState: "generation_failed", limitations: ["generation_failed"] });
+  if (input.generationState === "unavailable") return emptyCandidate({ businessDate: input.businessDate, role: input.role, displayState: "unavailable", limitations: ["latest_brief_unavailable"] });
+  return null;
 }
 
 function existingCandidate(input: {
@@ -92,4 +149,3 @@ export function readHermesDailyFarmBriefLatestCandidate(input: {
   if (state?.generation_status === "failed" || execution?.status === "failed_closed") return emptyCandidate({ businessDate, role: input.role, displayState: "generation_failed", limitations: ["generation_failed"] });
   return emptyCandidate({ businessDate, role: input.role, displayState: "unavailable", limitations: ["latest_brief_unavailable"] });
 }
-

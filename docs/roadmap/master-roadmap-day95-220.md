@@ -59,3 +59,7 @@ Server-owned request normalization, Asia/Tokyo business-date derivation, strict 
 ### Day110 — Hermes Daily Farm Brief Generation Execution Adapter and Latest Read Boundary
 
 The strictly parsed Day109 decision authorizes at most one Day107 integration and one Day108 scope/role projection pass. Canonical completed/skipped/failed-closed results and injected-state latest candidates distinguish current, stale, in-progress, failed, and unavailable display states without persistence, API/UI, scheduler, retry, notification, Queue/Worker, model, Redis, or DB writes.
+
+### Day111 — Hermes Daily Farm Brief Authenticated Latest Read API Boundary
+
+A GET-only, no-store API service now gates a strict latest-source union behind server authentication and server-owned role/scope resolution. Authentication failures return 401, unknown or forbidden roles return 403, and both stop before the at-most-once, no-retry source reader. Projectable sources undergo Day110 exact role projection inside the service; status-only sources carry no scope/snapshot and safely produce in-progress, failed, or unavailable candidates without projection. Current and stale remain projectable safe states, restoring all five 200 display states without accepting completed candidates or raw execution results. Raw source/scope/snapshot identifiers remain internal. The production adapter denies by default; no anonymous access, UI, persistence, migration, RLS, scheduler, notification, Queue/Worker, Redis, LLM, Proposal/Audit write, or business DB write is added.

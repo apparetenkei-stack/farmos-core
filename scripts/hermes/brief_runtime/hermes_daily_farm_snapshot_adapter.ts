@@ -258,7 +258,7 @@ function validateOperationalTopLevel(value: unknown): value is JsonRecord {
 function validateOperationalSource(
   value: unknown,
   sourceType: "inventory" | "work_log",
-): value is JsonRecord {
+): value is JsonRecord & { records: unknown[] } {
   if (!isRecord(value) || !hasExactKeys(value, OPERATIONAL_SOURCE_KEYS)) {
     return false;
   }
@@ -378,7 +378,7 @@ function invalidSource(
   sourceType: "inventory" | "work_log",
   nowIso: string,
 ): HermesDailyFarmSource<never> {
-  return createSource({
+  return createSource<never>({
     sourceType,
     available: false,
     generatedAt: null,
@@ -483,17 +483,22 @@ function normalizeMemoryRecords(
   ).slice(0, limit);
 }
 
-function normalizeMemorySource(input: {
+type HermesDailyFarmSnapshotMemorySourceInput = {
   sourceType: "crop_cycle" | "hermes_note";
   values: unknown;
   generatedAt: unknown;
   available: boolean;
   nowIso: string;
-}): HermesDailyFarmSource<HermesDailyFarmMemoryRecord> {
-  if (
-    !validateMemoryArray(input.values) ||
-    (input.generatedAt !== null && !isCanonicalIso(input.generatedAt))
-  ) {
+};
+
+function isValidatedMemorySourceInput(
+  input: HermesDailyFarmSnapshotMemorySourceInput,
+): input is HermesDailyFarmSnapshotMemorySourceInput & { values: unknown[]; generatedAt: string | null } {
+  return validateMemoryArray(input.values) && (input.generatedAt === null || isCanonicalIso(input.generatedAt));
+}
+
+function normalizeMemorySource(input: HermesDailyFarmSnapshotMemorySourceInput): HermesDailyFarmSource<HermesDailyFarmMemoryRecord> {
+  if (!isValidatedMemorySourceInput(input)) {
     return createSource({
       sourceType: input.sourceType,
       available: false,

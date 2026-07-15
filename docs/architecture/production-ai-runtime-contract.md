@@ -116,3 +116,7 @@ Day109 adds a fixture-only, read-only decision boundary for Asia/Tokyo business 
 ## Day110 Daily Farm Brief execution and latest read
 
 Day110 enforces the strict Day109 decision before one Day107 integration and one Day108 scope/role projection pass. It returns a canonical execution result and injected-state latest candidate without persistence, API/UI, retry, notification, Queue/Worker, model, scheduler, Redis, or database operations.
+
+## Day111 Daily Farm Brief authenticated latest read API
+
+Day111 adds a GET-only, no-store response boundary around the strict Day110 latest candidate parser. Authentication precedes server-owned role/scope resolution; unauthenticated access returns 401, unknown or forbidden roles return 403, and neither path invokes the at-most-once, no-retry source reader. Its strict discriminated union separates projectable Brief data from status-only in-progress, failed, and unavailable states without accepting a completed candidate or raw execution result. The service applies server-owned exact projection only to projectable sources and uses Day110 zero-scope semantics for status sources, then parses both candidates strictly. Current, stale, in-progress, failed, and unavailable return safe 200 responses; invalid sources return 500. Raw source/scope/snapshot identifiers remain internal. The production adapter has no auth/source provider and denies by default. No writes, persistence, scheduler, Queue/Worker, Redis, LLM, notification, UI, migration, or RLS change is added.

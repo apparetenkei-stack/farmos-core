@@ -10,7 +10,7 @@ import {
   type HermesDailyFarmBriefLatestCandidate,
   type HermesDailyFarmBriefLatestSourceStatus,
 } from "./hermes_daily_farm_brief_execution_contract";
-import { isCanonicalIso, parseHermesDailyFarmBriefGenerationDecision } from "./hermes_daily_farm_brief_generation_contract";
+import { isCanonicalIso, isHermesDailyFarmBusinessDate, parseHermesDailyFarmBriefGenerationDecision } from "./hermes_daily_farm_brief_generation_contract";
 import {
   parseHermesDailyFarmBriefExecutionIntegrationBundle,
   parseHermesDailyFarmBriefScopeReferenceInput,
@@ -105,21 +105,23 @@ function sourceStatus(projection: HermesDailyFarmBriefRoleProjection): HermesDai
   return projection.summary.source_status.map((source) => ({ ...source }));
 }
 
-function completedCandidate(input: {
-  request: HermesDailyFarmBriefExecutionRequest;
-  projection: HermesDailyFarmBriefRoleProjection;
+export function createHermesDailyFarmBriefLatestCandidateFromRoleProjection(input: {
+  businessDate: string;
+  roleProjection: unknown;
 }): HermesDailyFarmBriefLatestCandidate | null {
-  const staleSources = input.projection.summary.source_status.filter((source) => (source.source_type === "inventory" || source.source_type === "work_log") && source.freshness !== "fresh");
+  const projection = parseHermesDailyFarmBriefRoleProjection(input.roleProjection);
+  if (projection === null || !isHermesDailyFarmBusinessDate(input.businessDate)) return null;
+  const staleSources = projection.summary.source_status.filter((source) => (source.source_type === "inventory" || source.source_type === "work_log") && source.freshness !== "fresh");
   const reasons: HermesDailyFarmBriefLatestCandidate["stale_reason_codes"] = staleSources.length > 0 ? ["required_source_stale"] : [];
-  const limitations = [...new Set(input.projection.limitations)].sort();
+  const limitations = [...new Set(projection.limitations)].sort();
   const candidate: HermesDailyFarmBriefLatestCandidate = {
     schema_version: "hermes.daily_farm_brief.latest_candidate.v1",
-    business_date: input.request.business_date,
-    generated_at: input.projection.generated_at,
-    brief_status: input.projection.brief_status,
-    role: input.projection.role,
-    visible_scope_count: input.projection.visible_scope_count,
-    source_status: sourceStatus(input.projection),
+    business_date: input.businessDate,
+    generated_at: projection.generated_at,
+    brief_status: projection.brief_status,
+    role: projection.role,
+    visible_scope_count: projection.visible_scope_count,
+    source_status: sourceStatus(projection),
     stale: reasons.length > 0,
     stale_reason_codes: reasons,
     limitations,
@@ -241,7 +243,7 @@ export async function executeHermesDailyFarmBriefGeneration(input: {
 
   const executedAt = completionTime(input.dependencies);
   if (executedAt === null || Date.parse(request.execution_requested_at) > Date.parse(executedAt) || Date.parse(snapshot.generated_at) < Date.parse(request.execution_requested_at) || Date.parse(snapshot.generated_at) > Date.parse(executedAt)) return executedAt === null ? null : result({ request, executedAt, status: "failed_closed", flags: [true, true, true, true], failureCode: "timestamp_invalid" });
-  const candidate = completedCandidate({ request, projection });
+  const candidate = createHermesDailyFarmBriefLatestCandidateFromRoleProjection({ businessDate: request.business_date, roleProjection: projection });
   if (candidate === null || Date.parse(candidate.generated_at as string) > Date.parse(executedAt)) return result({ request, executedAt, status: "failed_closed", flags: [true, true, true, true], failureCode: "latest_candidate_invalid" });
   return result({ request, executedAt, status: "completed", flags: [true, true, true, true], failureCode: null, projection, candidate });
 }
