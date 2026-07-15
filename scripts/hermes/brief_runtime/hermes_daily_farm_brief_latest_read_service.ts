@@ -12,6 +12,7 @@ import {
   createHermesDailyFarmBriefGenerationStateLatestCandidate,
   createHermesDailyFarmBriefRoleAwareLatestCandidate,
 } from "./hermes_daily_farm_brief_latest_read_boundary";
+import { deriveHermesDailyFarmBusinessDate } from "./hermes_daily_farm_brief_generation_contract";
 
 export type HermesDailyFarmBriefLatestReadDependencies = {
   authenticate: (request: Request) => Promise<unknown>;
@@ -65,9 +66,12 @@ export async function serveHermesDailyFarmBriefLatestRead(input: {
     source = null;
   }
   if (source === null) return response("latest_read_failed", 500);
+  const requestedBusinessDate = deriveHermesDailyFarmBusinessDate(request.requested_at);
+  if (requestedBusinessDate === null) return response("latest_read_failed", 500);
   const candidate = source.source_kind === "projectable_brief"
     ? createHermesDailyFarmBriefRoleAwareLatestCandidate({
         businessDate: source.business_date,
+        requestedBusinessDate,
         scopeIndex: source.scope_index,
         snapshot: source.snapshot,
         role: actor.role,

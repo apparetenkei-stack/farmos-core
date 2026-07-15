@@ -27,6 +27,7 @@ import { parseHermesDailyFarmSnapshot } from "./hermes_daily_farm_snapshot_adapt
 
 export function createHermesDailyFarmBriefRoleAwareLatestCandidate(input: {
   businessDate: string;
+  requestedBusinessDate: string;
   scopeIndex: unknown;
   snapshot: unknown;
   role: HermesDailyFarmBriefRole;
@@ -39,6 +40,9 @@ export function createHermesDailyFarmBriefRoleAwareLatestCandidate(input: {
     scopeIndex === null ||
     snapshot === null ||
     allowedScopeKeys === null ||
+    !isHermesDailyFarmBusinessDate(input.businessDate) ||
+    !isHermesDailyFarmBusinessDate(input.requestedBusinessDate) ||
+    input.businessDate > input.requestedBusinessDate ||
     JSON.stringify(allowedScopeKeys) !== JSON.stringify(input.allowedScopeKeys) ||
     !["administrator", "general_staff"].includes(input.role) ||
     (input.role === "administrator" && allowedScopeKeys.length !== 0)
@@ -51,9 +55,16 @@ export function createHermesDailyFarmBriefRoleAwareLatestCandidate(input: {
       allowedScopeKeys,
     });
     if (input.role === "general_staff" && projection.scopes.some((scope) => !allowedScopeKeys.includes(scope.scope_key))) return null;
-    return createHermesDailyFarmBriefLatestCandidateFromRoleProjection({
+    const candidate = createHermesDailyFarmBriefLatestCandidateFromRoleProjection({
       businessDate: input.businessDate,
       roleProjection: projection,
+    });
+    if (candidate === null || input.businessDate === input.requestedBusinessDate) return candidate;
+    return parseHermesDailyFarmBriefLatestCandidate({
+      ...candidate,
+      stale: true,
+      stale_reason_codes: ["previous_business_date", ...candidate.stale_reason_codes],
+      display_state: "stale",
     });
   } catch {
     return null;

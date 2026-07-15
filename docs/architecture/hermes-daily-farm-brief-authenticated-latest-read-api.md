@@ -40,3 +40,7 @@ All rows return `Cache-Control: no-store`. There is no retry, persistence, migra
 The fixture-only test proves all five display states, allowed-only staff visibility, unmatched and empty staff visibility of zero, complete administrator visibility, zero projection inputs for status-only sources, a no-argument source reader, absence of candidate/execution-result injection, strict union/candidate/safety tamper rejection, method handling, no-store headers, raw source/identifier scans, exact call counts, and deterministic output. The formal regression chain includes Day110 through Day106, Operational Context integration, Runtime contract, Development Review, and the Next.js build.
 
 Rollback removes the Day111 contracts, service, deny-by-default server adapter, GET route, unit/preview scripts, package scripts, documentation entries, and the Day110 helper exports used by the service. There is no stored data to roll back.
+
+## Day112 persisted-source handoff
+
+Day112 supplies a fixture-only persisted-record parser and read-repository selector that can produce this boundary's strict latest source without exposing record IDs, versions, repository metadata, or storage timestamps. The production repository and authentication provider remain unconnected, so production behavior stays fail-closed at 401 with `Cache-Control: no-store`. Day112 does not create a table, migration, RLS policy, persistence write, or new API behavior.
