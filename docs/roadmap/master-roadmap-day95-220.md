@@ -75,7 +75,7 @@ FarmOS Core now owns the future Daily Brief store. Strict server-owned projectab
 ### Daily Brief delivery path: Day114–120
 
 - Day114: local isolated DB persistence vertical slice, after explicit schema ownership, transaction, idempotency, permissions/RLS, retention, rollback, and test-isolation review.
-- Day115: production read adapter and server authentication connection.
+- Day115: production-readiness contracts and fixture wiring are complete; actual production DB/authentication/actor-directory connections remain approval-gated and deny by default.
 - Day116: manual generation → persist → authenticated read E2E.
 - Day117: farming-application Daily Brief display without transferring storage ownership.
 - Day118: minimal scheduled generation with explicit operational controls.
@@ -87,3 +87,7 @@ This schedule does not pre-authorize migrations, production writes, RLS changes,
 ### Day114 — Isolated PostgreSQL Persistence Vertical Slice and Read Repository Integration
 
 The server-owned Day113 command now completes an atomic write/read cycle in `farmos_core_day114_test`: FarmOS Core `ai` tables, idempotency/source receipts, canonical version transition, advisory locking, rollback/concurrency verification, Day112 PostgreSQL read selection, and Day111 display. The production repository remains deny-by-default. Production migration, RLS/roles, retention/backup, production write, farming-application storage, UI, scheduler, and external services remain outside Day114. Day115 starts production-readiness, authentication/provider, and farming-application Proxy review.
+
+### Day115 — Production Read Repository Readiness, Server Authentication Provider, and Farming Application Proxy
+
+Strict safe configuration and target classification now isolate production-candidate reads from Day114/local targets. A lazy read-only `pg` repository, server authentication/principal bridge, server-owned role/scope resolver, Day112-to-Day111 dependency factory, and fixed server-side farming-application proxy contract are fixture-verified with bounded timeouts, exact parsing, and zero retry. Production DB/authentication/actor-directory connections, migration, RLS/role changes, farming-application changes, and browser UI remain unperformed. Day116 targets the approval-gated manual generation → persist → authenticated read E2E; Day117 targets farming-application display.

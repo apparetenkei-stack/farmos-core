@@ -1,5 +1,7 @@
 # Hermes Daily Farm Brief isolated PostgreSQL persistence vertical slice
 
+> Day115 does not reuse this isolated target as production. `farmos_core_day114_test` is explicitly classified and rejected by the production repository factory; the Day114 adapter and database behavior are unchanged.
+
 Day114 completes the first write/read vertical slice in the dedicated Docker PostgreSQL database `farmos_core_day114_test`. FarmOS Core owns both `ai.daily_farm_brief_records` and `ai.daily_farm_brief_persistence_commands`; no Daily Brief is stored in the farming application, Sales, or Brand schemas.
 
 The target classifier accepts only the exact isolated database name before starting `psql`. Each connection also checks `current_database()`. The verified server path is the local container Unix socket; credentials and connection strings are never printed. The known preimplementation local-development credential exposure is recorded separately and no new implementation exposure occurred.

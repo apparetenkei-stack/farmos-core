@@ -1,5 +1,7 @@
 # Hermes Daily Farm Brief authenticated latest read API boundary
 
+> Day115 adds a server authentication/provider and actor-directory wiring boundary without changing this Day111 response, safety, GET-only, query, status, or no-store contract. Providers remain production-unconnected and deny by default; fixture wiring alone reaches the existing service.
+
 ## Purpose and endpoint
 
 Day111 exposes the Day110 latest candidate through `GET /api/hermes/daily-farm-brief/latest`. The endpoint is read-only, force-dynamic, and always returns `Cache-Control: no-store`. It accepts no request body, query parameter, client role, scope allow-list, model setting, endpoint, credential, or connection setting. Unsupported methods return 405 with `Allow: GET`; a query-bearing or otherwise invalid GET returns 400 before authentication or candidate access.

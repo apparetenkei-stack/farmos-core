@@ -138,3 +138,9 @@ This is not a Runtime, Worker, LLM, API, Proposal, Audit, or business-database w
 ## Day114 isolated PostgreSQL persistence
 
 Day114 connects the Day113 command and Day112 reader only to the dedicated local Docker database `farmos_core_day114_test`. FarmOS Core owns two `ai` tables. READ COMMITTED plus advisory transaction locks, unique receipts/canonical constraints, one-connection transactions, zero retry, rollback injection, real concurrency, read-only DTO reconstruction, Day112 selection, and Day111 current/stale output are verified. Production migration/write/RLS remain false and production adapters still deny by default.
+
+## Day115 production readiness and farming-application proxy
+
+Day115 defines strict safe production-read configuration, target classification, a lazy `pg` read-only repository, server authentication/provider and actor-directory bridges, latest-route dependency composition, and a Core-side farming-application proxy contract. The reader uses explicit columns, 500 records maximum, UTC, bounded timeouts, transaction-read-only verification, future-row exclusion, and zero retry. Passwords, connection strings, database/user identities, raw rows, exceptions, and upstream bodies never reach API results.
+
+Production configuration, database, authentication, and actor-directory providers remain unconnected and deny by default. No production connection/read/write, migration, RLS/role change, browser/UI change, or farming-application repository change occurs. Day116 is the approval-gated manual generation → persist → authenticated read E2E handoff; Day117 remains farming-application display.

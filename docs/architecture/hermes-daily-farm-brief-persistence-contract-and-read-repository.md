@@ -1,5 +1,7 @@
 # Hermes Daily Farm Brief persistence contract and read repository boundary
 
+> Day115 adds a separate production-candidate read adapter that reconstructs this exact Day112 repository DTO in a verified read-only transaction. Missing configuration and isolated/local targets deny by default; no production connection or read is performed.
+
 ## Purpose and scope
 
 Day112 defines the record shape that a future Daily Farm Brief store would have to preserve and the read-only boundary that can reconstruct Day111 `hermes.daily_farm_brief.latest_read_source.v1`. This is a contract and fixture exercise only. No database table exists, no migration or RLS change was created or run, Brief persistence was not performed, and the production repository is not connected.
