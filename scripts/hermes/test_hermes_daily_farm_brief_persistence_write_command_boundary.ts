@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { pathToFileURL } from "node:url";
 
 import type { HermesOperationalReadonlyClientResult } from "../../src/lib/hermes/hermes_operational_readonly_client";
 import { createHermesDailyFarmBriefProductionPersistenceRepository } from "../../src/lib/hermes/hermes_daily_farm_brief_persistence_write_repository";
@@ -28,7 +29,7 @@ import { createHermesDailyFarmSnapshot } from "./brief_runtime/hermes_daily_farm
 import type { HermesDailyFarmBriefGenerationDecision } from "./brief_runtime/hermes_daily_farm_brief_generation_contract";
 import { createHermesDailyFarmBriefGenerationRequest, orchestrateHermesDailyFarmBriefGeneration } from "./brief_runtime/hermes_daily_farm_brief_generation_orchestrator";
 
-const CURRENT_DATE = "2026-07-15";
+export const CURRENT_DATE = "2026-07-15";
 const PREVIOUS_DATE = "2026-07-14";
 const NOW = "2026-07-15T03:00:00.000Z";
 const URL = "http://localhost/api/hermes/daily-farm-brief/latest";
@@ -37,7 +38,7 @@ function operationalSource<T>(type: "inventory" | "work_log", records: T[], gene
   return { result: "ok" as const, source_type: type, endpoint_path: type === "inventory" ? ("/api/farmos-core/inventory-summary" as const) : ("/api/farmos-core/recent-work-logs" as const), http_method: "GET" as const, fetch_performed: false, available: true, transaction_read_only: true as const, requested_limit: 100, http_status: 200, response_source: type === "inventory" ? ("apparetenkei_inventory_readonly" as const) : ("apparetenkei_work_logs_readonly" as const), generated_at: generatedAt, record_count: records.length, records, has_more: false, error_code: null, write_performed: false as const, restricted_fields_exposed: false as const, credentials_exposed: false as const };
 }
 
-function generationDecision(businessDate: string, requestedAt: string, requestId: string): HermesDailyFarmBriefGenerationDecision {
+export function generationDecision(businessDate: string, requestedAt: string, requestId: string): HermesDailyFarmBriefGenerationDecision {
   const request = createHermesDailyFarmBriefGenerationRequest({ triggerType: "manual", requestedAt, actorRole: "administrator", authorizationVerified: true, serverForceRegenerationAllowed: false, requestIdFactory: () => requestId });
   assert(request);
   assert.equal(request.business_date, businessDate);
@@ -46,7 +47,7 @@ function generationDecision(businessDate: string, requestedAt: string, requestId
   return decision;
 }
 
-function projectableFixture(input: { businessDate: string; generatedAt: string; requestAt: string; executedAt: string; suffix: string }) {
+export function projectableFixture(input: { businessDate: string; generatedAt: string; requestAt: string; executedAt: string; suffix: string }) {
   const logs = [{ id: `raw-work-${input.suffix}`, startedAt: input.generatedAt, fieldId: null, workTypeId: null, workTypeName: "private fixture body", durationMinutes: 15, targetCrop: "cabbage", cropCycleId: null, machineId: null, implementId: null, yieldAmount: null, yieldUnit: null, appliedMaterials: null }];
   const operational: HermesOperationalReadonlyClientResult = {
     result: "ok", checked: "hermes_operational_readonly_client", boundary: "day92_hermes_operational_readonly_client", inventory: operationalSource("inventory", [], input.generatedAt), work_log: operationalSource("work_log", logs, input.generatedAt), inventory_source_connected: true, work_log_source_connected: true, external_fetch_performed: false, hermes_context_injection_performed: false, suggestion_generation_performed: false, proposal_created: false, proposal_saved: false, proposal_apply_performed: false, app_db_write_performed: false, core_db_write_performed: false, audit_write_performed: false, database_write_performed: false, credentials_exposed: false, arbitrary_endpoint_allowed: false, arbitrary_method_allowed: false,
@@ -65,7 +66,7 @@ function projectableFixture(input: { businessDate: string; generatedAt: string; 
   return { source, execution, decision };
 }
 
-function buildProjectable(fixture: ReturnType<typeof projectableFixture>, input: { expected: number | null; requestedAt: string; commandId: string }) {
+export function buildProjectable(fixture: ReturnType<typeof projectableFixture>, input: { expected: number | null; requestedAt: string; commandId: string }) {
   const command = buildHermesDailyFarmBriefProjectablePersistenceCommand({ executionResult: fixture.execution, latestSource: fixture.source, expectedCurrentVersion: input.expected, requestedAt: input.requestedAt, commandIdFactory: () => input.commandId, recordIdFactory: (date, kind) => `daily-brief-${date}-${kind}` });
   assert(command);
   return command;
@@ -206,7 +207,9 @@ async function main(): Promise<void> {
   console.log(JSON.stringify({ result: "pass", boundary: "hermes_daily_farm_brief_persistence_write_command", states: ["persisted", "reused", "rejected", "failed_closed"], version_transition: "distinct_execution_v1_superseded_v2_canonical", idempotency_reuse: true, idempotency_conflict: true, source_execution_uniqueness: true, server_clock_enforced: true, execution_payload_binding: true, transaction_rollback: true, repository_transaction_max_calls: 1, retry_count: 0, read_after_write: { day112: "selected", day111: "current", previous: "stale" }, production_repository: "deny_by_default", database_write_performed: false }));
 }
 
-main().catch((error) => {
-  console.error(error instanceof Error ? error.stack ?? error.message : "day113_test_failed");
-  process.exitCode = 1;
-});
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main().catch((error) => {
+    console.error(error instanceof Error ? error.stack ?? error.message : "day113_test_failed");
+    process.exitCode = 1;
+  });
+}

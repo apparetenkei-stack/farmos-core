@@ -45,3 +45,7 @@ Safety keeps production/database, app/business database, migration, RLS, Proposa
 Fixture unit and preview cover projectable and generation-state persistence, v1/v2 transition, idempotent replay/conflict, optimistic mismatch, multiple canonical records, version gaps, strict command/record parsing, future timestamps, rollback, call counts, deterministic safe results, production denial, Day112 read-after-write, and Day111 current/stale/status display.
 
 Day114 considers a local isolated DB persistence vertical slice. Before implementing it, FarmOS Core storage schema ownership, table shape, transaction SQL and locking, unique/idempotency constraints, local role permissions/RLS, retention, rollback, and test isolation must be reviewed. Day114 may create a reviewed local migration and adapter only with explicit authorization; Day113 grants no production write authority.
+
+## Day114 isolated PostgreSQL implementation
+
+Day114 implements the reviewed vertical slice only in `farmos_core_day114_test`: transactional tables/constraints, advisory-lock atomic writes, command/source receipts, read-only explicit-column reads, real rollback and concurrency, Day112 selection, and Day111 display. Production repositories remain deny-by-default. No production migration, RLS, role, retention, backup, or write authority is added.

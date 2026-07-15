@@ -83,3 +83,7 @@ FarmOS Core now owns the future Daily Brief store. Strict server-owned projectab
 - Day120: farm-owner pilot start decision.
 
 This schedule does not pre-authorize migrations, production writes, RLS changes, scheduler registration, UI changes, or external publication; each boundary retains its own readiness and approval gates.
+
+### Day114 — Isolated PostgreSQL Persistence Vertical Slice and Read Repository Integration
+
+The server-owned Day113 command now completes an atomic write/read cycle in `farmos_core_day114_test`: FarmOS Core `ai` tables, idempotency/source receipts, canonical version transition, advisory locking, rollback/concurrency verification, Day112 PostgreSQL read selection, and Day111 display. The production repository remains deny-by-default. Production migration, RLS/roles, retention/backup, production write, farming-application storage, UI, scheduler, and external services remain outside Day114. Day115 starts production-readiness, authentication/provider, and farming-application Proxy review.

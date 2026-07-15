@@ -53,3 +53,5 @@ Rollback removes the Day112 contract, selection boundary, fixture repository, de
 Day113 assigns Daily Brief storage ownership to FarmOS Core and adds strict server-owned command builders, idempotency and optimistic-concurrency contracts, one-call atomic transaction semantics, and a fixture-only write repository. The fixture transitions canonical v1 to superseded v1 plus canonical v2 and feeds the unchanged Day112 selector. No table, migration, RLS change, SQL, production repository connection, or production database write is added.
 
 Day114 considers a local isolated DB persistence vertical slice. Storage schema ownership, transaction/locking, idempotency constraints, RLS and local role permissions, retention, rollback, and production readiness remain separate approval gates.
+
+Day114 now supplies an isolated PostgreSQL implementation of this unchanged read interface. It uses a read-only transaction, explicit columns, a 500-row limit, future-record exclusion, and strict DTO reconstruction before this parser/selector. Only `farmos_core_day114_test` is connected; production remains unavailable by default.
