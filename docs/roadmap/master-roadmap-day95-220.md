@@ -78,7 +78,7 @@ FarmOS Core now owns the future Daily Brief store. Strict server-owned projectab
 - Day115: production-readiness contracts and fixture wiring are complete; actual production DB/authentication/actor-directory connections remain approval-gated and deny by default.
 - Day116: local isolated DB and fixture-authenticated manual generation → atomic persist → latest read E2E complete; production remains unconnected.
 - Day117: farming-application Daily Brief display without transferring storage ownership.
-- Day118: minimal scheduled generation with explicit operational controls.
+- Day118: browser-safe deterministic Daily Brief display projection complete; no generated narrative or HTTP publication.
 - Day119: feedback and operational validation.
 - Day120: farm-owner pilot start decision.
 
@@ -95,3 +95,7 @@ Strict safe configuration and target classification now isolate production-candi
 ### Day116 — Manual Generation, Atomic Persistence, and Authenticated Latest Read E2E
 
 A deterministic administrator-only manual request now traverses Day109–115 through one Day110 fixture execution, the Day113 server command, the Day114 isolated PostgreSQL transaction, Day112 selection, Day115 fixture identity, and the Day111 200/no-store response. Day116-specific chains verify v1, replay reuse, distinct-execution v2, rollback after supersede, canonical/receipt uniqueness, authorization failures with zero reads, and safe output. Production DB/authentication/actor directory, production migration/write permission, scheduler, and farming-application code remain unchanged. Day117 implements Daily Brief display; Day118 scheduler consideration remains separately gated.
+
+### Day118 — Safe Daily Brief Display Projection
+
+The browser-safe DTO now deterministically maps the strict latest candidate and server-owned role projection through fixed templates. Persisted records contain no Daily Brief fact body, so no facts or narrative are reconstructed or inferred. Administrator and already allow-listed general-staff scopes produce bounded priorities; source/stale/limitation states become fixed public messages. Raw snapshots, identifiers, facts, internal codes/counts, credentials, DB operations, model execution, and browser overrides remain absent. The existing latest API is unchanged and HTTP publication is deferred to Day119.

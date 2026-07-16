@@ -25,3 +25,7 @@ Rollback is removal of the Day115 TypeScript/docs/package-script changes. There 
 ## Day116 handoff completed
 
 Day116 uses only the Day115 fixture authentication provider and actor directory to complete manual generation → isolated persistence → authenticated latest read. Production providers and the production reader remain unconnected and deny by default. Day117 is the farming-application display handoff; Day118 scheduler consideration remains a separate gate.
+
+## Day118 safe display projection
+
+Day118 adds no route and does not modify the latest API. A fixture-only boundary converts a matching server-owned role projection and latest candidate into a browser-safe deterministic DTO. Persisted records contain no Daily Brief fact body, so facts and narrative are neither reconstructed nor generated. Raw snapshots, identifiers, internal codes/counts, credentials, and role/scope overrides remain excluded. HTTP publication is deferred to Day119.
