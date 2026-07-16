@@ -19,6 +19,9 @@ import {
   createHermesDailyFarmBriefProductionReadRepository,
   type HermesDailyFarmBriefProductionReadExecutor,
 } from "./hermes_daily_farm_brief_production_read_repository";
+import {
+  createHermesDailyFarmBriefPilotIdentityBoundary,
+} from "./hermes_daily_farm_brief_pilot_authentication";
 
 export function createHermesDailyFarmBriefLatestServerDependencies(input: {
   authenticationProvider: HermesDailyFarmBriefServerAuthenticationProvider;
@@ -60,11 +63,30 @@ export function createHermesDailyFarmBriefProductionLatestServerBoundary(input: 
   } as const;
 }
 
-// No repository-wide authentication provider or persisted Brief reader exists yet.
-// The production adapter therefore denies anonymous access and cannot reach the source reader.
-export const hermesDailyFarmBriefLatestServerDependencies = createHermesDailyFarmBriefLatestServerDependencies({
-  authenticationProvider: new HermesDailyFarmBriefDenyByDefaultAuthenticationProvider(),
-  actorDirectory: new HermesDailyFarmBriefDenyByDefaultActorDirectory(),
-  readRepository: new HermesDailyFarmBriefDenyByDefaultReadRepository(),
+export function createHermesDailyFarmBriefPilotLatestServerBoundary(input: {
+  environment: Readonly<Record<string, string | undefined>>;
+  clock: () => string;
+  executor?: HermesDailyFarmBriefProductionReadExecutor;
+}) {
+  const identity = createHermesDailyFarmBriefPilotIdentityBoundary(input.environment);
+  const repository = identity.state === "ready"
+    ? createHermesDailyFarmBriefProductionReadRepository(input.environment, input.executor)
+    : { state: "denied" as const, repository: new HermesDailyFarmBriefDenyByDefaultReadRepository(), config: null };
+  const ready = identity.state === "ready" && repository.state === "ready";
+  const authenticationProvider = ready ? identity.authenticationProvider : new HermesDailyFarmBriefDenyByDefaultAuthenticationProvider();
+  const actorDirectory = ready ? identity.actorDirectory : new HermesDailyFarmBriefDenyByDefaultActorDirectory();
+  const readRepository = ready ? repository.repository : new HermesDailyFarmBriefDenyByDefaultReadRepository();
+  return {
+    authentication_state: ready ? "ready" : "denied",
+    actor_directory_state: ready ? "ready" : "denied",
+    repository_state: ready ? "ready" : "denied",
+    dependencies: createHermesDailyFarmBriefLatestServerDependencies({ authenticationProvider, actorDirectory, readRepository, clock: input.clock }),
+  } as const;
+}
+
+export const hermesDailyFarmBriefLatestServerBoundary = createHermesDailyFarmBriefPilotLatestServerBoundary({
+  environment: process.env,
   clock: () => new Date().toISOString(),
 });
+
+export const hermesDailyFarmBriefLatestServerDependencies = hermesDailyFarmBriefLatestServerBoundary.dependencies;

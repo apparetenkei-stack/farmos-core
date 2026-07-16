@@ -80,7 +80,7 @@ FarmOS Core now owns the future Daily Brief store. Strict server-owned projectab
 - Day117: farming-application Daily Brief display without transferring storage ownership.
 - Day118: browser-safe deterministic Daily Brief display projection complete; no generated narrative or HTTP publication.
 - Day119: authenticated safe-display HTTP publication complete; production authentication and farming-app rendering remain deferred.
-- Day120: farm-owner pilot start decision.
+- Day120: farm-owner pilot read connection with strict server-owned Bearer identity and production-candidate read-only repository; activation remains environment-gated and fail-closed.
 
 This schedule does not pre-authorize migrations, production writes, RLS changes, scheduler registration, UI changes, or external publication; each boundary retains its own readiness and approval gates.
 
@@ -103,3 +103,7 @@ The browser-safe DTO now deterministically maps the strict latest candidate and 
 ### Day119 — Authenticated Latest Display API
 
 The Day118 DTO is published through a new authenticated GET endpoint while the original latest endpoint remains unchanged. Existing authentication, actor resolution, server dependencies, and persisted source selection are reused with at-most-once source access. One shared artifact build returns the matching role projection and candidate; current/stale returns the safe display and status-only states return `display: null`. Production authentication remains deny-by-default, and farming-application rendering is deferred.
+
+### Day120 — Daily Brief Farm-owner Pilot Read Connection
+
+The existing latest and latest-display routes now share one pilot dependency factory. A bounded Bearer token maps only to a server-owned principal, and a strict environment directory supplies administrator or wildcard-free general-staff authorization. The existing production-candidate PostgreSQL reader is enabled only when identity and database configuration validate together; partial configuration denies authentication and repository access. This is a read-only pilot connection: no migration, database write, RLS/role change, client role/scope input, scheduler, model execution, or farming-application code change is included.

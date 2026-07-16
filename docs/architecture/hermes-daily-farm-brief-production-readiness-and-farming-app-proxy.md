@@ -33,3 +33,13 @@ Day118 adds no route and does not modify the latest API. A fixture-only boundary
 ## Day119 authenticated display publication
 
 The Day118 DTO is now available from a new authenticated latest-display endpoint. It reuses the existing authentication, actor resolution, persisted-source reader, and server dependencies; the source is read at most once. One shared artifact build supplies both candidate and role projection. The existing latest endpoint and farming-app proxy are unchanged. Production authentication remains unconnected and returns 401 by default; farming-app rendering is still deferred.
+
+## Day120 farm-owner pilot connection
+
+The shared latest and latest-display dependencies now have a server-only pilot factory. It activates only when both the strict pilot identity configuration and the existing production-candidate read configuration are valid. Otherwise authentication, actor resolution, and repository access all select their existing deny-by-default implementations. The safe internal readiness states are `ready` or `denied` and are not added to either API response.
+
+Authentication accepts one `Authorization: Bearer` credential, bounds and validates it, compares a SHA-256 digest with `timingSafeEqual`, and returns only the environment-owned principal reference. The actor directory maps that exact principal to an administrator with an empty scope list or general staff with a canonical wildcard-free scope allow-list. Request headers and query parameters cannot override role, scope, principal, database target, or authorization.
+
+Required pilot variables are `HERMES_DAILY_FARM_BRIEF_PILOT_TOKEN`, `HERMES_DAILY_FARM_BRIEF_PILOT_PRINCIPAL_REF`, `HERMES_DAILY_FARM_BRIEF_PILOT_ROLE`, and `HERMES_DAILY_FARM_BRIEF_PILOT_ALLOWED_SCOPE_KEYS`. The scope value is a canonical JSON array. Database variables remain exactly the existing `HERMES_DAILY_BRIEF_DATABASE_*` contract; no second credential format is introduced. Values belong only in the deployment's server-side secret/configuration store and are not documented or logged here.
+
+This connection is read-only. It creates no migration and performs no database write, RLS/role change, server startup, token generation, `.env` mutation, or farming-application change. Rollback is removal or disablement of the pilot environment configuration, which immediately restores deny-by-default behavior; code rollback removes the pilot adapter and restores the dependency constant.

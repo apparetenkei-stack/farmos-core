@@ -158,3 +158,7 @@ Day118 adds a pure deterministic projection after server-owned role/scope filter
 ## Day119 authenticated latest-display API
 
 Day119 adds a separate GET-only, no-store endpoint for the unchanged Day118 DTO. Existing authentication, actor resolution, persisted-source selection, and server dependencies are reused. Projectable sources are read once and transformed through one shared role-aware artifact build, preventing candidate/projection drift. Status-only sources return `display: null`. Fixed public errors cover invalid request, authentication, authorization, method, and read/projection failure. The existing latest API remains unchanged, production authentication remains unconnected and deny-by-default, and farming-application body rendering is deferred.
+
+## Day120 Daily Brief pilot read connection
+
+Day120 connects the shared latest/latest-display server dependency through a strict environment-owned Bearer provider, exact principal-to-role/scope directory, and the existing production-candidate read-only repository factory. All identity and database configuration must validate together; partial, malformed, local, isolated, or missing configuration restores the deny provider, deny directory, and unavailable repository. Tokens, credentials, host/user/database identities, and safe readiness states are not API fields. Reads remain one read-only transaction with zero retry; database writes, migrations, RLS/role changes, scheduler/model/Queue/Worker operations, Proposal/Audit writes, and client role/scope overrides remain prohibited.
