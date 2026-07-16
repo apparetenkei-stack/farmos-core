@@ -26,6 +26,13 @@ limit 500`;
 type SafeReadExecution = { database_matches: boolean; user_present: boolean; transaction_read_only: boolean; rows: unknown[] };
 export type HermesDailyFarmBriefProductionReadExecutor = { executeReadOnly(query: string): Promise<SafeReadExecution> };
 
+export function createHermesDailyFarmBriefProductionPoolSslConfig(
+  sslMode: HermesDailyFarmBriefProductionReadRepositoryConfig["ssl_mode"],
+): false | { rejectUnauthorized: boolean } {
+  if (sslMode === "disable") return false;
+  return { rejectUnauthorized: sslMode === "verify-full" };
+}
+
 type RawRow = Record<string, unknown>;
 function rawRecord(row: unknown): unknown {
   if (typeof row !== "object" || row === null || Array.isArray(row)) return null;
@@ -54,7 +61,7 @@ export class HermesDailyFarmBriefProductionPostgresReadRepository implements Her
 class PgProductionReadExecutor implements HermesDailyFarmBriefProductionReadExecutor {
   private readonly pool: Pool;
   constructor(private readonly config: HermesDailyFarmBriefProductionReadRepositoryConfig, settings: { host: string; user: string; credential: string }) {
-    const poolConfig: PoolConfig = { host: settings.host, port: config.port, database: config.database_name, user: settings.user, ["pass" + "word"]: settings.credential, application_name: config.application_name, connectionTimeoutMillis: config.connect_timeout_ms, max: 2, ssl: config.ssl_mode === "verify-full" ? { rejectUnauthorized: true } : { rejectUnauthorized: false } };
+    const poolConfig: PoolConfig = { host: settings.host, port: config.port, database: config.database_name, user: settings.user, ["pass" + "word"]: settings.credential, application_name: config.application_name, connectionTimeoutMillis: config.connect_timeout_ms, max: 2, ssl: createHermesDailyFarmBriefProductionPoolSslConfig(config.ssl_mode) };
     this.pool = new Pool(poolConfig);
   }
   async executeReadOnly(query: string): Promise<SafeReadExecution> {

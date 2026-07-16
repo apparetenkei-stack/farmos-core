@@ -19,6 +19,7 @@ import { serveHermesDailyFarmBriefLatestRead } from "./brief_runtime/hermes_dail
 import {
   HERMES_DAILY_FARM_BRIEF_PRODUCTION_READ_QUERY,
   HermesDailyFarmBriefProductionPostgresReadRepository,
+  createHermesDailyFarmBriefProductionPoolSslConfig,
   createHermesDailyFarmBriefProductionReadRepository,
   type HermesDailyFarmBriefProductionReadExecutor,
 } from "../../src/lib/hermes/hermes_daily_farm_brief_production_read_repository";
@@ -55,6 +56,24 @@ async function main(): Promise<void> {
   assert.equal(parseHermesDailyFarmBriefProductionEnvironment({}), null);
   assert.equal(parseHermesDailyFarmBriefProductionEnvironment({ ...VALID_ENV, HERMES_DAILY_BRIEF_DATABASE_PORT: "x" }), null);
   assert.equal(parseHermesDailyFarmBriefProductionEnvironment({ ...VALID_ENV, HERMES_DAILY_BRIEF_DATABASE_STATEMENT_TIMEOUT_MS: "999999" }), null);
+  const repositoryState = (environment: Readonly<Record<string, string | undefined>>) => createHermesDailyFarmBriefProductionReadRepository(environment, fixtureExecutor().executor).state;
+  const { HERMES_DAILY_BRIEF_DATABASE_HOST: _omittedHost, ...missingHostEnvironment } = VALID_ENV;
+  assert.equal(repositoryState({ ...missingHostEnvironment, HERMES_DAILY_BRIEF_DATABASE_SSL_MODE: "disable" }), "denied");
+  for (const host of ["127.0.0.1", "localhost"]) {
+    assert.equal(repositoryState({ ...VALID_ENV, HERMES_DAILY_BRIEF_DATABASE_HOST: host, HERMES_DAILY_BRIEF_DATABASE_SSL_MODE: "disable" }), "ready");
+  }
+  for (const host of ["0.0.0.0", "::1", "127.0.0.1:5432", "LOCALHOST", "db.internal", "", " localhost", "localhost "]) {
+    assert.equal(repositoryState({ ...VALID_ENV, HERMES_DAILY_BRIEF_DATABASE_HOST: host, HERMES_DAILY_BRIEF_DATABASE_SSL_MODE: "disable" }), "denied");
+  }
+  assert.equal(repositoryState({ ...VALID_ENV, HERMES_DAILY_BRIEF_DATABASE_SSL_MODE: "require" }), "ready");
+  assert.equal(repositoryState({ ...VALID_ENV, HERMES_DAILY_BRIEF_DATABASE_SSL_MODE: "verify-full" }), "ready");
+  assert.equal(repositoryState({ ...VALID_ENV, HERMES_DAILY_BRIEF_DATABASE_SSL_MODE: "invalid" }), "denied");
+  for (const databaseName of ["farmos_core_day114_test", "farmos_core_local", "farmos_core_restore_test", "postgres"]) {
+    assert.equal(repositoryState({ ...VALID_ENV, HERMES_DAILY_BRIEF_DATABASE_NAME: databaseName }), "denied");
+  }
+  assert.equal(createHermesDailyFarmBriefProductionPoolSslConfig("disable"), false);
+  assert.deepEqual(createHermesDailyFarmBriefProductionPoolSslConfig("require"), { rejectUnauthorized: false });
+  assert.deepEqual(createHermesDailyFarmBriefProductionPoolSslConfig("verify-full"), { rejectUnauthorized: true });
   const safeConfig = JSON.stringify(config);
   assert(!safeConfig.includes("password")); assert(!safeConfig.includes("connection")); assert(!safeConfig.includes(VALID_ENV.HERMES_DAILY_BRIEF_DATABASE_PASSWORD));
   assert.equal(createHermesDailyFarmBriefProductionReadRepository({ ...VALID_ENV, HERMES_DAILY_BRIEF_DATABASE_NAME: "farmos_core_day114_test" }).state, "denied");

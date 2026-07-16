@@ -34,7 +34,7 @@ export type HermesDailyFarmBriefProductionReadRepositoryConfig = {
   port: number;
   database_name: string;
   user_present: true;
-  ssl_mode: "require" | "verify-full";
+  ssl_mode: "disable" | "require" | "verify-full";
   connect_timeout_ms: number;
   statement_timeout_ms: number;
   lock_timeout_ms: number;
@@ -60,7 +60,7 @@ export function classifyHermesDailyFarmBriefDatabaseTarget(databaseName: unknown
 }
 
 export function parseHermesDailyFarmBriefProductionReadRepositoryConfig(value: unknown): HermesDailyFarmBriefProductionReadRepositoryConfig | null {
-  if (!record(value) || !exact(value, CONFIG_KEYS) || value.schema_version !== "hermes.daily_farm_brief.production_read_repository_config.v1" || value.enabled !== true || value.target_class !== "production_candidate" || value.host_present !== true || value.user_present !== true || value.application_name !== "farmos-core-hermes-daily-brief-read" || value.read_only_required !== true || value.retry_count !== 0 || !["require", "verify-full"].includes(String(value.ssl_mode)) || classifyHermesDailyFarmBriefDatabaseTarget(value.database_name) !== "production_candidate" || !boundedInt(value.port, 1, 65535) || !boundedInt(value.connect_timeout_ms, 100, 10_000) || !boundedInt(value.statement_timeout_ms, 100, 30_000) || !boundedInt(value.lock_timeout_ms, 100, 5_000)) return null;
+  if (!record(value) || !exact(value, CONFIG_KEYS) || value.schema_version !== "hermes.daily_farm_brief.production_read_repository_config.v1" || value.enabled !== true || value.target_class !== "production_candidate" || value.host_present !== true || value.user_present !== true || value.application_name !== "farmos-core-hermes-daily-brief-read" || value.read_only_required !== true || value.retry_count !== 0 || !["disable", "require", "verify-full"].includes(String(value.ssl_mode)) || classifyHermesDailyFarmBriefDatabaseTarget(value.database_name) !== "production_candidate" || !boundedInt(value.port, 1, 65535) || !boundedInt(value.connect_timeout_ms, 100, 10_000) || !boundedInt(value.statement_timeout_ms, 100, 30_000) || !boundedInt(value.lock_timeout_ms, 100, 5_000)) return null;
   return value as HermesDailyFarmBriefProductionReadRepositoryConfig;
 }
 
@@ -70,9 +70,12 @@ export const HERMES_DAILY_BRIEF_DATABASE_ENV_KEYS = {
 
 export function parseHermesDailyFarmBriefProductionEnvironment(environment: Readonly<Record<string, string | undefined>>): HermesDailyFarmBriefProductionReadRepositoryConfig | null {
   const integer = (key: string): number => Number(environment[key]);
-  return parseHermesDailyFarmBriefProductionReadRepositoryConfig({
+  const host = environment[HERMES_DAILY_BRIEF_DATABASE_ENV_KEYS.host];
+  const config = parseHermesDailyFarmBriefProductionReadRepositoryConfig({
     schema_version: "hermes.daily_farm_brief.production_read_repository_config.v1", enabled: environment[HERMES_DAILY_BRIEF_DATABASE_ENV_KEYS.enabled] === "true", target_class: classifyHermesDailyFarmBriefDatabaseTarget(environment[HERMES_DAILY_BRIEF_DATABASE_ENV_KEYS.database]), host_present: Boolean(environment[HERMES_DAILY_BRIEF_DATABASE_ENV_KEYS.host]), port: integer(HERMES_DAILY_BRIEF_DATABASE_ENV_KEYS.port), database_name: environment[HERMES_DAILY_BRIEF_DATABASE_ENV_KEYS.database], user_present: Boolean(environment[HERMES_DAILY_BRIEF_DATABASE_ENV_KEYS.user]), ssl_mode: environment[HERMES_DAILY_BRIEF_DATABASE_ENV_KEYS.ssl], connect_timeout_ms: integer(HERMES_DAILY_BRIEF_DATABASE_ENV_KEYS.connect), statement_timeout_ms: integer(HERMES_DAILY_BRIEF_DATABASE_ENV_KEYS.statement), lock_timeout_ms: integer(HERMES_DAILY_BRIEF_DATABASE_ENV_KEYS.lock), application_name: "farmos-core-hermes-daily-brief-read", read_only_required: true, retry_count: 0,
   });
+  if (config?.ssl_mode === "disable" && host !== "127.0.0.1" && host !== "localhost") return null;
+  return config;
 }
 
 export type HermesDailyFarmBriefServerAuthenticationProviderResult =
