@@ -17,3 +17,7 @@ Title and summaries are fixed strings. Priority details contain only fixed count
 The exact parser enforces schema keys, nested keys, canonical timestamps/business dates, current/stale only, text and array limits, control/HTML/raw-JSON rejection, duplicate rejection, source order, severity, fixed templates, and the exact Safety object. The serialized DTO exposes only business date, generation time, display state, fixed title/summary, safe priorities/attention/source disclosure/limitations, and Safety.
 
 Day118 is not a generated narrative. It performs no model execution, persistence, Proposal, notification, production read/write, or repository read. HTTP publication is deferred to Day119.
+
+## Day119 publication
+
+Day119 publishes this unchanged DTO through a separate authenticated GET endpoint. Candidate and role projection now come from one shared server-owned artifact build, and the persisted source is read at most once. Status-only states return `display: null`. The original latest endpoint remains unchanged.

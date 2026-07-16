@@ -22,17 +22,27 @@ import {
   parseHermesDailyFarmBriefAllowedScopeKeys,
   parseHermesDailyFarmBriefScopeIndex,
   type HermesDailyFarmBriefRole,
+  type HermesDailyFarmBriefRoleProjection,
 } from "./hermes_daily_farm_brief_scope_contract";
 import { parseHermesDailyFarmSnapshot } from "./hermes_daily_farm_snapshot_adapter";
 
-export function createHermesDailyFarmBriefRoleAwareLatestCandidate(input: {
+export type HermesDailyFarmBriefRoleAwareLatestArtifacts = {
+  latest_candidate: HermesDailyFarmBriefLatestCandidate;
+  role_projection: HermesDailyFarmBriefRoleProjection;
+};
+
+export type HermesDailyFarmBriefRoleAwareLatestInput = {
   businessDate: string;
   requestedBusinessDate: string;
   scopeIndex: unknown;
   snapshot: unknown;
   role: HermesDailyFarmBriefRole;
   allowedScopeKeys: unknown;
-}): HermesDailyFarmBriefLatestCandidate | null {
+};
+
+export function createHermesDailyFarmBriefRoleAwareLatestArtifacts(
+  input: HermesDailyFarmBriefRoleAwareLatestInput,
+): HermesDailyFarmBriefRoleAwareLatestArtifacts | null {
   const scopeIndex = parseHermesDailyFarmBriefScopeIndex(input.scopeIndex);
   const snapshot = parseHermesDailyFarmSnapshot(input.snapshot);
   const allowedScopeKeys = parseHermesDailyFarmBriefAllowedScopeKeys(input.allowedScopeKeys);
@@ -59,16 +69,19 @@ export function createHermesDailyFarmBriefRoleAwareLatestCandidate(input: {
       businessDate: input.businessDate,
       roleProjection: projection,
     });
-    if (candidate === null || input.businessDate === input.requestedBusinessDate) return candidate;
-    return parseHermesDailyFarmBriefLatestCandidate({
-      ...candidate,
-      stale: true,
-      stale_reason_codes: ["previous_business_date", ...candidate.stale_reason_codes],
-      display_state: "stale",
-    });
+    if (candidate === null) return null;
+    const latestCandidate = input.businessDate === input.requestedBusinessDate ? candidate : parseHermesDailyFarmBriefLatestCandidate({ ...candidate, stale: true, stale_reason_codes: ["previous_business_date", ...candidate.stale_reason_codes], display_state: "stale" });
+    if (latestCandidate === null || latestCandidate.role !== projection.role || latestCandidate.generated_at !== projection.generated_at || latestCandidate.brief_status !== projection.brief_status || latestCandidate.visible_scope_count !== projection.visible_scope_count || JSON.stringify(latestCandidate.source_status) !== JSON.stringify(projection.summary.source_status)) return null;
+    return { latest_candidate: latestCandidate, role_projection: projection };
   } catch {
     return null;
   }
+}
+
+export function createHermesDailyFarmBriefRoleAwareLatestCandidate(
+  input: HermesDailyFarmBriefRoleAwareLatestInput,
+): HermesDailyFarmBriefLatestCandidate | null {
+  return createHermesDailyFarmBriefRoleAwareLatestArtifacts(input)?.latest_candidate ?? null;
 }
 
 function emptyCandidate(input: {

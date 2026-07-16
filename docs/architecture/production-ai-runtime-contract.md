@@ -154,3 +154,7 @@ Production database, migration, RLS/role, authentication, and actor directory re
 ## Day118 browser-safe display projection
 
 Day118 adds a pure deterministic projection after server-owned role/scope filtering. It consumes only strict matching latest-candidate and role-projection contracts, accepts no browser role/scope, and performs no repository read. Persisted records do not contain the Daily Brief fact body, so the boundary does not recreate facts or generate a narrative. Fixed templates map public display labels, warning/info counts, source availability/freshness, stale reasons, and known limitations into a strictly bounded DTO. Raw snapshots, facts, identifiers, operational/diagnostic counts, internal codes, and credentials remain absent. In-progress, failed, unavailable, and mismatched inputs fail closed. HTTP publication is a Day119 gate.
+
+## Day119 authenticated latest-display API
+
+Day119 adds a separate GET-only, no-store endpoint for the unchanged Day118 DTO. Existing authentication, actor resolution, persisted-source selection, and server dependencies are reused. Projectable sources are read once and transformed through one shared role-aware artifact build, preventing candidate/projection drift. Status-only sources return `display: null`. Fixed public errors cover invalid request, authentication, authorization, method, and read/projection failure. The existing latest API remains unchanged, production authentication remains unconnected and deny-by-default, and farming-application body rendering is deferred.

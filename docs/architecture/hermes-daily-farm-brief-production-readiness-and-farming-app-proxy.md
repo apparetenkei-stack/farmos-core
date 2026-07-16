@@ -29,3 +29,7 @@ Day116 uses only the Day115 fixture authentication provider and actor directory 
 ## Day118 safe display projection
 
 Day118 adds no route and does not modify the latest API. A fixture-only boundary converts a matching server-owned role projection and latest candidate into a browser-safe deterministic DTO. Persisted records contain no Daily Brief fact body, so facts and narrative are neither reconstructed nor generated. Raw snapshots, identifiers, internal codes/counts, credentials, and role/scope overrides remain excluded. HTTP publication is deferred to Day119.
+
+## Day119 authenticated display publication
+
+The Day118 DTO is now available from a new authenticated latest-display endpoint. It reuses the existing authentication, actor resolution, persisted-source reader, and server dependencies; the source is read at most once. One shared artifact build supplies both candidate and role projection. The existing latest endpoint and farming-app proxy are unchanged. Production authentication remains unconnected and returns 401 by default; farming-app rendering is still deferred.

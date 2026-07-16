@@ -32,7 +32,8 @@ function availability(status: HermesDailyFarmBriefProjectionSourceStatus["status
 }
 
 function priorities(projection: HermesDailyFarmBriefRoleProjection): HermesDailyFarmBriefDisplayPriority[] {
-  const candidates = projection.scopes.flatMap((scope) => {
+  type PriorityCandidate = HermesDailyFarmBriefDisplayPriority & { scopeType: (typeof HERMES_DAILY_FARM_SCOPE_TYPE_ORDER)[number] };
+  const candidates = projection.scopes.flatMap<PriorityCandidate>((scope) => {
     if (scope.warning_count > 0) return [{ scopeType: scope.scope_type, label: scope.display_label, detail: `確認事項が${scope.warning_count}件あります。`, severity: "attention" as const }];
     if (scope.info_count > 0) return [{ scopeType: scope.scope_type, label: scope.display_label, detail: `参考情報が${scope.info_count}件あります。`, severity: "info" as const }];
     return [];
@@ -61,7 +62,7 @@ function attentionItems(candidate: HermesDailyFarmBriefLatestCandidate, projecti
 
 function limitations(candidate: HermesDailyFarmBriefLatestCandidate, projection: HermesDailyFarmBriefRoleProjection): string[] {
   const codes = new Set<string>([...projection.limitations, ...candidate.limitations, ...candidate.stale_reason_codes]);
-  const output = LIMITATION_ORDER.filter((code) => codes.has(code)).map((code) => LIMITATION_MAP[code]);
+  const output: string[] = LIMITATION_ORDER.filter((code) => codes.has(code)).map((code) => LIMITATION_MAP[code]);
   if ([...codes].some((code) => !Object.hasOwn(LIMITATION_MAP, code))) output.push("一部の情報を表示できません。");
   return [...new Set(output)].slice(0, HERMES_DAILY_FARM_BRIEF_DISPLAY_PROJECTION_LIMITS.limitations);
 }

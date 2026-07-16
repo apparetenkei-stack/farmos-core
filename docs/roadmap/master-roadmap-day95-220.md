@@ -79,7 +79,7 @@ FarmOS Core now owns the future Daily Brief store. Strict server-owned projectab
 - Day116: local isolated DB and fixture-authenticated manual generation → atomic persist → latest read E2E complete; production remains unconnected.
 - Day117: farming-application Daily Brief display without transferring storage ownership.
 - Day118: browser-safe deterministic Daily Brief display projection complete; no generated narrative or HTTP publication.
-- Day119: feedback and operational validation.
+- Day119: authenticated safe-display HTTP publication complete; production authentication and farming-app rendering remain deferred.
 - Day120: farm-owner pilot start decision.
 
 This schedule does not pre-authorize migrations, production writes, RLS changes, scheduler registration, UI changes, or external publication; each boundary retains its own readiness and approval gates.
@@ -99,3 +99,7 @@ A deterministic administrator-only manual request now traverses Day109–115 thr
 ### Day118 — Safe Daily Brief Display Projection
 
 The browser-safe DTO now deterministically maps the strict latest candidate and server-owned role projection through fixed templates. Persisted records contain no Daily Brief fact body, so no facts or narrative are reconstructed or inferred. Administrator and already allow-listed general-staff scopes produce bounded priorities; source/stale/limitation states become fixed public messages. Raw snapshots, identifiers, facts, internal codes/counts, credentials, DB operations, model execution, and browser overrides remain absent. The existing latest API is unchanged and HTTP publication is deferred to Day119.
+
+### Day119 — Authenticated Latest Display API
+
+The Day118 DTO is published through a new authenticated GET endpoint while the original latest endpoint remains unchanged. Existing authentication, actor resolution, server dependencies, and persisted source selection are reused with at-most-once source access. One shared artifact build returns the matching role projection and candidate; current/stale returns the safe display and status-only states return `display: null`. Production authentication remains deny-by-default, and farming-application rendering is deferred.
