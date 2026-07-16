@@ -11,6 +11,7 @@ if (!enabled) {
       {
         result: "skipped",
         reason: "real_data_smoke_not_enabled",
+        real_data_preview: "not_executed_environment_unavailable",
         external_read_performed: false,
         database_write_performed: false,
         notification_performed: false,
@@ -28,5 +29,29 @@ if (!enabled) {
     timezone: "Asia/Tokyo",
   });
 
-  console.log(JSON.stringify(result.safe_preview, null, 2));
+  const sources = Object.fromEntries(
+    result.safe_preview.sources.map((source) => [
+      source.source_type,
+      {
+        status: source.status,
+        record_count: source.record_count,
+        freshness: source.freshness,
+      },
+    ]),
+  );
+  const cropCycle = result.safe_preview.sources.find(
+    (source) => source.source_type === "crop_cycle",
+  );
+  console.log(JSON.stringify({
+    result: "ok",
+    real_data_preview: "executed_read_only",
+    sources,
+    relation_validation_result:
+      cropCycle?.status === "invalid" ? "failed_closed" : "passed_or_not_applicable",
+    external_read_performed: true,
+    database_write_performed: false,
+    brief_persistence_performed: false,
+    proposal_saved: false,
+    secret_exposed: false,
+  }, null, 2));
 }

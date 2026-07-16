@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { parseHermesOperationalReadonlySourceResult } from "../../../src/lib/hermes/hermes_operational_readonly_client";
 import {
   HERMES_DAILY_FARM_BRIEF_POLICY,
   HERMES_DAILY_FARM_SOURCE_ORDER,
@@ -41,8 +42,12 @@ const OPERATIONAL_TOP_LEVEL_KEYS = [
   "boundary",
   "inventory",
   "work_log",
+  "field",
+  "crop_cycle",
   "inventory_source_connected",
   "work_log_source_connected",
+  "field_source_connected",
+  "crop_cycle_source_connected",
   "external_fetch_performed",
   "hermes_context_injection_performed",
   "suggestion_generation_performed",
@@ -58,64 +63,8 @@ const OPERATIONAL_TOP_LEVEL_KEYS = [
   "arbitrary_method_allowed",
 ] as const;
 
-const OPERATIONAL_SOURCE_KEYS = [
-  "result",
-  "source_type",
-  "endpoint_path",
-  "http_method",
-  "fetch_performed",
-  "available",
-  "transaction_read_only",
-  "requested_limit",
-  "http_status",
-  "response_source",
-  "generated_at",
-  "record_count",
-  "records",
-  "has_more",
-  "error_code",
-  "write_performed",
-  "restricted_fields_exposed",
-  "credentials_exposed",
-] as const;
-
-const INVENTORY_RECORD_KEYS = [
-  "id",
-  "name",
-  "baseType",
-  "currentQuantity",
-  "unit",
-] as const;
-
-const WORK_LOG_RECORD_KEYS = [
-  "id",
-  "startedAt",
-  "fieldId",
-  "workTypeId",
-  "workTypeName",
-  "durationMinutes",
-  "targetCrop",
-  "cropCycleId",
-  "machineId",
-  "implementId",
-  "yieldAmount",
-  "yieldUnit",
-  "appliedMaterials",
-] as const;
-
-const APPLIED_MATERIAL_KEYS = [
-  "materialId",
-  "materialName",
-  "quantity",
-  "unit",
-] as const;
-
 function isRecord(value: unknown): value is JsonRecord {
   return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function hasOnlyKeys(value: JsonRecord, allowed: readonly string[]): boolean {
-  return Object.keys(value).every((key) => allowed.includes(key));
 }
 
 function hasExactKeys(value: JsonRecord, expected: readonly string[]): boolean {
@@ -135,18 +84,6 @@ function isCanonicalIso(value: unknown): value is string {
     Number.isFinite(timestamp) &&
     new Date(timestamp).toISOString() === value
   );
-}
-
-function isPrimitiveId(value: unknown): boolean {
-  return typeof value === "string" || typeof value === "number";
-}
-
-function isNullablePrimitiveId(value: unknown): boolean {
-  return value === null || isPrimitiveId(value);
-}
-
-function isNullableString(value: unknown): boolean {
-  return value === null || typeof value === "string";
 }
 
 function isNullableQuantity(value: unknown): boolean {
@@ -181,64 +118,18 @@ function normalizeQuantity(value: unknown): string | number | null {
   return isNullableQuantity(value) ? (value as string | number | null) : null;
 }
 
-function validateAppliedMaterial(value: unknown): boolean {
-  return (
-    isRecord(value) &&
-    hasExactKeys(value, APPLIED_MATERIAL_KEYS) &&
-    isNullablePrimitiveId(value.materialId) &&
-    isNullableString(value.materialName) &&
-    isNullableQuantity(value.quantity) &&
-    isNullableString(value.unit)
-  );
-}
-
-function validateInventoryInputRecord(value: unknown): boolean {
-  if (!isRecord(value) || !hasOnlyKeys(value, INVENTORY_RECORD_KEYS)) {
-    return false;
-  }
-
-  return (
-    (value.id === undefined || value.id === null || isPrimitiveId(value.id)) &&
-    typeof value.name === "string" &&
-    isNullableString(value.baseType) &&
-    isNullableQuantity(value.currentQuantity) &&
-    isNullableString(value.unit)
-  );
-}
-
-function validateWorkLogInputRecord(value: unknown): boolean {
-  if (!isRecord(value) || !hasOnlyKeys(value, WORK_LOG_RECORD_KEYS)) {
-    return false;
-  }
-
-  return (
-    (value.id === undefined || value.id === null || isPrimitiveId(value.id)) &&
-    isNullableString(value.startedAt) &&
-    isNullablePrimitiveId(value.fieldId) &&
-    isNullablePrimitiveId(value.workTypeId) &&
-    isNullableString(value.workTypeName) &&
-    isNullableQuantity(value.durationMinutes) &&
-    isNullableString(value.targetCrop) &&
-    isNullablePrimitiveId(value.cropCycleId) &&
-    isNullablePrimitiveId(value.machineId) &&
-    isNullablePrimitiveId(value.implementId) &&
-    isNullableQuantity(value.yieldAmount) &&
-    isNullableString(value.yieldUnit) &&
-    (value.appliedMaterials === null ||
-      (Array.isArray(value.appliedMaterials) &&
-        value.appliedMaterials.every(validateAppliedMaterial)))
-  );
-}
-
 function validateOperationalTopLevel(value: unknown): value is JsonRecord {
+  const legacyKeys = OPERATIONAL_TOP_LEVEL_KEYS.filter((key) => !["field", "crop_cycle", "field_source_connected", "crop_cycle_source_connected"].includes(key));
   return (
     isRecord(value) &&
-    hasExactKeys(value, OPERATIONAL_TOP_LEVEL_KEYS) &&
+    (hasExactKeys(value, OPERATIONAL_TOP_LEVEL_KEYS) || hasExactKeys(value, legacyKeys)) &&
     ["ok", "partial", "error"].includes(String(value.result)) &&
     value.checked === "hermes_operational_readonly_client" &&
     value.boundary === "day92_hermes_operational_readonly_client" &&
     typeof value.inventory_source_connected === "boolean" &&
     typeof value.work_log_source_connected === "boolean" &&
+    (value.field_source_connected === undefined || typeof value.field_source_connected === "boolean") &&
+    (value.crop_cycle_source_connected === undefined || typeof value.crop_cycle_source_connected === "boolean") &&
     typeof value.external_fetch_performed === "boolean" &&
     value.hermes_context_injection_performed === false &&
     value.suggestion_generation_performed === false &&
@@ -257,71 +148,30 @@ function validateOperationalTopLevel(value: unknown): value is JsonRecord {
 
 function validateOperationalSource(
   value: unknown,
-  sourceType: "inventory" | "work_log",
+  sourceType: "inventory" | "work_log" | "field" | "crop_cycle",
+  legacyMissingIdAllowed = false,
 ): value is JsonRecord & { records: unknown[] } {
-  if (!isRecord(value) || !hasExactKeys(value, OPERATIONAL_SOURCE_KEYS)) {
-    return false;
-  }
-
-  if (!Array.isArray(value.records)) {
-    return false;
-  }
-
   if (
-    !Number.isInteger(value.record_count) ||
-    Number(value.record_count) < 0 ||
-    value.record_count !== value.records.length
+    legacyMissingIdAllowed &&
+    (sourceType === "inventory" || sourceType === "work_log") &&
+    isRecord(value) &&
+    Array.isArray(value.records)
   ) {
-    return false;
+    const normalizedLegacyValue = {
+      ...value,
+      records: value.records.map((record) =>
+        isRecord(record) && (record.id === undefined || record.id === null)
+          ? { ...record, id: "legacy-missing-id" }
+          : record,
+      ),
+    };
+    return parseHermesOperationalReadonlySourceResult(
+      normalizedLegacyValue,
+      sourceType,
+    ) !== null;
   }
 
-  const recordsValid =
-    sourceType === "inventory"
-      ? value.records.every(validateInventoryInputRecord)
-      : value.records.every(validateWorkLogInputRecord);
-  const expectedEndpoint =
-    sourceType === "inventory"
-      ? "/api/farmos-core/inventory-summary"
-      : "/api/farmos-core/recent-work-logs";
-  const expectedResponseSource =
-    sourceType === "inventory"
-      ? "apparetenkei_inventory_readonly"
-      : "apparetenkei_work_logs_readonly";
-  const validErrorCodes = [
-    "configuration_unavailable",
-    "invalid_limit",
-    "timeout",
-    "network_unavailable",
-    "remote_http_error",
-    "invalid_response",
-  ];
-
-  return (
-    recordsValid &&
-    ["ok", "error"].includes(String(value.result)) &&
-    value.source_type === sourceType &&
-    value.endpoint_path === expectedEndpoint &&
-    value.http_method === "GET" &&
-    typeof value.fetch_performed === "boolean" &&
-    typeof value.available === "boolean" &&
-    ((value.result === "ok" && value.available === true) ||
-      (value.result === "error" && value.available === false)) &&
-    value.transaction_read_only === true &&
-    Number.isInteger(value.requested_limit) &&
-    Number(value.requested_limit) >= 0 &&
-    (value.http_status === null ||
-      (Number.isInteger(value.http_status) &&
-        Number(value.http_status) >= 100 &&
-        Number(value.http_status) <= 599)) &&
-    (value.response_source === null ||
-      value.response_source === expectedResponseSource) &&
-    (value.generated_at === null || isCanonicalIso(value.generated_at)) &&
-    typeof value.has_more === "boolean" &&
-    (value.error_code === null || validErrorCodes.includes(String(value.error_code))) &&
-    value.write_performed === false &&
-    value.restricted_fields_exposed === false &&
-    value.credentials_exposed === false
-  );
+  return parseHermesOperationalReadonlySourceResult(value, sourceType) !== null;
 }
 
 function sortNullableIds<T extends { id: string | null }>(values: T[]): T[] {
@@ -348,11 +198,9 @@ function createSource<T>(input: {
     nowIso: input.nowIso,
   });
   const invalid = input.invalid === true || timestampInvalid;
-  const freshness = evaluateHermesDailyFarmFreshness({
-    sourceType: input.sourceType,
-    generatedAt: input.generatedAt,
-    nowIso: input.nowIso,
-  });
+  const freshness = input.sourceType === "field" || input.sourceType === "crop_cycle"
+    ? "unknown"
+    : evaluateHermesDailyFarmFreshness({ sourceType: input.sourceType, generatedAt: input.generatedAt, nowIso: input.nowIso });
   const status: HermesDailyFarmSourceStatus = invalid
     ? "invalid"
     : !input.available
@@ -375,7 +223,7 @@ function createSource<T>(input: {
 }
 
 function invalidSource(
-  sourceType: "inventory" | "work_log",
+  sourceType: "inventory" | "work_log" | "field" | "crop_cycle",
   nowIso: string,
 ): HermesDailyFarmSource<never> {
   return createSource<never>({
@@ -393,8 +241,9 @@ function invalidSource(
 function normalizeInventorySource(
   value: unknown,
   nowIso: string,
+  legacyMissingIdAllowed = false,
 ): HermesDailyFarmSource<HermesDailyFarmInventoryRecord> {
-  if (!validateOperationalSource(value, "inventory")) {
+  if (!validateOperationalSource(value, "inventory", legacyMissingIdAllowed)) {
     return invalidSource("inventory", nowIso);
   }
 
@@ -425,8 +274,9 @@ function normalizeInventorySource(
 function normalizeWorkLogSource(
   value: unknown,
   nowIso: string,
+  legacyMissingIdAllowed = false,
 ): HermesDailyFarmSource<HermesDailyFarmWorkLogRecord> {
-  if (!validateOperationalSource(value, "work_log")) {
+  if (!validateOperationalSource(value, "work_log", legacyMissingIdAllowed)) {
     return invalidSource("work_log", nowIso);
   }
 
@@ -454,6 +304,29 @@ function normalizeWorkLogSource(
     limitations: [],
     nowIso,
   });
+}
+
+function normalizeFieldSource(value: unknown, nowIso: string): HermesDailyFarmSource<HermesDailyFarmMemoryRecord> {
+  if (!validateOperationalSource(value, "field")) return invalidSource("field", nowIso);
+  const records = sortNullableIds(value.records.map((item) => {
+    const record = item as JsonRecord;
+    return { id: safeId(record.reference), label: safeText(record.display_name), status: "unknown", source_timestamp: null };
+  })).slice(0, HERMES_DAILY_FARM_BRIEF_POLICY.source_record_limits.field);
+  return createSource({ sourceType: "field", available: value.available === true && value.result === "ok", generatedAt: value.generated_at as string | null, records, recordCount: Number(value.record_count), limitations: ["source_timestamp_observation_only"], nowIso });
+}
+
+function normalizeOperationalCropCycleSource(input: { value: unknown; fieldValue: unknown; nowIso: string }): HermesDailyFarmSource<HermesDailyFarmMemoryRecord> {
+  if (!validateOperationalSource(input.value, "crop_cycle")) return invalidSource("crop_cycle", input.nowIso);
+  if (!validateOperationalSource(input.fieldValue, "field")) {
+    return input.value.result === "ok" && input.value.records.length > 0 ? invalidSource("crop_cycle", input.nowIso) : createSource({ sourceType: "crop_cycle", available: false, generatedAt: null, records: [], recordCount: 0, limitations: ["crop_cycle_source_unavailable"], nowIso: input.nowIso });
+  }
+  const fieldReferences = new Set(input.fieldValue.records.map((item) => (item as JsonRecord).reference));
+  if (input.value.records.some((item) => (item as JsonRecord).field_references instanceof Array && ((item as JsonRecord).field_references as unknown[]).some((reference) => !fieldReferences.has(reference)))) return invalidSource("crop_cycle", input.nowIso);
+  const records = sortNullableIds(input.value.records.map((item) => {
+    const record = item as JsonRecord;
+    return { id: safeId(record.reference), label: safeText(record.crop_display_name), status: "unknown", source_timestamp: null };
+  })).slice(0, HERMES_DAILY_FARM_BRIEF_POLICY.source_record_limits.crop_cycle);
+  return createSource({ sourceType: "crop_cycle", available: input.value.available === true && input.value.result === "ok", generatedAt: input.value.generated_at as string | null, records, recordCount: Number(input.value.record_count), limitations: ["source_timestamp_observation_only"], nowIso: input.nowIso });
 }
 
 function validateMemoryArray(value: unknown): value is unknown[] {
@@ -571,28 +444,27 @@ export function createHermesDailyFarmSnapshot(input: {
   const operational = validateOperationalTopLevel(input.operationalSources)
     ? input.operationalSources
     : null;
+  const legacyOperational = operational !== null &&
+    !Object.hasOwn(operational, "field") &&
+    !Object.hasOwn(operational, "crop_cycle");
   const inventory = operational
-    ? normalizeInventorySource(operational.inventory, input.nowIso)
+    ? normalizeInventorySource(
+        operational.inventory,
+        input.nowIso,
+        legacyOperational,
+      )
     : invalidSource("inventory", input.nowIso);
   const workLog = operational
-    ? normalizeWorkLogSource(operational.work_log, input.nowIso)
+    ? normalizeWorkLogSource(
+        operational.work_log,
+        input.nowIso,
+        legacyOperational,
+      )
     : invalidSource("work_log", input.nowIso);
-  const field = createSource<never>({
-    sourceType: "field",
-    available: false,
-    generatedAt: null,
-    records: [],
-    recordCount: 0,
-    limitations: ["independent_field_source_not_implemented"],
-    nowIso: input.nowIso,
-  });
-  const cropCycle = normalizeMemorySource({
-    sourceType: "crop_cycle",
-    values: input.memory?.crop_cycles,
-    generatedAt: input.memory?.crop_cycle_generated_at,
-    available: input.memory?.crop_cycle_available !== false,
-    nowIso: input.nowIso,
-  });
+  const field = operational?.field ? normalizeFieldSource(operational.field, input.nowIso) : createSource({ sourceType: "field", available: false, generatedAt: null, records: [], recordCount: 0, limitations: ["independent_field_source_unavailable"], nowIso: input.nowIso });
+  const cropCycle = operational?.crop_cycle
+    ? normalizeOperationalCropCycleSource({ value: operational.crop_cycle, fieldValue: operational.field, nowIso: input.nowIso })
+    : createSource({ sourceType: "crop_cycle", available: false, generatedAt: null, records: [], recordCount: 0, limitations: ["crop_cycle_operational_source_unavailable"], nowIso: input.nowIso });
   const hermesNote = normalizeMemorySource({
     sourceType: "hermes_note",
     values: input.memory?.hermes_notes,
@@ -765,11 +637,9 @@ function validateCanonicalSource(
     return false;
   }
 
-  const expectedFreshness = evaluateHermesDailyFarmFreshness({
-    sourceType,
-    generatedAt: value.generated_at as string | null,
-    nowIso,
-  });
+  const expectedFreshness = sourceType === "field" || sourceType === "crop_cycle"
+    ? "unknown"
+    : evaluateHermesDailyFarmFreshness({ sourceType, generatedAt: value.generated_at as string | null, nowIso });
   if (value.freshness !== expectedFreshness) {
     return false;
   }
@@ -796,10 +666,8 @@ function validateCanonicalSource(
   if (sourceType === "work_log") {
     return value.records.every(validateCanonicalWorkLogRecord);
   }
-  if (sourceType === "field") {
-    return value.records.length === 0;
-  }
-  return value.records.every(validateCanonicalMemoryRecord);
+  if (sourceType === "field" || sourceType === "crop_cycle" || sourceType === "hermes_note") return value.records.every(validateCanonicalMemoryRecord);
+  return false;
 }
 
 export function parseHermesDailyFarmSnapshot(

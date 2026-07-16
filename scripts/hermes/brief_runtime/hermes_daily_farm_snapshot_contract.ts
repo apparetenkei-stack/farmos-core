@@ -52,7 +52,7 @@ export type HermesDailyFarmSnapshot = {
   sources: {
     inventory: HermesDailyFarmSource<HermesDailyFarmInventoryRecord>;
     work_log: HermesDailyFarmSource<HermesDailyFarmWorkLogRecord>;
-    field: HermesDailyFarmSource<never>;
+    field: HermesDailyFarmSource<HermesDailyFarmMemoryRecord>;
     crop_cycle: HermesDailyFarmSource<HermesDailyFarmMemoryRecord>;
     hermes_note: HermesDailyFarmSource<HermesDailyFarmMemoryRecord>;
   };

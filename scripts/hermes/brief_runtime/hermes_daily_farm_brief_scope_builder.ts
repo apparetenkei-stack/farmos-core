@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { isHermesOperationalOpaqueReference } from "../../../src/lib/hermes/hermes_operational_reference_contract";
 import type { HermesDailyFarmBrief } from "./hermes_daily_farm_brief_contract";
 import { parseHermesDailyFarmBrief } from "./hermes_daily_farm_brief_builder";
 import { HERMES_DAILY_FARM_SOURCE_ORDER } from "./hermes_daily_farm_brief_policy";
@@ -35,12 +36,11 @@ type MutableScope = {
   source_refs: Set<"work_log" | "crop_cycle">;
   work_log_count: number;
   crop_cycle_count: number;
+  crop_cycle_ids: Set<string>;
   work_log_ids: Set<string>;
   limitations: Set<string>;
   data_gaps: Set<string>;
 };
-
-const ID_PATTERN = /^[0-9A-Za-z][0-9A-Za-z._:-]{0,127}$/u;
 
 function canonicalIso(value: string): boolean {
   const timestamp = Date.parse(value);
@@ -49,8 +49,8 @@ function canonicalIso(value: string): boolean {
 
 export function normalizeHermesDailyFarmBriefScopeId(value: unknown): string | null {
   if (typeof value !== "string" && typeof value !== "number") return null;
-  const normalized = String(value).trim();
-  return ID_PATTERN.test(normalized) ? normalized : null;
+  const normalized = String(value);
+  return isHermesOperationalOpaqueReference(normalized) ? normalized : null;
 }
 
 export function normalizeHermesDailyFarmBriefScopeCrop(value: unknown): string | null {
@@ -86,6 +86,7 @@ function addScope(map: Map<string, MutableScope>, input: { type: HermesDailyFarm
       source_refs: new Set(),
       work_log_count: 0,
       crop_cycle_count: 0,
+      crop_cycle_ids: new Set(),
       work_log_ids: new Set(),
       limitations: new Set(),
       data_gaps: new Set(),
@@ -97,7 +98,11 @@ function addScope(map: Map<string, MutableScope>, input: { type: HermesDailyFarm
     scope.work_log_count += 1;
     if (input.recordId !== null) scope.work_log_ids.add(input.recordId);
   } else {
-    scope.crop_cycle_count += 1;
+    const cycleIdentity = input.recordId ?? `unidentified:${input.explicitValue}`;
+    if (!scope.crop_cycle_ids.has(cycleIdentity)) {
+      scope.crop_cycle_ids.add(cycleIdentity);
+      scope.crop_cycle_count += 1;
+    }
   }
   return scope;
 }
@@ -134,9 +139,11 @@ export function buildHermesDailyFarmBriefScopeIndex(input: {
     const derived: MutableScope[] = [];
     if (crop !== null) derived.push(addScope(scopes, { type: "crop", explicitValue: crop, source: "work_log", recordId }));
     if (fieldId !== null) {
-      unresolvedFields += 1;
       const scope = addScope(scopes, { type: "field", explicitValue: fieldId, source: "work_log", recordId });
-      scope.limitations.add("independent_field_source_unavailable");
+      if (snapshot.sources.field.status !== "available" && snapshot.sources.field.status !== "empty") {
+        unresolvedFields += 1;
+        scope.limitations.add("independent_field_source_unavailable");
+      }
       derived.push(scope);
     }
     if (cycleId !== null) {
@@ -155,8 +162,11 @@ export function buildHermesDailyFarmBriefScopeIndex(input: {
     if (recordId === null || crop === null || fieldId === null) unscopedCropCycles += 1;
     if (crop !== null) addScope(scopes, { type: "crop", explicitValue: crop, source: "crop_cycle", recordId });
     if (fieldId !== null) {
-      unresolvedFields += 1;
-      addScope(scopes, { type: "field", explicitValue: fieldId, source: "crop_cycle", recordId }).limitations.add("independent_field_source_unavailable");
+      const scope = addScope(scopes, { type: "field", explicitValue: fieldId, source: "crop_cycle", recordId });
+      if (snapshot.sources.field.status !== "available" && snapshot.sources.field.status !== "empty") {
+        unresolvedFields += 1;
+        scope.limitations.add("independent_field_source_unavailable");
+      }
     }
     if (recordId !== null) addScope(scopes, { type: "crop_cycle", explicitValue: recordId, source: "crop_cycle", recordId });
   }

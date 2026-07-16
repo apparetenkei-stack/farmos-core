@@ -6,9 +6,11 @@ import {
   FARMOS_CORE_READONLY_TOKEN_ENV,
   readHermesOperationalReadonlySources,
 } from "../../src/lib/hermes/hermes_operational_readonly_client";
+import { isHermesOperationalOpaqueReference } from "../../src/lib/hermes/hermes_operational_reference_contract";
 
 const TEST_BASE_URL = "http://127.0.0.1:3999";
 const TEST_TOKEN = "day92-unit-test-token";
+type JsonRecord = Record<string, unknown>;
 
 function makeEnv(overrides?: Record<string, string | undefined>) {
   return {
@@ -32,7 +34,7 @@ function makeSuccessEnvelope(input: {
     generatedAt: "2026-07-10T00:00:00.000Z",
     readOnly: true,
     recordCount: input.records.length,
-    records: input.records,
+    records: structuredClone(input.records),
     pagination: {
       limit: input.limit ?? 100,
       hasMore: false,
@@ -41,6 +43,25 @@ function makeSuccessEnvelope(input: {
       writePerformed: false,
       restrictedFieldsExposed: false,
     },
+  };
+}
+
+function makeDay122Envelope(input: {
+  source: "apparetenkei_fields_readonly" | "apparetenkei_crop_cycles_readonly";
+  schemaVersion: "farmos.core.fields.read.v1" | "farmos.core.crop_cycles.read.v1";
+  records: unknown[];
+  limit?: number;
+}) {
+  return {
+    result: "ok",
+    schema_version: input.schemaVersion,
+    source: input.source,
+    generated_at: "2026-07-10T00:00:00.000Z",
+    readOnly: true,
+    record_count: input.records.length,
+    records: structuredClone(input.records),
+    pagination: { limit: input.limit ?? 100, hasMore: false },
+    safety: { writePerformed: false, restrictedFieldsExposed: false },
   };
 }
 
@@ -79,6 +100,29 @@ const workLogRecords = [
   },
 ];
 
+const fieldRecords = Array.from({ length: 71 }, (_, index) => ({
+  reference: `field-reference-${index + 1}`,
+  display_name: `Field ${index + 1}`,
+  active_state: "unknown" as const,
+  source_updated_at: null,
+}));
+
+const cropCycleRecords = Array.from({ length: 40 }, (_, index) => ({
+  reference: `crop-cycle-reference-${index + 1}`,
+  field_references: [`field-reference-${(index % fieldRecords.length) + 1}`],
+  crop_display_name: index % 2 === 0 ? "Cabbage" : null,
+  cycle_state: "unknown" as const,
+  operational_start_date: index % 2 === 0 ? "2026-07-01" : null,
+  source_updated_at: null,
+}));
+
+function envelopeForUrl(url: string): Record<string, unknown> {
+  if (url.includes("/inventory-summary")) return makeSuccessEnvelope({ source: "apparetenkei_inventory_readonly", records: inventoryRecords });
+  if (url.includes("/recent-work-logs")) return makeSuccessEnvelope({ source: "apparetenkei_work_logs_readonly", records: workLogRecords });
+  if (url.includes("/fields")) return makeDay122Envelope({ source: "apparetenkei_fields_readonly", schemaVersion: "farmos.core.fields.read.v1", records: fieldRecords });
+  return makeDay122Envelope({ source: "apparetenkei_crop_cycles_readonly", schemaVersion: "farmos.core.crop_cycles.read.v1", records: cropCycleRecords });
+}
+
 function createSuccessFetch(
   captures: Array<{
     url: string;
@@ -99,18 +143,8 @@ function createSuccessFetch(
       bodyPresent: init?.body !== undefined && init?.body !== null,
     });
 
-    const isInventory =
-      url.includes("/api/farmos-core/inventory-summary");
-
     return new Response(
-      JSON.stringify(
-        makeSuccessEnvelope({
-          source: isInventory
-            ? "apparetenkei_inventory_readonly"
-            : "apparetenkei_work_logs_readonly",
-          records: isInventory ? inventoryRecords : workLogRecords,
-        }),
-      ),
+      JSON.stringify(envelopeForUrl(url)),
       {
         status: 200,
         headers: {
@@ -139,6 +173,15 @@ function assertGlobalSafety(
 }
 
 async function main(): Promise<void> {
+  const reference120 = `a${"b".repeat(119)}`;
+  assert.equal(isHermesOperationalOpaqueReference(reference120), true);
+  assert.equal(isHermesOperationalOpaqueReference(`${reference120}c`), false);
+  assert.equal(isHermesOperationalOpaqueReference("field reference"), false);
+  assert.equal(isHermesOperationalOpaqueReference("field\nreference"), false);
+  assert.equal(isHermesOperationalOpaqueReference("field/reference"), false);
+  assert.equal(isHermesOperationalOpaqueReference("550e8400-e29b-41d4-a716-446655440000"), true);
+  assert.equal(isHermesOperationalOpaqueReference("field:stable_id-1"), true);
+
   let fetchCount = 0;
   const missingConfiguration =
     await readHermesOperationalReadonlySources({
@@ -208,8 +251,12 @@ async function main(): Promise<void> {
   assert.equal(success.result, "ok");
   assert.equal(success.inventory_source_connected, true);
   assert.equal(success.work_log_source_connected, true);
+  assert.equal(success.field_source_connected, true);
+  assert.equal(success.crop_cycle_source_connected, true);
   assert.equal(success.inventory.record_count, 1);
   assert.equal(success.work_log.record_count, 1);
+  assert.equal(success.field?.record_count, 71);
+  assert.equal(success.crop_cycle?.record_count, 40);
   assert.equal(success.inventory.records[0]?.currentQuantity, 0);
   assert.equal(success.work_log.records[0]?.durationMinutes, 0);
   assert.equal(success.work_log.records[0]?.yieldAmount, 0);
@@ -217,11 +264,13 @@ async function main(): Promise<void> {
     success.work_log.records[0]?.appliedMaterials?.[0]?.quantity,
     0,
   );
-  assert.equal(captures.length, 2);
+  assert.equal(captures.length, 4);
   assert.equal(
     captures.every((capture) => capture.method === "GET"),
     true,
   );
+  assert.equal(captures.some((capture) => capture.url === `${TEST_BASE_URL}/api/farmos-core/fields?limit=100`), true);
+  assert.equal(captures.some((capture) => capture.url === `${TEST_BASE_URL}/api/farmos-core/crop-cycles?limit=100`), true);
   assert.equal(
     captures.every(
       (capture) =>
@@ -259,29 +308,12 @@ async function main(): Promise<void> {
   assert.equal(serializedSuccess.includes(TEST_TOKEN), false);
 
   const restrictedFetch: typeof fetch = async (input) => {
-    const isInventory =
-      String(input).includes("/api/farmos-core/inventory-summary");
-
-    const records = isInventory
-      ? [
-          {
-            ...inventoryRecords[0],
-            price_per_unit: 100,
-          },
-        ]
-      : workLogRecords;
-
-    return new Response(
-      JSON.stringify(
-        makeSuccessEnvelope({
-          source: isInventory
-            ? "apparetenkei_inventory_readonly"
-            : "apparetenkei_work_logs_readonly",
-          records,
-        }),
-      ),
-      { status: 200 },
-    );
+    const url = String(input);
+    const envelope = envelopeForUrl(url);
+    if (url.includes("/inventory-summary")) {
+      envelope.records = [{ ...inventoryRecords[0], price_per_unit: 100 }];
+    }
+    return new Response(JSON.stringify(envelope), { status: 200 });
   };
 
   const restricted = await readHermesOperationalReadonlySources({
@@ -298,31 +330,12 @@ async function main(): Promise<void> {
   assertGlobalSafety(restricted);
 
   const rawDetailsFetch: typeof fetch = async (input) => {
-    const isInventory =
-      String(input).includes("/api/farmos-core/inventory-summary");
-
-    const records = isInventory
-      ? inventoryRecords
-      : [
-          {
-            ...workLogRecords[0],
-            details: {
-              worker_name: "restricted",
-            },
-          },
-        ];
-
-    return new Response(
-      JSON.stringify(
-        makeSuccessEnvelope({
-          source: isInventory
-            ? "apparetenkei_inventory_readonly"
-            : "apparetenkei_work_logs_readonly",
-          records,
-        }),
-      ),
-      { status: 200 },
-    );
+    const url = String(input);
+    const envelope = envelopeForUrl(url);
+    if (url.includes("/recent-work-logs")) {
+      envelope.records = [{ ...workLogRecords[0], details: { worker_name: "restricted" } }];
+    }
+    return new Response(JSON.stringify(envelope), { status: 200 });
   };
 
   const rawDetails = await readHermesOperationalReadonlySources({
@@ -336,15 +349,9 @@ async function main(): Promise<void> {
   assert.equal(rawDetails.work_log.records.length, 0);
 
   const badCountFetch: typeof fetch = async (input) => {
-    const isInventory =
-      String(input).includes("/api/farmos-core/inventory-summary");
-    const envelope = makeSuccessEnvelope({
-      source: isInventory
-        ? "apparetenkei_inventory_readonly"
-        : "apparetenkei_work_logs_readonly",
-      records: isInventory ? inventoryRecords : workLogRecords,
-    });
-    envelope.recordCount = 99;
+    const envelope = envelopeForUrl(String(input));
+    if (Object.hasOwn(envelope, "recordCount")) envelope.recordCount = 99;
+    else envelope.record_count = 99;
 
     return new Response(JSON.stringify(envelope), { status: 200 });
   };
@@ -357,6 +364,110 @@ async function main(): Promise<void> {
   assert.equal(badCount.result, "error");
   assert.equal(badCount.inventory.error_code, "invalid_response");
   assert.equal(badCount.work_log.error_code, "invalid_response");
+  assert.equal(badCount.field?.error_code, "invalid_response");
+  assert.equal(badCount.crop_cycle?.error_code, "invalid_response");
+
+  const overrideFetch = (target: "fields" | "crop-cycles", mutate: (envelope: Record<string, unknown>) => void): typeof fetch => async (input) => {
+    const url = String(input);
+    const envelope = envelopeForUrl(url);
+    if (url.includes(`/api/farmos-core/${target}`)) mutate(envelope);
+    return new Response(JSON.stringify(envelope), { status: 200 });
+  };
+
+  const emptyDay122 = await readHermesOperationalReadonlySources({
+    env: makeEnv(),
+    fetchImpl: async (input) => {
+      const url = String(input);
+      const envelope = envelopeForUrl(url);
+      if (url.includes("/fields") || url.includes("/crop-cycles")) {
+        envelope.records = [];
+        envelope.record_count = 0;
+      }
+      return new Response(JSON.stringify(envelope), { status: 200 });
+    },
+  });
+  assert.equal(emptyDay122.field?.result, "ok");
+  assert.equal(emptyDay122.field?.record_count, 0);
+  assert.equal(emptyDay122.crop_cycle?.result, "ok");
+  assert.equal(emptyDay122.crop_cycle?.record_count, 0);
+
+  const fieldUnknownKey = await readHermesOperationalReadonlySources({ env: makeEnv(), fetchImpl: overrideFetch("fields", (envelope) => { (envelope.records as JsonRecord[])[0].unknown = true; }) });
+  assert.equal(fieldUnknownKey.field?.error_code, "invalid_response");
+  const fieldMissingKey = await readHermesOperationalReadonlySources({ env: makeEnv(), fetchImpl: overrideFetch("fields", (envelope) => { delete (envelope.records as JsonRecord[])[0].display_name; }) });
+  assert.equal(fieldMissingKey.field?.error_code, "invalid_response");
+  const fieldMalformedEnvelope = await readHermesOperationalReadonlySources({ env: makeEnv(), fetchImpl: overrideFetch("fields", (envelope) => { envelope.extra = true; }) });
+  assert.equal(fieldMalformedEnvelope.field?.error_code, "invalid_response");
+
+  const fieldContractMutations: Array<(envelope: JsonRecord) => void> = [
+    (envelope) => { envelope.schema_version = "farmos.core.fields.read.v0"; },
+    (envelope) => { envelope.source = "wrong_fields_source"; },
+    (envelope) => { envelope.readOnly = false; },
+    (envelope) => { (envelope.safety as JsonRecord).writePerformed = true; },
+    (envelope) => { (envelope.safety as JsonRecord).restrictedFieldsExposed = true; },
+    (envelope) => { ((envelope.records as JsonRecord[])[0]).reference = `${reference120}c`; },
+    (envelope) => { ((envelope.records as JsonRecord[])[0]).reference = "field\nreference"; },
+    (envelope) => { ((envelope.records as JsonRecord[])[1]).reference = (envelope.records as JsonRecord[])[0].reference; },
+  ];
+  for (const mutate of fieldContractMutations) {
+    const rejected = await readHermesOperationalReadonlySources({ env: makeEnv(), fetchImpl: overrideFetch("fields", mutate) });
+    assert.equal(rejected.field.error_code, "invalid_response");
+    assert.equal(rejected.field.record_count, 0);
+  }
+
+  const referenceBoundaryAccepted = await readHermesOperationalReadonlySources({
+    env: makeEnv(),
+    fetchImpl: async (input) => {
+      const url = String(input);
+      const envelope = envelopeForUrl(url);
+      if (url.includes("/fields")) (envelope.records as JsonRecord[])[0].reference = reference120;
+      if (url.includes("/crop-cycles")) (envelope.records as JsonRecord[])[0].field_references = [reference120];
+      return new Response(JSON.stringify(envelope), { status: 200 });
+    },
+  });
+  assert.equal(referenceBoundaryAccepted.field.result, "ok");
+  assert.equal(referenceBoundaryAccepted.crop_cycle.result, "ok");
+
+  const duplicateFieldReference = await readHermesOperationalReadonlySources({ env: makeEnv(), fetchImpl: overrideFetch("crop-cycles", (envelope) => { (envelope.records as JsonRecord[])[0].field_references = ["field-reference-1", "field-reference-1"]; }) });
+  assert.equal(duplicateFieldReference.crop_cycle?.error_code, "invalid_response");
+  const invalidOperationalDate = await readHermesOperationalReadonlySources({ env: makeEnv(), fetchImpl: overrideFetch("crop-cycles", (envelope) => { (envelope.records as JsonRecord[])[0].operational_start_date = "2026-02-31"; }) });
+  assert.equal(invalidOperationalDate.crop_cycle?.error_code, "invalid_response");
+  const cropMissingKey = await readHermesOperationalReadonlySources({ env: makeEnv(), fetchImpl: overrideFetch("crop-cycles", (envelope) => { delete (envelope.records as JsonRecord[])[0].cycle_state; }) });
+  assert.equal(cropMissingKey.crop_cycle?.error_code, "invalid_response");
+  const cropContractMutations: Array<(envelope: JsonRecord) => void> = [
+    (envelope) => { envelope.schema_version = "farmos.core.crop_cycles.read.v0"; },
+    (envelope) => { envelope.source = "wrong_crop_cycle_source"; },
+    (envelope) => { envelope.readOnly = false; },
+    (envelope) => { (envelope.records as JsonRecord[])[1].reference = (envelope.records as JsonRecord[])[0].reference; },
+    (envelope) => { (envelope.records as JsonRecord[])[0].reference = `${reference120}c`; },
+    (envelope) => { (envelope.records as JsonRecord[])[0].field_references = ["field/reference"]; },
+    (envelope) => { (envelope.records as JsonRecord[])[0].field_references = Array.from({ length: 101 }, (_, index) => `field-${index}`); },
+  ];
+  for (const mutate of cropContractMutations) {
+    const rejected = await readHermesOperationalReadonlySources({ env: makeEnv(), fetchImpl: overrideFetch("crop-cycles", mutate) });
+    assert.equal(rejected.crop_cycle.error_code, "invalid_response");
+    assert.equal(rejected.crop_cycle.record_count, 0);
+  }
+  const orphanRelation = await readHermesOperationalReadonlySources({ env: makeEnv(), fetchImpl: overrideFetch("crop-cycles", (envelope) => { (envelope.records as JsonRecord[])[0].field_references = ["field-reference-absent"]; }) });
+  assert.equal(orphanRelation.crop_cycle?.error_code, "invalid_response");
+  assert.equal(orphanRelation.crop_cycle?.record_count, 0);
+
+  const unauthorized = await readHermesOperationalReadonlySources({ env: makeEnv(), fetchImpl: async () => new Response(null, { status: 401 }) });
+  assert.equal(unauthorized.field?.error_code, "remote_http_error");
+  assert.equal(unauthorized.crop_cycle?.error_code, "remote_http_error");
+
+  const redirected = await readHermesOperationalReadonlySources({
+    env: makeEnv(),
+    fetchImpl: (async (input) => {
+      const url = String(input);
+      if (url.includes("/fields") || url.includes("/crop-cycles")) return { ok: true, redirected: true, status: 200, text: async () => JSON.stringify(envelopeForUrl(url)) } as Response;
+      return new Response(JSON.stringify(envelopeForUrl(url)), { status: 200 });
+    }) as typeof fetch,
+  });
+  assert.equal(redirected.field?.error_code, "remote_http_error");
+  assert.equal(redirected.crop_cycle?.error_code, "remote_http_error");
+
+  assert.equal(captures.filter((capture) => capture.url.includes("/fields?")).length, 1);
+  assert.equal(captures.filter((capture) => capture.url.includes("/crop-cycles?")).length, 1);
 
   const remoteSecret = "remote-internal-secret";
   const httpError = await readHermesOperationalReadonlySources({

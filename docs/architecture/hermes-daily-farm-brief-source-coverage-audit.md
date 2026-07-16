@@ -18,7 +18,7 @@ The completed farming-application audit found 71 fields, 40 crop cycles with zer
 
 ## 5. Existing read APIs
 
-`GET /api/farmos-core/inventory-summary` returns 7 records without a filter or zero-stock exclusion. `GET /api/farmos-core/recent-work-logs` returns the fixed maximum of 100 records. Farming-application Core read APIs for fields and crop cycles do not exist at Day121.
+`GET /api/farmos-core/inventory-summary` returns 7 records without a filter or zero-stock exclusion. `GET /api/farmos-core/recent-work-logs` returns the fixed maximum of 100 records. At Day122, the farming application also provides `GET /api/farmos-core/fields` and `GET /api/farmos-core/crop-cycles`.
 
 ## 6. Core call chain
 
@@ -42,8 +42,8 @@ The independent Operational Context integration is not an intermediate Daily Bri
 
 | Source | Farming-app actual | Existing API | Core adapter coverage | Current snapshot state | Day122 |
 |---|---:|---|---|---|---|
-| fields | 71 | none | external reads 0 | unavailable, record count 0 | required |
-| crop cycles | 40 | none | Core `app.crop_cycles` memory summary, maximum 10 | memory provenance, freshness unknown | required |
+| fields | 71 | fields read API | strict operational adapter; fixture expected count 71 | available in fixture, freshness unknown | connected |
+| crop cycles | 40 | crop-cycles read API | strict operational adapter; fixture expected count 40 | available in fixture, freshness unknown | connected |
 | inventory | 7 | inventory-summary returns 7 | normal response preserves count 7; display record limit 20 | available even when no attention fact is produced | retain and verify |
 | work records | 541 | recent-work-logs returns 100 | adapter count 100; snapshot display records maximum 10; scope references up to 100 | available or explicitly limited, never empty solely due to truncation | retain and verify |
 
@@ -77,9 +77,9 @@ unknown_unverifiable_from_repository
 
 The repository contains no saved receipt, execution origin, source-count metadata, or external-fetch evidence that can prove fixture, partial-real-data, or full-real-data origin. No stronger classification may be inferred.
 
-## 13. Day122 target
+## 13. Day122 implementation
 
-The farming application target is `GET /api/farmos-core/fields` and `GET /api/farmos-core/crop-cycles`, using server-to-server Bearer authentication, GET only, explicit columns, no `select *`, fixed limits, existing timeout policy, and no writes, migrations, or RLS changes. Raw identifiers must not reach browser-safe projection.
+The farming application exposes `GET /api/farmos-core/fields` and `GET /api/farmos-core/crop-cycles`, using server-to-server Bearer authentication, GET only, explicit columns, no `select *`, fixed limits, existing timeout policy, and no writes, migrations, or RLS changes. FarmOS Core connects both through one four-source operational readonly client. Fixture contracts expect 71 fields and 40 crop cycles; a network preview was not executed during this implementation.
 
 FarmOS Core review targets are:
 
@@ -92,7 +92,7 @@ FarmOS Core review targets are:
 - `scripts/hermes/brief_runtime/hermes_daily_farm_brief_scope_builder.ts`
 - related fixture tests
 
-The operational crop-cycle API and Hermes memory context remain separate sources.
+The operational crop-cycle API is operational truth. Core `app.crop_cycles` remains Hermes auxiliary memory context and is neither merged nor used as fallback. Orphan field relations fail closed. API `generated_at` remains observation time, so field and crop-cycle freshness stays unknown. Opaque references are used only for internal relation/scope identity and are excluded from browser-safe projection.
 
 ## 14. Day123 target
 

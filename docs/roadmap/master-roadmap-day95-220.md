@@ -111,6 +111,6 @@ The existing latest and latest-display routes now share one pilot dependency fac
 ### Day121–124 — Source Coverage Gate and Proposal Handoff
 
 - Day121 fixes audited actual counts, adapter paths, availability, freshness, provenance, and the Day120 origin classification (`unknown_unverifiable_from_repository`) in a pure fixture-only contract.
-- Day122 connects separate farming-application operational read adapters for fields and crop cycles. Farming-app crop cycles remain operational truth; Core `app.crop_cycles` remains Hermes memory context and is not merged into that source.
+- Day122 connects strict farming-application operational read adapters for fields and crop cycles. Fixture contracts verify expected counts 71/40, orphan relations fail closed, freshness remains unknown, and raw references stay outside browser projection. Farming-app crop cycles remain operational truth; Core `app.crop_cycles` remains Hermes memory context and is not merged into that source. Network preview remains separately environment-gated.
 - Day123 separates inventory source record count, attention fact/count, and latest-display wording, then performs an explicitly authorized new real-data Brief generation, manual persistence, and dashboard E2E after the coverage gate passes.
 - Day124 begins the minimum Proposal vertical slice only after source coverage passes. This does not postpone the Day130 administrator Proposal gate.

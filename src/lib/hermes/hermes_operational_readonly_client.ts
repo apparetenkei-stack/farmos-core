@@ -1,3 +1,5 @@
+import { isHermesOperationalOpaqueReference } from "./hermes_operational_reference_contract";
+
 export const HERMES_OPERATIONAL_READONLY_CLIENT =
   "day92_hermes_operational_readonly_client" as const;
 
@@ -18,7 +20,11 @@ const INVENTORY_ENDPOINT_PATH =
   "/api/farmos-core/inventory-summary" as const;
 const WORK_LOG_ENDPOINT_PATH =
   "/api/farmos-core/recent-work-logs" as const;
+const FIELD_ENDPOINT_PATH = "/api/farmos-core/fields" as const;
+const CROP_CYCLE_ENDPOINT_PATH = "/api/farmos-core/crop-cycles" as const;
 const MAX_RESPONSE_CHARS = 1_000_000;
+const MAX_DISPLAY_TEXT_CHARS = 120;
+const MAX_FIELD_REFERENCES = 100;
 
 type EnvMap = Record<string, string | undefined>;
 type JsonRecord = Record<string, unknown>;
@@ -56,6 +62,46 @@ export type HermesOperationalWorkLogRecord = {
   appliedMaterials: HermesOperationalAppliedMaterial[] | null;
 };
 
+export type HermesOperationalFieldRecord = {
+  reference: string;
+  display_name: string;
+  active_state: "unknown";
+  source_updated_at: null;
+};
+
+export type HermesOperationalCropCycleRecord = {
+  reference: string;
+  field_references: string[];
+  crop_display_name: string | null;
+  cycle_state: "unknown";
+  operational_start_date: string | null;
+  source_updated_at: null;
+};
+
+type HermesOperationalSourceType =
+  | "inventory"
+  | "work_log"
+  | "field"
+  | "crop_cycle";
+
+type HermesOperationalRecord =
+  | HermesOperationalInventoryRecord
+  | HermesOperationalWorkLogRecord
+  | HermesOperationalFieldRecord
+  | HermesOperationalCropCycleRecord;
+
+type HermesOperationalEndpointPath =
+  | typeof INVENTORY_ENDPOINT_PATH
+  | typeof WORK_LOG_ENDPOINT_PATH
+  | typeof FIELD_ENDPOINT_PATH
+  | typeof CROP_CYCLE_ENDPOINT_PATH;
+
+type HermesOperationalResponseSource =
+  | "apparetenkei_inventory_readonly"
+  | "apparetenkei_work_logs_readonly"
+  | "apparetenkei_fields_readonly"
+  | "apparetenkei_crop_cycles_readonly";
+
 export type HermesOperationalReadonlyErrorCode =
   | "configuration_unavailable"
   | "invalid_limit"
@@ -66,20 +112,15 @@ export type HermesOperationalReadonlyErrorCode =
 
 export type HermesOperationalReadonlySourceResult<TRecord> = {
   result: "ok" | "error";
-  source_type: "inventory" | "work_log";
-  endpoint_path:
-    | typeof INVENTORY_ENDPOINT_PATH
-    | typeof WORK_LOG_ENDPOINT_PATH;
+  source_type: HermesOperationalSourceType;
+  endpoint_path: HermesOperationalEndpointPath;
   http_method: "GET";
   fetch_performed: boolean;
   available: boolean;
   transaction_read_only: true;
   requested_limit: number;
   http_status: number | null;
-  response_source:
-    | "apparetenkei_inventory_readonly"
-    | "apparetenkei_work_logs_readonly"
-    | null;
+  response_source: HermesOperationalResponseSource | null;
   generated_at: string | null;
   record_count: number;
   records: TRecord[];
@@ -90,14 +131,23 @@ export type HermesOperationalReadonlySourceResult<TRecord> = {
   credentials_exposed: false;
 };
 
+/**
+ * Fixture-compatible input shape. Production reads use the required four-source
+ * subtype below; missing legacy field/crop-cycle inputs normalize to unavailable
+ * at the Daily Farm Snapshot boundary.
+ */
 export type HermesOperationalReadonlyClientResult = {
   result: "ok" | "partial" | "error";
   checked: "hermes_operational_readonly_client";
   boundary: typeof HERMES_OPERATIONAL_READONLY_CLIENT;
   inventory: HermesOperationalReadonlySourceResult<HermesOperationalInventoryRecord>;
   work_log: HermesOperationalReadonlySourceResult<HermesOperationalWorkLogRecord>;
+  field?: HermesOperationalReadonlySourceResult<HermesOperationalFieldRecord>;
+  crop_cycle?: HermesOperationalReadonlySourceResult<HermesOperationalCropCycleRecord>;
   inventory_source_connected: boolean;
   work_log_source_connected: boolean;
+  field_source_connected?: boolean;
+  crop_cycle_source_connected?: boolean;
   external_fetch_performed: boolean;
   hermes_context_injection_performed: false;
   suggestion_generation_performed: false;
@@ -111,6 +161,16 @@ export type HermesOperationalReadonlyClientResult = {
   credentials_exposed: false;
   arbitrary_endpoint_allowed: false;
   arbitrary_method_allowed: false;
+};
+
+export type HermesOperationalReadonlyFourSourceClientResult = Omit<
+  HermesOperationalReadonlyClientResult,
+  "field" | "crop_cycle" | "field_source_connected" | "crop_cycle_source_connected"
+> & {
+  field: HermesOperationalReadonlySourceResult<HermesOperationalFieldRecord>;
+  crop_cycle: HermesOperationalReadonlySourceResult<HermesOperationalCropCycleRecord>;
+  field_source_connected: boolean;
+  crop_cycle_source_connected: boolean;
 };
 
 type ResolvedConfig =
@@ -128,9 +188,7 @@ type ResolvedConfig =
     };
 
 type ValidatedEnvelope<TRecord> = {
-  source:
-    | "apparetenkei_inventory_readonly"
-    | "apparetenkei_work_logs_readonly";
+  source: HermesOperationalResponseSource;
   generatedAt: string;
   recordCount: number;
   records: TRecord[];
@@ -196,12 +254,72 @@ const APPLIED_MATERIAL_ALLOWED_KEYS = new Set([
   "unit",
 ]);
 
+const DAY122_ENVELOPE_KEYS = [
+  "result",
+  "schema_version",
+  "source",
+  "generated_at",
+  "readOnly",
+  "record_count",
+  "records",
+  "pagination",
+  "safety",
+] as const;
+const DAY122_PAGINATION_KEYS = ["limit", "hasMore"] as const;
+const DAY122_SAFETY_KEYS = ["writePerformed", "restrictedFieldsExposed"] as const;
+const FIELD_RECORD_KEYS = ["reference", "display_name", "active_state", "source_updated_at"] as const;
+const CROP_CYCLE_RECORD_KEYS = ["reference", "field_references", "crop_display_name", "cycle_state", "operational_start_date", "source_updated_at"] as const;
+const OPERATIONAL_SOURCE_RESULT_KEYS = [
+  "result",
+  "source_type",
+  "endpoint_path",
+  "http_method",
+  "fetch_performed",
+  "available",
+  "transaction_read_only",
+  "requested_limit",
+  "http_status",
+  "response_source",
+  "generated_at",
+  "record_count",
+  "records",
+  "has_more",
+  "error_code",
+  "write_performed",
+  "restricted_fields_exposed",
+  "credentials_exposed",
+] as const;
+
 function isRecord(value: unknown): value is JsonRecord {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function hasOnlyKeys(value: JsonRecord, allowed: Set<string>): boolean {
   return Object.keys(value).every((key) => allowed.has(key));
+}
+
+function hasExactKeys(value: JsonRecord, expected: readonly string[]): boolean {
+  return Object.keys(value).length === expected.length && expected.every((key) => Object.hasOwn(value, key));
+}
+
+function isCanonicalIso(value: unknown): value is string {
+  if (typeof value !== "string") return false;
+  const timestamp = Date.parse(value);
+  return Number.isFinite(timestamp) && new Date(timestamp).toISOString() === value;
+}
+
+function isCanonicalBusinessDate(value: unknown): value is string {
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/u.test(value)) return false;
+  const timestamp = Date.parse(`${value}T00:00:00.000Z`);
+  return Number.isFinite(timestamp) && new Date(timestamp).toISOString().slice(0, 10) === value;
+}
+
+function isBoundedPlainText(value: unknown, maximum: number): value is string {
+  return typeof value === "string" && value.length > 0 && value.length <= maximum && value === value.trim() && !/[\u0000-\u001f\u007f]/u.test(value);
+}
+
+function isReference(value: unknown): value is string {
+  return isHermesOperationalOpaqueReference(value);
 }
 
 function isPrimitiveId(value: unknown): value is PrimitiveId {
@@ -312,6 +430,97 @@ function validateWorkLogRecord(
   );
 }
 
+function validateFieldRecord(value: unknown): value is HermesOperationalFieldRecord {
+  return isRecord(value) && hasExactKeys(value, FIELD_RECORD_KEYS) && isReference(value.reference) && isBoundedPlainText(value.display_name, MAX_DISPLAY_TEXT_CHARS) && value.active_state === "unknown" && value.source_updated_at === null;
+}
+
+function validateCropCycleRecord(value: unknown): value is HermesOperationalCropCycleRecord {
+  if (!isRecord(value) || !hasExactKeys(value, CROP_CYCLE_RECORD_KEYS) || !isReference(value.reference) || !Array.isArray(value.field_references) || value.field_references.length > MAX_FIELD_REFERENCES || !value.field_references.every(isReference) || new Set(value.field_references).size !== value.field_references.length) return false;
+  return (value.crop_display_name === null || isBoundedPlainText(value.crop_display_name, MAX_DISPLAY_TEXT_CHARS)) && value.cycle_state === "unknown" && (value.operational_start_date === null || isCanonicalBusinessDate(value.operational_start_date)) && value.source_updated_at === null;
+}
+
+export function parseHermesOperationalReadonlySourceResult(
+  value: unknown,
+  sourceType: HermesOperationalSourceType,
+): HermesOperationalReadonlySourceResult<HermesOperationalRecord> | null {
+  if (!isRecord(value) || !hasExactKeys(value, OPERATIONAL_SOURCE_RESULT_KEYS)) {
+    return null;
+  }
+
+  const validateRecord = sourceType === "inventory"
+    ? validateInventoryRecord
+    : sourceType === "work_log"
+      ? validateWorkLogRecord
+      : sourceType === "field"
+        ? validateFieldRecord
+        : validateCropCycleRecord;
+  const expectedEndpoint: Record<HermesOperationalSourceType, HermesOperationalEndpointPath> = {
+    inventory: INVENTORY_ENDPOINT_PATH,
+    work_log: WORK_LOG_ENDPOINT_PATH,
+    field: FIELD_ENDPOINT_PATH,
+    crop_cycle: CROP_CYCLE_ENDPOINT_PATH,
+  };
+  const expectedResponseSource: Record<HermesOperationalSourceType, HermesOperationalResponseSource> = {
+    inventory: "apparetenkei_inventory_readonly",
+    work_log: "apparetenkei_work_logs_readonly",
+    field: "apparetenkei_fields_readonly",
+    crop_cycle: "apparetenkei_crop_cycles_readonly",
+  };
+  const validErrorCodes: readonly HermesOperationalReadonlyErrorCode[] = [
+    "configuration_unavailable",
+    "invalid_limit",
+    "timeout",
+    "network_unavailable",
+    "remote_http_error",
+    "invalid_response",
+  ];
+
+  if (
+    !["ok", "error"].includes(String(value.result)) ||
+    value.source_type !== sourceType ||
+    value.endpoint_path !== expectedEndpoint[sourceType] ||
+    value.http_method !== "GET" ||
+    typeof value.fetch_performed !== "boolean" ||
+    typeof value.available !== "boolean" ||
+    ((value.result === "ok" && value.available !== true) ||
+      (value.result === "error" && value.available !== false)) ||
+    value.transaction_read_only !== true ||
+    !Number.isSafeInteger(value.requested_limit) ||
+    Number(value.requested_limit) < 1 ||
+    Number(value.requested_limit) > HERMES_OPERATIONAL_READONLY_MAX_LIMIT ||
+    (value.http_status !== null &&
+      (!Number.isSafeInteger(value.http_status) ||
+        Number(value.http_status) < 100 ||
+        Number(value.http_status) > 599)) ||
+    (value.response_source !== null &&
+      value.response_source !== expectedResponseSource[sourceType]) ||
+    (value.generated_at !== null && !isCanonicalIso(value.generated_at)) ||
+    !Number.isSafeInteger(value.record_count) ||
+    Number(value.record_count) < 0 ||
+    !Array.isArray(value.records) ||
+    value.records.length !== value.record_count ||
+    !value.records.every(validateRecord) ||
+    typeof value.has_more !== "boolean" ||
+    (value.error_code !== null &&
+      !validErrorCodes.includes(value.error_code as HermesOperationalReadonlyErrorCode)) ||
+    value.write_performed !== false ||
+    value.restricted_fields_exposed !== false ||
+    value.credentials_exposed !== false
+  ) {
+    return null;
+  }
+
+  if (
+    (sourceType === "field" || sourceType === "crop_cycle") &&
+    new Set(value.records.map((record) => (record as { reference: string }).reference)).size !==
+      value.records.length
+  ) {
+    return null;
+  }
+
+  return structuredClone(value) as HermesOperationalReadonlySourceResult<HermesOperationalRecord>;
+}
+
 function normalizeBaseUrl(value: unknown): string | null {
   if (typeof value !== "string" || value.trim().length === 0) {
     return null;
@@ -419,10 +628,8 @@ function resolveConfig(input: {
 }
 
 function createErrorSource<TRecord>(input: {
-  sourceType: "inventory" | "work_log";
-  endpointPath:
-    | typeof INVENTORY_ENDPOINT_PATH
-    | typeof WORK_LOG_ENDPOINT_PATH;
+  sourceType: HermesOperationalSourceType;
+  endpointPath: HermesOperationalEndpointPath;
   limit: number;
   errorCode: HermesOperationalReadonlyErrorCode;
   fetchPerformed?: boolean;
@@ -493,6 +700,54 @@ function validateEnvelope<TRecord>(input: {
     source: input.expectedSource,
     generatedAt: input.value.generatedAt,
     recordCount: records.length,
+    records,
+    pagination: {
+      limit: input.requestedLimit,
+      hasMore: input.value.pagination.hasMore,
+    },
+  };
+}
+
+function validateDay122Envelope<TRecord>(input: {
+  value: unknown;
+  schemaVersion: "farmos.core.fields.read.v1" | "farmos.core.crop_cycles.read.v1";
+  expectedSource: "apparetenkei_fields_readonly" | "apparetenkei_crop_cycles_readonly";
+  requestedLimit: number;
+  validateRecord: (value: unknown) => value is TRecord;
+  recordReference: (value: TRecord) => string;
+}): ValidatedEnvelope<TRecord> | null {
+  if (!isRecord(input.value) || containsRestrictedKey(input.value) || !hasExactKeys(input.value, DAY122_ENVELOPE_KEYS)) return null;
+  if (
+    input.value.result !== "ok" ||
+    input.value.schema_version !== input.schemaVersion ||
+    input.value.source !== input.expectedSource ||
+    !isCanonicalIso(input.value.generated_at) ||
+    input.value.readOnly !== true ||
+    !Number.isSafeInteger(input.value.record_count) ||
+    Number(input.value.record_count) < 0 ||
+    !Array.isArray(input.value.records) ||
+    !isRecord(input.value.pagination) ||
+    !hasExactKeys(input.value.pagination, DAY122_PAGINATION_KEYS) ||
+    input.value.pagination.limit !== input.requestedLimit ||
+    !Number.isSafeInteger(input.value.pagination.limit) ||
+    Number(input.value.pagination.limit) < 1 ||
+    Number(input.value.pagination.limit) > HERMES_OPERATIONAL_READONLY_MAX_LIMIT ||
+    typeof input.value.pagination.hasMore !== "boolean" ||
+    !isRecord(input.value.safety) ||
+    !hasExactKeys(input.value.safety, DAY122_SAFETY_KEYS) ||
+    input.value.safety.writePerformed !== false ||
+    input.value.safety.restrictedFieldsExposed !== false ||
+    input.value.records.length !== input.value.record_count ||
+    !input.value.records.every(input.validateRecord)
+  ) return null;
+
+  const records = input.value.records as TRecord[];
+  if (new Set(records.map(input.recordReference)).size !== records.length) return null;
+
+  return {
+    source: input.expectedSource,
+    generatedAt: input.value.generated_at,
+    recordCount: input.value.records.length,
     records,
     pagination: {
       limit: input.requestedLimit,
@@ -629,11 +884,97 @@ async function readSource<TRecord>(input: {
   }
 }
 
+async function readDay122Source<TRecord>(input: {
+  baseUrl: string;
+  token: string;
+  timeoutMs: number;
+  limit: number;
+  sourceType: "field" | "crop_cycle";
+  endpointPath: typeof FIELD_ENDPOINT_PATH | typeof CROP_CYCLE_ENDPOINT_PATH;
+  schemaVersion: "farmos.core.fields.read.v1" | "farmos.core.crop_cycles.read.v1";
+  expectedSource: "apparetenkei_fields_readonly" | "apparetenkei_crop_cycles_readonly";
+  validateRecord: (value: unknown) => value is TRecord;
+  recordReference: (value: TRecord) => string;
+  fetchImpl: typeof fetch;
+}): Promise<HermesOperationalReadonlySourceResult<TRecord>> {
+  const url = new URL(input.endpointPath, input.baseUrl);
+  url.searchParams.set("limit", String(input.limit));
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), input.timeoutMs);
+
+  try {
+    const response = await input.fetchImpl(url, {
+      method: "GET",
+      headers: { Accept: "application/json", Authorization: `Bearer ${input.token}` },
+      cache: "no-store",
+      redirect: "error",
+      signal: controller.signal,
+    });
+    if (!response.ok || response.redirected) {
+      return createErrorSource({ sourceType: input.sourceType, endpointPath: input.endpointPath, limit: input.limit, errorCode: "remote_http_error", fetchPerformed: true, httpStatus: response.status });
+    }
+    const text = await response.text();
+    if (text.length > MAX_RESPONSE_CHARS) {
+      return createErrorSource({ sourceType: input.sourceType, endpointPath: input.endpointPath, limit: input.limit, errorCode: "invalid_response", fetchPerformed: true, httpStatus: response.status });
+    }
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(text);
+    } catch {
+      return createErrorSource({ sourceType: input.sourceType, endpointPath: input.endpointPath, limit: input.limit, errorCode: "invalid_response", fetchPerformed: true, httpStatus: response.status });
+    }
+    const envelope = validateDay122Envelope({ value: parsed, schemaVersion: input.schemaVersion, expectedSource: input.expectedSource, requestedLimit: input.limit, validateRecord: input.validateRecord, recordReference: input.recordReference });
+    if (envelope === null) {
+      return createErrorSource({ sourceType: input.sourceType, endpointPath: input.endpointPath, limit: input.limit, errorCode: "invalid_response", fetchPerformed: true, httpStatus: response.status });
+    }
+    return {
+      result: "ok",
+      source_type: input.sourceType,
+      endpoint_path: input.endpointPath,
+      http_method: "GET",
+      fetch_performed: true,
+      available: true,
+      transaction_read_only: true,
+      requested_limit: input.limit,
+      http_status: response.status,
+      response_source: envelope.source,
+      generated_at: envelope.generatedAt,
+      record_count: envelope.recordCount,
+      records: envelope.records,
+      has_more: envelope.pagination.hasMore,
+      error_code: null,
+      write_performed: false,
+      restricted_fields_exposed: false,
+      credentials_exposed: false,
+    };
+  } catch (error) {
+    const timedOut = controller.signal.aborted || (error instanceof DOMException && error.name === "AbortError");
+    return createErrorSource({ sourceType: input.sourceType, endpointPath: input.endpointPath, limit: input.limit, errorCode: timedOut ? "timeout" : "network_unavailable", fetchPerformed: true });
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+function validateCropCycleFieldRelations(input: {
+  field: HermesOperationalReadonlySourceResult<HermesOperationalFieldRecord>;
+  cropCycle: HermesOperationalReadonlySourceResult<HermesOperationalCropCycleRecord>;
+}): HermesOperationalReadonlySourceResult<HermesOperationalCropCycleRecord> {
+  if (input.cropCycle.result !== "ok" || input.cropCycle.records.length === 0) return input.cropCycle;
+  if (input.field.result !== "ok") {
+    return createErrorSource({ sourceType: "crop_cycle", endpointPath: CROP_CYCLE_ENDPOINT_PATH, limit: input.cropCycle.requested_limit, errorCode: "invalid_response", fetchPerformed: input.cropCycle.fetch_performed, httpStatus: input.cropCycle.http_status });
+  }
+  const fieldReferences = new Set(input.field.records.map((record) => record.reference));
+  const orphanFound = input.cropCycle.records.some((record) => record.field_references.some((reference) => !fieldReferences.has(reference)));
+  return orphanFound
+    ? createErrorSource({ sourceType: "crop_cycle", endpointPath: CROP_CYCLE_ENDPOINT_PATH, limit: input.cropCycle.requested_limit, errorCode: "invalid_response", fetchPerformed: input.cropCycle.fetch_performed, httpStatus: input.cropCycle.http_status })
+    : input.cropCycle;
+}
+
 export async function readHermesOperationalReadonlySources(input?: {
   env?: EnvMap;
   limit?: unknown;
   fetchImpl?: typeof fetch;
-}): Promise<HermesOperationalReadonlyClientResult> {
+}): Promise<HermesOperationalReadonlyFourSourceClientResult> {
   const env = input?.env ?? process.env;
   const config = resolveConfig({
     env,
@@ -655,6 +996,18 @@ export async function readHermesOperationalReadonlySources(input?: {
         limit: config.limit,
         errorCode: config.errorCode,
       });
+    const field = createErrorSource<HermesOperationalFieldRecord>({
+      sourceType: "field",
+      endpointPath: FIELD_ENDPOINT_PATH,
+      limit: config.limit,
+      errorCode: config.errorCode,
+    });
+    const cropCycle = createErrorSource<HermesOperationalCropCycleRecord>({
+      sourceType: "crop_cycle",
+      endpointPath: CROP_CYCLE_ENDPOINT_PATH,
+      limit: config.limit,
+      errorCode: config.errorCode,
+    });
 
     return {
       result: "error",
@@ -662,8 +1015,12 @@ export async function readHermesOperationalReadonlySources(input?: {
       boundary: HERMES_OPERATIONAL_READONLY_CLIENT,
       inventory,
       work_log: workLog,
+      field,
+      crop_cycle: cropCycle,
       inventory_source_connected: false,
       work_log_source_connected: false,
+      field_source_connected: false,
+      crop_cycle_source_connected: false,
       external_fetch_performed: false,
       hermes_context_injection_performed: false,
       suggestion_generation_performed: false,
@@ -681,7 +1038,7 @@ export async function readHermesOperationalReadonlySources(input?: {
   }
 
   const fetchImpl = input?.fetchImpl ?? fetch;
-  const [inventory, workLog] = await Promise.all([
+  const [inventory, workLog, field, unvalidatedCropCycle] = await Promise.all([
     readSource<HermesOperationalInventoryRecord>({
       baseUrl: config.baseUrl,
       token: config.token,
@@ -704,27 +1061,60 @@ export async function readHermesOperationalReadonlySources(input?: {
       validateRecord: validateWorkLogRecord,
       fetchImpl,
     }),
+    readDay122Source<HermesOperationalFieldRecord>({
+      baseUrl: config.baseUrl,
+      token: config.token,
+      timeoutMs: config.timeoutMs,
+      limit: config.limit,
+      sourceType: "field",
+      endpointPath: FIELD_ENDPOINT_PATH,
+      schemaVersion: "farmos.core.fields.read.v1",
+      expectedSource: "apparetenkei_fields_readonly",
+      validateRecord: validateFieldRecord,
+      recordReference: (record) => record.reference,
+      fetchImpl,
+    }),
+    readDay122Source<HermesOperationalCropCycleRecord>({
+      baseUrl: config.baseUrl,
+      token: config.token,
+      timeoutMs: config.timeoutMs,
+      limit: config.limit,
+      sourceType: "crop_cycle",
+      endpointPath: CROP_CYCLE_ENDPOINT_PATH,
+      schemaVersion: "farmos.core.crop_cycles.read.v1",
+      expectedSource: "apparetenkei_crop_cycles_readonly",
+      validateRecord: validateCropCycleRecord,
+      recordReference: (record) => record.reference,
+      fetchImpl,
+    }),
   ]);
+  const cropCycle = validateCropCycleFieldRelations({ field, cropCycle: unvalidatedCropCycle });
 
   const successCount =
     Number(inventory.result === "ok") +
-    Number(workLog.result === "ok");
+    Number(workLog.result === "ok") +
+    Number(field.result === "ok") +
+    Number(cropCycle.result === "ok");
 
   return {
     result:
-      successCount === 2
+      successCount === 4
         ? "ok"
-        : successCount === 1
+        : successCount > 0
           ? "partial"
           : "error",
     checked: "hermes_operational_readonly_client",
     boundary: HERMES_OPERATIONAL_READONLY_CLIENT,
     inventory,
     work_log: workLog,
+    field,
+    crop_cycle: cropCycle,
     inventory_source_connected: inventory.result === "ok",
     work_log_source_connected: workLog.result === "ok",
+    field_source_connected: field.result === "ok",
+    crop_cycle_source_connected: cropCycle.result === "ok",
     external_fetch_performed:
-      inventory.fetch_performed || workLog.fetch_performed,
+      inventory.fetch_performed || workLog.fetch_performed || field.fetch_performed || cropCycle.fetch_performed,
     hermes_context_injection_performed: false,
     suggestion_generation_performed: false,
     proposal_created: false,

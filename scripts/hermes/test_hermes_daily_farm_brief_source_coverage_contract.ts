@@ -50,6 +50,16 @@ assert.equal(cropCycles.availability, "unavailable");
 assert.equal(cropCycles.reason_code, "SOURCE_PROVENANCE_MISMATCH");
 assert.equal(cropCycles.provenance, "core_memory");
 
+const connectedFields = classify({ source: "field", provenance: "farming_app_api", expected_provenance: "farming_app_api", actual_record_count: 71, adapter_record_count: 71, fact_count: 0 });
+assert.equal(connectedFields.availability, "available");
+assert.equal(connectedFields.reason_code, "SOURCE_AVAILABLE");
+assert.equal(connectedFields.provenance, "farming_app_api");
+
+const connectedCropCycles = classify({ source: "crop_cycle", provenance: "farming_app_api", expected_provenance: "farming_app_api", actual_record_count: 40, adapter_record_count: 40, fact_count: 0 });
+assert.equal(connectedCropCycles.availability, "available");
+assert.equal(connectedCropCycles.reason_code, "SOURCE_AVAILABLE");
+assert.notEqual(connectedCropCycles.reason_code, "SOURCE_PROVENANCE_MISMATCH");
+
 const inventory = classify({});
 assert.equal(inventory.actual_record_count, 7);
 assert.equal(inventory.adapter_record_count, 7);

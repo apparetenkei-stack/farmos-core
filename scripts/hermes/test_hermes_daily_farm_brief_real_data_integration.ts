@@ -11,6 +11,7 @@ import {
   createHermesDailyFarmBriefIntegrationInput,
   parseHermesDailyFarmBriefIntegrationInput,
 } from "./brief_runtime/hermes_daily_farm_brief_input";
+import { classifyHermesDailyFarmBriefSourceCoverage } from "./brief_runtime/hermes_daily_farm_brief_source_coverage_contract";
 
 const NOW = "2026-07-14T09:00:00.000Z";
 
@@ -44,16 +45,31 @@ function workLogRecord(index: number) {
   };
 }
 
+function fieldRecord(index: number) {
+  return { reference: `field-${index}`, display_name: `private field body ${index}`, active_state: "unknown" as const, source_updated_at: null };
+}
+
+function cropCycleRecord(index: number) {
+  return { reference: `cycle-${index}`, field_references: [`field-${index}`], crop_display_name: `private operational crop body ${index}`, cycle_state: "unknown" as const, operational_start_date: "2026-07-01", source_updated_at: null };
+}
+
 function operationalFixture(input: {
   inventoryCount?: number;
   workLogCount?: number;
   inventoryMode?: SourceMode;
   workLogMode?: SourceMode;
+  fieldCount?: number;
+  cropCycleCount?: number;
+  fieldMode?: SourceMode;
+  cropCycleMode?: SourceMode;
+  orphanCropCycle?: boolean;
   inventoryGeneratedAt?: string | null;
   workLogGeneratedAt?: string | null;
 } = {}): HermesOperationalReadonlyClientResult {
   const inventoryMode = input.inventoryMode ?? "ok";
   const workLogMode = input.workLogMode ?? "ok";
+  const fieldMode = input.fieldMode ?? "ok";
+  const cropCycleMode = input.cropCycleMode ?? "ok";
   const source = <T>(options: {
     type: "inventory" | "work_log";
     mode: SourceMode;
@@ -96,10 +112,32 @@ function operationalFixture(input: {
     { length: input.workLogCount ?? 2 },
     (_, index) => workLogRecord(index),
   );
-  const successCount = Number(inventoryMode === "ok") + Number(workLogMode === "ok");
+  const fields = Array.from({ length: input.fieldCount ?? 2 }, (_, index) => fieldRecord(index));
+  const cropCycles = Array.from({ length: input.cropCycleCount ?? 2 }, (_, index) => ({ ...cropCycleRecord(index), field_references: input.orphanCropCycle && index === 0 ? ["field-orphan"] : [`field-${index}`] }));
+  const day122Source = <T>(options: { type: "field" | "crop_cycle"; mode: SourceMode; records: T[] }) => ({
+    result: options.mode === "ok" ? ("ok" as const) : ("error" as const),
+    source_type: options.type,
+    endpoint_path: options.type === "field" ? ("/api/farmos-core/fields" as const) : ("/api/farmos-core/crop-cycles" as const),
+    http_method: "GET" as const,
+    fetch_performed: options.mode === "ok",
+    available: options.mode === "ok",
+    transaction_read_only: true as const,
+    requested_limit: 100,
+    http_status: options.mode === "ok" ? 200 : null,
+    response_source: options.mode === "ok" ? options.type === "field" ? ("apparetenkei_fields_readonly" as const) : ("apparetenkei_crop_cycles_readonly" as const) : null,
+    generated_at: options.mode === "ok" ? "2026-07-14T08:00:00.000Z" : null,
+    record_count: options.mode === "ok" ? options.records.length : 0,
+    records: options.mode === "ok" ? options.records : [],
+    has_more: false,
+    error_code: options.mode === "ok" ? null : ("network_unavailable" as const),
+    write_performed: false as const,
+    restricted_fields_exposed: false as const,
+    credentials_exposed: false as const,
+  });
+  const successCount = Number(inventoryMode === "ok") + Number(workLogMode === "ok") + Number(fieldMode === "ok") + Number(cropCycleMode === "ok");
 
   return {
-    result: successCount === 2 ? "ok" : successCount === 1 ? "partial" : "error",
+    result: successCount === 4 ? "ok" : successCount > 0 ? "partial" : "error",
     checked: "hermes_operational_readonly_client",
     boundary: "day92_hermes_operational_readonly_client",
     inventory: source({
@@ -120,8 +158,12 @@ function operationalFixture(input: {
           : input.workLogGeneratedAt,
       records: workLogs,
     }),
+    field: day122Source({ type: "field", mode: fieldMode, records: fields }),
+    crop_cycle: day122Source({ type: "crop_cycle", mode: cropCycleMode, records: cropCycles }),
     inventory_source_connected: inventoryMode === "ok",
     work_log_source_connected: workLogMode === "ok",
+    field_source_connected: fieldMode === "ok",
+    crop_cycle_source_connected: cropCycleMode === "ok",
     external_fetch_performed: successCount > 0,
     hermes_context_injection_performed: false,
     suggestion_generation_performed: false,
@@ -226,6 +268,13 @@ async function main(): Promise<void> {
   assert.equal(day91Fixture.snapshot.sources.inventory.status, "empty");
   assert.equal(day91Fixture.snapshot.sources.inventory.record_count, 0);
   assert.equal(day91Fixture.snapshot.sources.work_log.record_count, 2);
+  assert.equal(day91Fixture.snapshot.sources.field.status, "available");
+  assert.equal(day91Fixture.snapshot.sources.field.record_count, 2);
+  assert.equal(day91Fixture.snapshot.sources.field.freshness, "unknown");
+  assert.equal(day91Fixture.snapshot.sources.crop_cycle.status, "available");
+  assert.equal(day91Fixture.snapshot.sources.crop_cycle.record_count, 2);
+  assert.equal(day91Fixture.snapshot.sources.crop_cycle.freshness, "unknown");
+  assert.equal(day91Fixture.snapshot.sources.crop_cycle.records[0]?.label?.startsWith("private operational crop body"), true);
   assert.equal(day91Fixture.safe_preview.timezone, "Asia/Tokyo");
   assert(parseHermesDailyFarmBriefRealDataIntegrationResult(day91Fixture));
   assert.equal(Object.hasOwn(day91Fixture, "scope_reference_input"), false);
@@ -338,7 +387,7 @@ async function main(): Promise<void> {
   assert.equal(memoryUnavailable.result, "ready");
   assert.equal(
     memoryUnavailable.snapshot.sources.crop_cycle.status,
-    "unavailable",
+    "available",
   );
   assert.equal(
     memoryUnavailable.snapshot.sources.hermes_note.status,
@@ -384,7 +433,7 @@ async function main(): Promise<void> {
 
   assert.equal(
     day91Fixture.snapshot.sources.crop_cycle.generated_at,
-    null,
+    "2026-07-14T08:00:00.000Z",
   );
   assert.equal(day91Fixture.snapshot.sources.hermes_note.generated_at, null);
   assert.equal(
@@ -403,13 +452,14 @@ async function main(): Promise<void> {
 
   const limited = await integrate({
     operational: async () =>
-      operationalFixture({ inventoryCount: 25, workLogCount: 15 }),
+      operationalFixture({ inventoryCount: 25, workLogCount: 15, fieldCount: 25, cropCycleCount: 25 }),
     memory: async () => memoryFixture({ cropCount: 25, noteCount: 15 }),
     snapshotId: "snapshot-limited",
     briefId: "brief-limited",
   });
   assert.equal(limited.snapshot.sources.inventory.records.length, 20);
   assert.equal(limited.snapshot.sources.work_log.records.length, 10);
+  assert.equal(limited.snapshot.sources.field.records.length, 20);
   assert.equal(limited.snapshot.sources.crop_cycle.records.length, 20);
   assert.equal(limited.snapshot.sources.hermes_note.records.length, 10);
   assert.ok(
@@ -430,6 +480,7 @@ async function main(): Promise<void> {
   assert.doesNotMatch(safeOutput, /private inventory body/u);
   assert.doesNotMatch(safeOutput, /private work body/u);
   assert.doesNotMatch(safeOutput, /private crop body/u);
+  assert.doesNotMatch(safeOutput, /field-0|cycle-0|field_references|reference/iu);
   assert.doesNotMatch(safeOutput, /private note body/u);
   assert.doesNotMatch(safeOutput, /\/api\/farmos-core/u);
   assert.doesNotMatch(safeOutput, /authorization|credential|token/iu);
@@ -459,6 +510,48 @@ async function main(): Promise<void> {
   assert.equal(day91Fixture.safe_preview.safety.model_execution_performed, false);
   assert.equal(day91Fixture.safe_preview.safety.secret_exposed, false);
   assert.equal(day91Fixture.safe_preview.safety.brief_persistence_performed, false);
+
+  const coverage = await integrate({
+    operational: async () => operationalFixture({ inventoryCount: 7, workLogCount: 100, fieldCount: 71, cropCycleCount: 40 }),
+    snapshotId: "snapshot-day122-coverage",
+    briefId: "brief-day122-coverage",
+  });
+  assert.equal(coverage.snapshot.sources.inventory.record_count, 7);
+  assert.equal(coverage.snapshot.sources.work_log.record_count, 100);
+  assert.equal(coverage.snapshot.sources.field.record_count, 71);
+  assert.equal(coverage.snapshot.sources.crop_cycle.record_count, 40);
+  const fieldCoverage = classifyHermesDailyFarmBriefSourceCoverage({ source: "field", read_state: "success", provenance: "farming_app_api", expected_provenance: "farming_app_api", actual_record_count: 71, adapter_record_count: coverage.snapshot.sources.field.record_count, fact_count: 0, observed_at: coverage.snapshot.sources.field.generated_at, latest_business_at: null, source_updated_at: null, authoritative_freshness: null, notes: ["Day122 fixture evidence."] });
+  const cropCoverage = classifyHermesDailyFarmBriefSourceCoverage({ source: "crop_cycle", read_state: "success", provenance: "farming_app_api", expected_provenance: "farming_app_api", actual_record_count: 40, adapter_record_count: coverage.snapshot.sources.crop_cycle.record_count, fact_count: 0, observed_at: coverage.snapshot.sources.crop_cycle.generated_at, latest_business_at: null, source_updated_at: null, authoritative_freshness: null, notes: ["Day122 fixture evidence."] });
+  assert.equal(fieldCoverage?.availability, "available");
+  assert.equal(fieldCoverage?.provenance, "farming_app_api");
+  assert.equal(cropCoverage?.availability, "available");
+  assert.equal(cropCoverage?.reason_code, "SOURCE_AVAILABLE");
+
+  const clientValidWhitespace = operationalFixture();
+  clientValidWhitespace.field!.records[0]!.display_name =
+    "private  field body";
+  clientValidWhitespace.crop_cycle!.records[0]!.crop_display_name =
+    "private  operational crop body";
+  const whitespaceProjection = await integrate({
+    operational: async () => clientValidWhitespace,
+    snapshotId: "snapshot-day122-client-valid-whitespace",
+    briefId: "brief-day122-client-valid-whitespace",
+  });
+  assert.equal(whitespaceProjection.snapshot.sources.field.status, "available");
+  assert.equal(
+    whitespaceProjection.snapshot.sources.crop_cycle.status,
+    "available",
+  );
+
+  const emptyOperationalSources = await integrate({ operational: async () => operationalFixture({ fieldCount: 0, cropCycleCount: 0 }), snapshotId: "snapshot-day122-empty", briefId: "brief-day122-empty" });
+  assert.equal(emptyOperationalSources.snapshot.sources.field.status, "empty");
+  assert.equal(emptyOperationalSources.snapshot.sources.crop_cycle.status, "empty");
+  const failedOperationalSources = await integrate({ operational: async () => operationalFixture({ fieldMode: "unavailable", cropCycleMode: "unavailable" }), snapshotId: "snapshot-day122-source-failure", briefId: "brief-day122-source-failure" });
+  assert.equal(failedOperationalSources.snapshot.sources.field.status, "unavailable");
+  assert.equal(failedOperationalSources.snapshot.sources.crop_cycle.status, "unavailable");
+  const orphan = await integrate({ operational: async () => operationalFixture({ orphanCropCycle: true }), snapshotId: "snapshot-day122-orphan", briefId: "brief-day122-orphan" });
+  assert.equal(orphan.snapshot.sources.crop_cycle.status, "invalid");
+  assert.equal(orphan.result, "unavailable");
 
   console.log(
     JSON.stringify(

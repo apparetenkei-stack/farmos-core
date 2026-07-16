@@ -175,7 +175,6 @@ export function parseHermesDailyFarmBriefExecutionIntegrationBundle(
 
 function createScopeReferenceInput(input: {
   operationalOutcome: ReaderOutcome;
-  memoryOutcome: ReaderOutcome;
   snapshot: HermesDailyFarmSnapshot;
 }): HermesDailyFarmBriefScopeReferenceInput {
   const workLogs: HermesDailyFarmBriefScopeWorkLogInput[] = [];
@@ -191,16 +190,17 @@ function createScopeReferenceInput(input: {
     }
   }
   const cropCycles: HermesDailyFarmBriefScopeCropCycleInput[] = [];
-  if ((input.snapshot.sources.crop_cycle.status === "available" || input.snapshot.sources.crop_cycle.status === "empty") && input.memoryOutcome.status === "returned" && isRecord(input.memoryOutcome.value) && memorySafetyValid(input.memoryOutcome.value)) {
-    const context = input.memoryOutcome.value.context as JsonRecord;
-    const safeAppContext = context.safe_app_context as JsonRecord;
-    for (const item of safeAppContext.crop_cycles_summary as unknown[]) {
+  if ((input.snapshot.sources.crop_cycle.status === "available" || input.snapshot.sources.crop_cycle.status === "empty") && input.operationalOutcome.status === "returned" && isRecord(input.operationalOutcome.value) && isRecord(input.operationalOutcome.value.crop_cycle) && Array.isArray(input.operationalOutcome.value.crop_cycle.records)) {
+    for (const item of input.operationalOutcome.value.crop_cycle.records) {
       if (!isRecord(item)) continue;
-      cropCycles.push({
-        id: normalizeHermesDailyFarmBriefScopeId(item.id),
-        crop: normalizeHermesDailyFarmBriefScopeCrop(item.crop ?? item.crop_name ?? item.crop_type),
-        field_id: normalizeHermesDailyFarmBriefScopeId(item.field_id),
-      });
+      const fieldReferences = Array.isArray(item.field_references) && item.field_references.length > 0 ? item.field_references : [null];
+      for (const fieldReference of fieldReferences) {
+        cropCycles.push({
+          id: normalizeHermesDailyFarmBriefScopeId(item.reference),
+          crop: normalizeHermesDailyFarmBriefScopeCrop(item.crop_display_name),
+          field_id: normalizeHermesDailyFarmBriefScopeId(fieldReference),
+        });
+      }
     }
   }
   const references: HermesDailyFarmBriefScopeReferenceInput = {
@@ -237,13 +237,14 @@ async function readOnce(
 }
 
 function createUnavailableOperationalResult(): HermesOperationalReadonlyClientResult {
-  const source = (sourceType: "inventory" | "work_log") => ({
+  const source = (sourceType: "inventory" | "work_log" | "field" | "crop_cycle") => ({
     result: "error" as const,
     source_type: sourceType,
     endpoint_path:
-      sourceType === "inventory"
-        ? ("/api/farmos-core/inventory-summary" as const)
-        : ("/api/farmos-core/recent-work-logs" as const),
+      sourceType === "inventory" ? ("/api/farmos-core/inventory-summary" as const)
+        : sourceType === "work_log" ? ("/api/farmos-core/recent-work-logs" as const)
+          : sourceType === "field" ? ("/api/farmos-core/fields" as const)
+            : ("/api/farmos-core/crop-cycles" as const),
     http_method: "GET" as const,
     fetch_performed: false,
     available: false,
@@ -267,8 +268,12 @@ function createUnavailableOperationalResult(): HermesOperationalReadonlyClientRe
     boundary: "day92_hermes_operational_readonly_client",
     inventory: source("inventory"),
     work_log: source("work_log"),
+    field: source("field"),
+    crop_cycle: source("crop_cycle"),
     inventory_source_connected: false,
     work_log_source_connected: false,
+    field_source_connected: false,
+    crop_cycle_source_connected: false,
     external_fetch_performed: false,
     hermes_context_injection_performed: false,
     suggestion_generation_performed: false,
@@ -485,7 +490,6 @@ export async function integrateHermesDailyFarmBriefExecutionBundle(
 
   const scopeReferenceInput = createScopeReferenceInput({
     operationalOutcome,
-    memoryOutcome,
     snapshot,
   });
 

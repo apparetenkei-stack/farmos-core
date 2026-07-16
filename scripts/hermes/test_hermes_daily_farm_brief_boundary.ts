@@ -255,7 +255,7 @@ async function main(): Promise<void> {
   assert.equal(ready.sources.inventory.status, "empty");
   assert.equal(ready.sources.work_log.status, "available");
   assert.equal(ready.sources.field.status, "unavailable");
-  assert.equal(ready.sources.crop_cycle.status, "available");
+  assert.equal(ready.sources.crop_cycle.status, "unavailable");
   assert.equal(ready.sources.crop_cycle.freshness, "unknown");
   assert.ok(parseHermesDailyFarmSnapshot(ready));
 
@@ -344,7 +344,7 @@ async function main(): Promise<void> {
   assert.equal(limited.sources.inventory.records.length, 20);
   assert.equal(limited.sources.work_log.records.length, 10);
   assert.equal(limited.sources.field.records.length, 0);
-  assert.equal(limited.sources.crop_cycle.records.length, 20);
+  assert.equal(limited.sources.crop_cycle.records.length, 0);
   assert.equal(limited.sources.hermes_note.records.length, 10);
   assert.equal(limited.sources.inventory.truncated, true);
   assert.equal(limited.sources.work_log.truncated, true);
