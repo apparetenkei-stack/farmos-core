@@ -107,3 +107,10 @@ The Day118 DTO is published through a new authenticated GET endpoint while the o
 ### Day120 — Daily Brief Farm-owner Pilot Read Connection
 
 The existing latest and latest-display routes now share one pilot dependency factory. A bounded Bearer token maps only to a server-owned principal, and a strict environment directory supplies administrator or wildcard-free general-staff authorization. The existing production-candidate PostgreSQL reader is enabled only when identity and database configuration validate together; partial configuration denies authentication and repository access. This is a read-only pilot connection: no migration, database write, RLS/role change, client role/scope input, scheduler, model execution, or farming-application code change is included.
+
+### Day121–124 — Source Coverage Gate and Proposal Handoff
+
+- Day121 fixes audited actual counts, adapter paths, availability, freshness, provenance, and the Day120 origin classification (`unknown_unverifiable_from_repository`) in a pure fixture-only contract.
+- Day122 connects separate farming-application operational read adapters for fields and crop cycles. Farming-app crop cycles remain operational truth; Core `app.crop_cycles` remains Hermes memory context and is not merged into that source.
+- Day123 separates inventory source record count, attention fact/count, and latest-display wording, then performs an explicitly authorized new real-data Brief generation, manual persistence, and dashboard E2E after the coverage gate passes.
+- Day124 begins the minimum Proposal vertical slice only after source coverage passes. This does not postpone the Day130 administrator Proposal gate.

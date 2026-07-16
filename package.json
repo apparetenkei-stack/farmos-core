@@ -280,6 +280,7 @@
     "run-hermes-daily-farm-brief-authenticated-latest-display-api-preview": "tsx scripts/hermes/run_hermes_daily_farm_brief_authenticated_latest_display_api_preview.ts",
     "check-hermes-daily-farm-brief-authenticated-latest-display-api-boundary": "pnpm run test-hermes-daily-farm-brief-authenticated-latest-display-api-boundary && pnpm run test-hermes-daily-farm-brief-display-projection-boundary && pnpm run test-hermes-daily-farm-brief-authenticated-latest-read-api-boundary && pnpm run test-hermes-daily-farm-brief-persisted-latest-source-boundary && pnpm run test-hermes-daily-farm-brief-scoped-projection-boundary && pnpm run test-hermes-daily-farm-brief-boundary && pnpm run test-hermes-operational-context-integration && pnpm run test-hermes-runtime-contract-boundary && pnpm run test-development-review-boundary && pnpm run build",
     "test-hermes-daily-farm-brief-pilot-boundary": "tsx scripts/hermes/test_hermes_daily_farm_brief_pilot_boundary.ts",
+    "test-hermes-daily-farm-brief-source-coverage-contract": "tsx scripts/hermes/test_hermes_daily_farm_brief_source_coverage_contract.ts",
     "test-hermes-field-crop-cycle-note-boundary": "tsx scripts/hermes/test_hermes_field_crop_cycle_note_boundary.ts",
     "test-hermes-inventory-work-log-suggestion-boundary": "tsx scripts/hermes/test_hermes_inventory_work_log_suggestion_boundary.ts",
     "test-hermes-pilot-operation-review-boundary": "tsx scripts/hermes/test_hermes_pilot_operation_review_boundary.ts",
