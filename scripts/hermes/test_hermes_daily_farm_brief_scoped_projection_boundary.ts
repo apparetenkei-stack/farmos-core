@@ -60,6 +60,12 @@ async function main(): Promise<void> {
   const administrator = buildHermesDailyFarmBriefRoleProjection({ scopeIndex: value.index, snapshot: value.snapshot, role: "administrator", allowedScopeKeys: [] });
   assert.equal(administrator.visible_scope_count, value.index.scopes.length);
   assert.equal(administrator.summary.unresolved_crop_cycle_reference_count, 1);
+  const legacyIndex = clone(value.index);
+  delete legacyIndex.summary.source_coverage;
+  const parsedLegacyIndex = parseHermesDailyFarmBriefScopeIndex(legacyIndex);
+  assert(parsedLegacyIndex);
+  const legacyAdministrator = buildHermesDailyFarmBriefRoleProjection({ scopeIndex: parsedLegacyIndex, snapshot: value.snapshot, role: "administrator", allowedScopeKeys: [] });
+  assert(legacyAdministrator.summary.source_coverage.every((item) => item.source_record_count === null && item.selected_fact_count === null));
   const allowed = [value.index.scopes[0].scope_key, value.index.scopes[2].scope_key, value.index.scopes[0].scope_key];
   const staff = buildHermesDailyFarmBriefRoleProjection({ scopeIndex: value.index, snapshot: value.snapshot, role: "general_staff", allowedScopeKeys: allowed });
   assert.equal(staff.visible_scope_count, 2);

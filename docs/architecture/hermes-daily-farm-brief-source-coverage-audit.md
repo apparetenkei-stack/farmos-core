@@ -98,6 +98,10 @@ The operational crop-cycle API is operational truth. Core `app.crop_cycles` rema
 
 Day123 does not assume an inventory API filter defect. It first separates source `record_count`, attention `fact_count`, attention count, and latest-display wording. Expected inventory state is available with 7 records and zero attention items allowed. After that gate, a new real-data Brief may proceed through explicit manual persistence and dashboard E2E under its own approved boundary.
 
+Day123 implements a strict `source_selection_coverage.v1` contract. `source_record_count` preserves the adapter count before Snapshot display limits, while `input_record_count` is the bounded record array actually evaluated by deterministic Brief rules. `selected_fact_count` counts selected facts by source and `attention_count` counts the warning subset. The two explicit flags `available_but_no_selected_facts` and `available_but_no_attention` are valid only for an available source and never change source availability to empty or unavailable.
+
+The coverage is derived server-side from the parsed Snapshot and Brief, copied into the persisted scope index, role-resolved with all metrics hidden for general staff, and exposed through the authenticated latest-display source disclosure without identifiers or records. Field and crop-cycle freshness remains `unknown`; generated-at observation time does not promote it to fresh. Day123 preview remains read-only: no Brief persistence, Proposal write, migration, or application database write is performed by this contract work.
+
 ## 15. Rollback
 
 Rollback is removal of the Day121 pure contract/test, this architecture document, its package script, and the Day121–124 roadmap entry. No runtime data or database rollback is required because Day121 has no runtime connection or write.

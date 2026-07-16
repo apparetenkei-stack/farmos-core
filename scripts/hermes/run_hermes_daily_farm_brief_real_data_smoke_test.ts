@@ -34,8 +34,24 @@ if (!enabled) {
       source.source_type,
       {
         status: source.status,
-        record_count: source.record_count,
         freshness: source.freshness,
+        ...(() => {
+          const coverage = result.safe_preview.source_coverage.find(
+            (item) => item.source_type === source.source_type,
+          );
+          return coverage === undefined
+            ? { source_record_count: source.record_count }
+            : {
+                source_record_count: coverage.source_record_count,
+                input_record_count: coverage.input_record_count,
+                selected_fact_count: coverage.selected_fact_count,
+                attention_count: coverage.attention_count,
+                available_but_no_selected_facts:
+                  coverage.available_but_no_selected_facts,
+                available_but_no_attention:
+                  coverage.available_but_no_attention,
+              };
+        })(),
       },
     ]),
   );

@@ -53,6 +53,46 @@ export function buildHermesDailyFarmBriefRoleProjection(input: {
       unscoped_crop_cycle_count: administrator ? scopeIndex.summary.unscoped_crop_cycle_count : null,
       unresolved_field_reference_count: administrator ? scopeIndex.summary.unresolved_field_reference_count : null,
       unresolved_crop_cycle_reference_count: administrator ? scopeIndex.summary.unresolved_crop_cycle_reference_count : null,
+      source_coverage: HERMES_DAILY_FARM_SOURCE_ORDER.map((sourceType) => {
+        const source = snapshot.sources[sourceType];
+        const coverage = scopeIndex.summary.source_coverage?.find(
+          (item) => item.source_type === sourceType,
+        );
+        if (coverage === undefined) {
+          return {
+            source_type: sourceType,
+            status:
+              administrator || source.status === "available" || source.status === "empty"
+                ? source.status
+                : "limited" as const,
+            freshness: source.freshness,
+            source_record_count: null,
+            input_record_count: null,
+            selected_fact_count: null,
+            attention_count: null,
+            available_but_no_selected_facts: null,
+            available_but_no_attention: null,
+          };
+        }
+        if (administrator) {
+          const { schema_version: _schemaVersion, ...visibleCoverage } = coverage;
+          return visibleCoverage;
+        }
+        return {
+          source_type: coverage.source_type,
+          status:
+            source.status === "available" || source.status === "empty"
+              ? source.status
+              : "limited" as const,
+          freshness: source.freshness,
+          source_record_count: null,
+          input_record_count: null,
+          selected_fact_count: null,
+          attention_count: null,
+          available_but_no_selected_facts: null,
+          available_but_no_attention: null,
+        };
+      }),
     },
     limitations,
     safety: { ...HERMES_DAILY_FARM_BRIEF_PROJECTION_SAFETY },

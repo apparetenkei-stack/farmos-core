@@ -6,6 +6,10 @@ import {
 } from "./hermes_daily_farm_brief_policy";
 import type { HermesDailyFarmSourceStatus } from "./hermes_daily_farm_snapshot_contract";
 import { isSupportedHermesDailyFarmBriefTimezone } from "./hermes_daily_farm_brief_input";
+import {
+  parseHermesDailyFarmBriefSourceSelectionCoverage,
+  type HermesDailyFarmBriefSourceSelectionCoverage,
+} from "./hermes_daily_farm_brief_source_coverage_contract";
 
 export const HERMES_DAILY_FARM_BRIEF_SCOPE_LIMITS = {
   crop_scopes: 50,
@@ -60,6 +64,7 @@ export type HermesDailyFarmBriefScopeIndex = {
     unscoped_crop_cycle_count: number;
     unresolved_field_reference_count: number;
     unresolved_crop_cycle_reference_count: number;
+    source_coverage?: HermesDailyFarmBriefSourceSelectionCoverage[];
   };
   limitations: string[];
   safety: HermesDailyFarmBriefProjectionSafety;
@@ -91,6 +96,18 @@ export type HermesDailyFarmBriefProjectionSourceStatus = {
   record_count: number | null;
 };
 
+export type HermesDailyFarmBriefProjectionSourceCoverage = {
+  source_type: HermesDailyFarmSourceType;
+  status: HermesDailyFarmSourceStatus | "limited";
+  freshness: HermesDailyFarmFreshness;
+  source_record_count: number | null;
+  input_record_count: number | null;
+  selected_fact_count: number | null;
+  attention_count: number | null;
+  available_but_no_selected_facts: boolean | null;
+  available_but_no_attention: boolean | null;
+};
+
 export type HermesDailyFarmBriefRoleProjection = {
   schema_version: "hermes.daily_farm_brief.role_projection.v1";
   role: HermesDailyFarmBriefRole;
@@ -110,6 +127,7 @@ export type HermesDailyFarmBriefRoleProjection = {
     unscoped_crop_cycle_count: number | null;
     unresolved_field_reference_count: number | null;
     unresolved_crop_cycle_reference_count: number | null;
+    source_coverage: HermesDailyFarmBriefProjectionSourceCoverage[];
   };
   limitations: string[];
   safety: HermesDailyFarmBriefProjectionSafety;
@@ -189,7 +207,8 @@ function validateScopeArray(value: unknown): value is HermesDailyFarmBriefScope[
 export function parseHermesDailyFarmBriefScopeIndex(value: unknown): HermesDailyFarmBriefScopeIndex | null {
   try {
     const index = typeof value === "string" ? JSON.parse(value) : value;
-    if (!isRecord(index) || !hasExactKeys(index, ["schema_version", "generated_at", "timezone", "brief_status", "scopes", "summary", "limitations", "safety"]) || index.schema_version !== "hermes.daily_farm_brief.scope_index.v1" || !isCanonicalIso(index.generated_at) || !isSupportedHermesDailyFarmBriefTimezone(index.timezone) || !["ready", "partial", "unavailable"].includes(String(index.brief_status)) || !validateScopeArray(index.scopes) || !isRecord(index.summary) || !hasExactKeys(index.summary, ["scope_count", "crop_scope_count", "field_scope_count", "crop_cycle_scope_count", "warning_count", "info_count", "unscoped_work_log_count", "unscoped_crop_cycle_count", "unresolved_field_reference_count", "unresolved_crop_cycle_reference_count"]) || !Object.values(index.summary).every(isCount) || !isCodeArray(index.limitations, 50) || !validateSafety(index.safety)) return null;
+    const summaryKeys = ["scope_count", "crop_scope_count", "field_scope_count", "crop_cycle_scope_count", "warning_count", "info_count", "unscoped_work_log_count", "unscoped_crop_cycle_count", "unresolved_field_reference_count", "unresolved_crop_cycle_reference_count"];
+    if (!isRecord(index) || !hasExactKeys(index, ["schema_version", "generated_at", "timezone", "brief_status", "scopes", "summary", "limitations", "safety"]) || index.schema_version !== "hermes.daily_farm_brief.scope_index.v1" || !isCanonicalIso(index.generated_at) || !isSupportedHermesDailyFarmBriefTimezone(index.timezone) || !["ready", "partial", "unavailable"].includes(String(index.brief_status)) || !validateScopeArray(index.scopes) || !isRecord(index.summary) || !(hasExactKeys(index.summary, summaryKeys) || hasExactKeys(index.summary, [...summaryKeys, "source_coverage"])) || !summaryKeys.every((key) => isCount(index.summary[key])) || (Object.hasOwn(index.summary, "source_coverage") && !validateCanonicalSelectionCoverageArray(index.summary.source_coverage)) || !isCodeArray(index.limitations, 50) || !validateSafety(index.safety)) return null;
     const scopes = index.scopes as HermesDailyFarmBriefScope[];
     const summary = index.summary;
     if (summary.scope_count !== scopes.length || summary.crop_scope_count !== scopes.filter((scope) => scope.scope_type === "crop").length || summary.field_scope_count !== scopes.filter((scope) => scope.scope_type === "field").length || summary.crop_cycle_scope_count !== scopes.filter((scope) => scope.scope_type === "crop_cycle").length || summary.warning_count !== scopes.reduce((sum, scope) => sum + scope.warning_count, 0) || summary.info_count !== scopes.reduce((sum, scope) => sum + scope.info_count, 0)) return null;
@@ -228,10 +247,59 @@ function validateCanonicalSourceStatusArray(
   );
 }
 
+function validateCanonicalSelectionCoverageArray(
+  value: unknown,
+): value is HermesDailyFarmBriefSourceSelectionCoverage[] {
+  if (!Array.isArray(value) || value.length !== HERMES_DAILY_FARM_SOURCE_ORDER.length) return false;
+  const parsed = value.map(parseHermesDailyFarmBriefSourceSelectionCoverage);
+  return parsed.every(
+    (item, index) => item?.source_type === HERMES_DAILY_FARM_SOURCE_ORDER[index],
+  );
+}
+
+function parseProjectionSourceCoverage(
+  value: unknown,
+): HermesDailyFarmBriefProjectionSourceCoverage | null {
+  if (!isRecord(value) || !hasExactKeys(value, [
+    "source_type",
+    "status",
+    "freshness",
+    "source_record_count",
+    "input_record_count",
+    "selected_fact_count",
+    "attention_count",
+    "available_but_no_selected_facts",
+    "available_but_no_attention",
+  ]) || !HERMES_DAILY_FARM_SOURCE_ORDER.includes(value.source_type as HermesDailyFarmSourceType) || !SOURCE_STATUSES.includes(String(value.status)) || !FRESHNESS.includes(String(value.freshness))) return null;
+  const metrics = [value.source_record_count, value.input_record_count, value.selected_fact_count, value.attention_count];
+  const flags = [value.available_but_no_selected_facts, value.available_but_no_attention];
+  if (metrics.some((item) => item !== null && !isCount(item)) || flags.some((item) => item !== null && typeof item !== "boolean")) return null;
+  if (metrics.every((item) => item !== null)) {
+    const full = parseHermesDailyFarmBriefSourceSelectionCoverage({
+      schema_version: "hermes.daily_farm_brief.source_selection_coverage.v1",
+      ...value,
+    });
+    if (full === null) return null;
+  } else if (!metrics.every((item) => item === null) || !flags.every((item) => item === null)) {
+    return null;
+  }
+  return value as HermesDailyFarmBriefProjectionSourceCoverage;
+}
+
+function validateCanonicalProjectionCoverageArray(
+  value: unknown,
+): value is HermesDailyFarmBriefProjectionSourceCoverage[] {
+  if (!Array.isArray(value) || value.length !== HERMES_DAILY_FARM_SOURCE_ORDER.length) return false;
+  const parsed = value.map(parseProjectionSourceCoverage);
+  return parsed.every(
+    (item, index) => item?.source_type === HERMES_DAILY_FARM_SOURCE_ORDER[index],
+  );
+}
+
 export function parseHermesDailyFarmBriefRoleProjection(value: unknown): HermesDailyFarmBriefRoleProjection | null {
   try {
     const projection = typeof value === "string" ? JSON.parse(value) : value;
-    if (!isRecord(projection) || !hasExactKeys(projection, ["schema_version", "role", "generated_at", "timezone", "brief_status", "visible_scope_count", "scopes", "summary", "limitations", "safety"]) || projection.schema_version !== "hermes.daily_farm_brief.role_projection.v1" || !["administrator", "general_staff"].includes(String(projection.role)) || !isCanonicalIso(projection.generated_at) || !isSupportedHermesDailyFarmBriefTimezone(projection.timezone) || !["ready", "partial", "unavailable"].includes(String(projection.brief_status)) || !isCount(projection.visible_scope_count) || !validateScopeArray(projection.scopes) || projection.visible_scope_count !== projection.scopes.length || !isRecord(projection.summary) || !hasExactKeys(projection.summary, ["crop_scope_count", "field_scope_count", "crop_cycle_scope_count", "warning_count", "info_count", "source_status", "unscoped_work_log_count", "unscoped_crop_cycle_count", "unresolved_field_reference_count", "unresolved_crop_cycle_reference_count"]) || !validateCanonicalSourceStatusArray(projection.summary.source_status) || !isCodeArray(projection.limitations, 50) || !validateSafety(projection.safety)) return null;
+    if (!isRecord(projection) || !hasExactKeys(projection, ["schema_version", "role", "generated_at", "timezone", "brief_status", "visible_scope_count", "scopes", "summary", "limitations", "safety"]) || projection.schema_version !== "hermes.daily_farm_brief.role_projection.v1" || !["administrator", "general_staff"].includes(String(projection.role)) || !isCanonicalIso(projection.generated_at) || !isSupportedHermesDailyFarmBriefTimezone(projection.timezone) || !["ready", "partial", "unavailable"].includes(String(projection.brief_status)) || !isCount(projection.visible_scope_count) || !validateScopeArray(projection.scopes) || projection.visible_scope_count !== projection.scopes.length || !isRecord(projection.summary) || !hasExactKeys(projection.summary, ["crop_scope_count", "field_scope_count", "crop_cycle_scope_count", "warning_count", "info_count", "source_status", "unscoped_work_log_count", "unscoped_crop_cycle_count", "unresolved_field_reference_count", "unresolved_crop_cycle_reference_count", "source_coverage"]) || !validateCanonicalSourceStatusArray(projection.summary.source_status) || !validateCanonicalProjectionCoverageArray(projection.summary.source_coverage) || !isCodeArray(projection.limitations, 50) || !validateSafety(projection.safety)) return null;
     const scopes = projection.scopes as HermesDailyFarmBriefScope[];
     const summary = projection.summary;
     if (![summary.crop_scope_count, summary.field_scope_count, summary.crop_cycle_scope_count, summary.warning_count, summary.info_count].every(isCount) || summary.crop_scope_count !== scopes.filter((scope) => scope.scope_type === "crop").length || summary.field_scope_count !== scopes.filter((scope) => scope.scope_type === "field").length || summary.crop_cycle_scope_count !== scopes.filter((scope) => scope.scope_type === "crop_cycle").length || summary.warning_count !== scopes.reduce((sum, scope) => sum + scope.warning_count, 0) || summary.info_count !== scopes.reduce((sum, scope) => sum + scope.info_count, 0)) return null;
@@ -239,6 +307,9 @@ export function parseHermesDailyFarmBriefRoleProjection(value: unknown): HermesD
     if (projection.role === "administrator" ? diagnostics.some((item) => !isCount(item)) : diagnostics.some((item) => item !== null)) return null;
     const statuses = summary.source_status as HermesDailyFarmBriefProjectionSourceStatus[];
     if (projection.role === "administrator" ? statuses.some((item) => item.status === "limited" || item.record_count === null) : statuses.some((item) => item.record_count !== null || (item.status !== "available" && item.status !== "empty" && item.status !== "limited"))) return null;
+    const coverage = summary.source_coverage as HermesDailyFarmBriefProjectionSourceCoverage[];
+    if (projection.role === "administrator" ? coverage.some((item) => item.status === "limited") : coverage.some((item) => item.source_record_count !== null || !["available", "empty", "limited"].includes(item.status))) return null;
+    if (coverage.some((item, index) => item.source_type !== statuses[index].source_type || item.status !== statuses[index].status || item.freshness !== statuses[index].freshness || (projection.role === "administrator" && item.source_record_count !== null && item.source_record_count !== statuses[index].record_count))) return null;
     return projection as HermesDailyFarmBriefRoleProjection;
   } catch { return null; }
 }

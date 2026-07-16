@@ -393,6 +393,33 @@ async function main(): Promise<void> {
     memoryUnavailable.snapshot.sources.hermes_note.status,
     "unavailable",
   );
+  const unavailableHermesNoteSelection =
+    memoryUnavailable.safe_preview.source_coverage.find(
+      (item) => item.source_type === "hermes_note",
+    );
+  assert.deepEqual(
+    unavailableHermesNoteSelection && {
+      source_record_count: unavailableHermesNoteSelection.source_record_count,
+      input_record_count: unavailableHermesNoteSelection.input_record_count,
+      selected_fact_count: unavailableHermesNoteSelection.selected_fact_count,
+      attention_count: unavailableHermesNoteSelection.attention_count,
+    },
+    {
+      source_record_count: 0,
+      input_record_count: 0,
+      selected_fact_count: 0,
+      attention_count: 0,
+    },
+  );
+  assert.equal(
+    memoryUnavailable.brief.facts.some(
+      (fact) =>
+        fact.source_type === "hermes_note" &&
+        fact.category === "source_state" &&
+        fact.fact_code === "source_unavailable",
+    ),
+    true,
+  );
 
   const operationalThrow = await integrate({
     operational: async () => {
@@ -520,6 +547,30 @@ async function main(): Promise<void> {
   assert.equal(coverage.snapshot.sources.work_log.record_count, 100);
   assert.equal(coverage.snapshot.sources.field.record_count, 71);
   assert.equal(coverage.snapshot.sources.crop_cycle.record_count, 40);
+  const inventorySelection = coverage.safe_preview.source_coverage.find((item) => item.source_type === "inventory");
+  const workLogSelection = coverage.safe_preview.source_coverage.find((item) => item.source_type === "work_log");
+  const fieldSelection = coverage.safe_preview.source_coverage.find((item) => item.source_type === "field");
+  const cropCycleSelection = coverage.safe_preview.source_coverage.find((item) => item.source_type === "crop_cycle");
+  assert.equal(inventorySelection?.source_record_count, 7);
+  assert.equal(inventorySelection?.input_record_count, 7);
+  assert.equal(workLogSelection?.source_record_count, 100);
+  assert.equal(workLogSelection?.input_record_count, 10);
+  assert.equal(workLogSelection?.selected_fact_count, 0);
+  assert.equal(workLogSelection?.attention_count, 0);
+  assert.equal(workLogSelection?.available_but_no_selected_facts, true);
+  assert.equal(workLogSelection?.available_but_no_attention, true);
+  assert.equal(fieldSelection?.source_record_count, 71);
+  assert.equal(fieldSelection?.input_record_count, 20);
+  assert.equal(fieldSelection?.freshness, "unknown");
+  assert.equal(fieldSelection?.selected_fact_count, 0);
+  assert.equal(fieldSelection?.attention_count, 0);
+  assert.equal(fieldSelection?.available_but_no_attention, true);
+  assert.equal(cropCycleSelection?.source_record_count, 40);
+  assert.equal(cropCycleSelection?.input_record_count, 20);
+  assert.equal(cropCycleSelection?.freshness, "unknown");
+  assert.equal(cropCycleSelection?.selected_fact_count, 0);
+  assert.equal(cropCycleSelection?.attention_count, 0);
+  assert.equal(cropCycleSelection?.available_but_no_attention, true);
   const fieldCoverage = classifyHermesDailyFarmBriefSourceCoverage({ source: "field", read_state: "success", provenance: "farming_app_api", expected_provenance: "farming_app_api", actual_record_count: 71, adapter_record_count: coverage.snapshot.sources.field.record_count, fact_count: 0, observed_at: coverage.snapshot.sources.field.generated_at, latest_business_at: null, source_updated_at: null, authoritative_freshness: null, notes: ["Day122 fixture evidence."] });
   const cropCoverage = classifyHermesDailyFarmBriefSourceCoverage({ source: "crop_cycle", read_state: "success", provenance: "farming_app_api", expected_provenance: "farming_app_api", actual_record_count: 40, adapter_record_count: coverage.snapshot.sources.crop_cycle.record_count, fact_count: 0, observed_at: coverage.snapshot.sources.crop_cycle.generated_at, latest_business_at: null, source_updated_at: null, authoritative_freshness: null, notes: ["Day122 fixture evidence."] });
   assert.equal(fieldCoverage?.availability, "available");

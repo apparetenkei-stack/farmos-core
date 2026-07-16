@@ -1,7 +1,22 @@
-import type {
-  HermesDailyFarmFreshness,
-  HermesDailyFarmSourceType,
+import {
+  HERMES_DAILY_FARM_SOURCE_ORDER,
+  type HermesDailyFarmFreshness,
+  type HermesDailyFarmSourceType,
 } from "./hermes_daily_farm_brief_policy";
+import type { HermesDailyFarmSourceStatus } from "./hermes_daily_farm_snapshot_contract";
+
+export type HermesDailyFarmBriefSourceSelectionCoverage = {
+  schema_version: "hermes.daily_farm_brief.source_selection_coverage.v1";
+  source_type: HermesDailyFarmSourceType;
+  status: HermesDailyFarmSourceStatus;
+  freshness: HermesDailyFarmFreshness;
+  source_record_count: number;
+  input_record_count: number;
+  selected_fact_count: number;
+  attention_count: number;
+  available_but_no_selected_facts: boolean;
+  available_but_no_attention: boolean;
+};
 
 export type HermesDailyFarmBriefSourceAvailability =
   | "available"
@@ -113,6 +128,19 @@ const EVIDENCE_KEYS = [
   "source_updated_at",
   "notes",
 ] as const;
+const SELECTION_COVERAGE_KEYS = [
+  "schema_version",
+  "source_type",
+  "status",
+  "freshness",
+  "source_record_count",
+  "input_record_count",
+  "selected_fact_count",
+  "attention_count",
+  "available_but_no_selected_facts",
+  "available_but_no_attention",
+] as const;
+const SELECTION_STATUSES = ["available", "empty", "unavailable", "invalid"] as const;
 
 type JsonRecord = Record<string, unknown>;
 
@@ -126,6 +154,85 @@ function hasExactKeys(value: JsonRecord, keys: readonly string[]): boolean {
 
 function isNonNegativeInteger(value: unknown): value is number {
   return Number.isSafeInteger(value) && Number(value) >= 0;
+}
+
+export function parseHermesDailyFarmBriefSourceSelectionCoverage(
+  value: unknown,
+): HermesDailyFarmBriefSourceSelectionCoverage | null {
+  try {
+    const coverage = typeof value === "string" ? JSON.parse(value) : value;
+    if (
+      !isRecord(coverage) ||
+      !hasExactKeys(coverage, SELECTION_COVERAGE_KEYS) ||
+      coverage.schema_version !==
+        "hermes.daily_farm_brief.source_selection_coverage.v1" ||
+      !HERMES_DAILY_FARM_SOURCE_ORDER.includes(
+        coverage.source_type as HermesDailyFarmSourceType,
+      ) ||
+      !SELECTION_STATUSES.includes(
+        coverage.status as (typeof SELECTION_STATUSES)[number],
+      ) ||
+      !FRESHNESS.includes(
+        coverage.freshness as (typeof FRESHNESS)[number],
+      ) ||
+      !isNonNegativeInteger(coverage.source_record_count) ||
+      !isNonNegativeInteger(coverage.input_record_count) ||
+      !isNonNegativeInteger(coverage.selected_fact_count) ||
+      !isNonNegativeInteger(coverage.attention_count) ||
+      typeof coverage.available_but_no_selected_facts !== "boolean" ||
+      typeof coverage.available_but_no_attention !== "boolean"
+    ) {
+      return null;
+    }
+    if (
+      coverage.input_record_count > coverage.source_record_count ||
+      coverage.selected_fact_count > coverage.input_record_count ||
+      coverage.attention_count > coverage.selected_fact_count ||
+      coverage.available_but_no_selected_facts !==
+        (coverage.status === "available" &&
+          coverage.selected_fact_count === 0) ||
+      coverage.available_but_no_attention !==
+        (coverage.status === "available" && coverage.attention_count === 0) ||
+      (coverage.status === "available" && coverage.source_record_count === 0) ||
+      (coverage.status === "empty" &&
+        (coverage.source_record_count !== 0 ||
+          coverage.input_record_count !== 0)) ||
+      ((coverage.status === "unavailable" || coverage.status === "invalid") &&
+        (coverage.source_record_count !== 0 || coverage.input_record_count !== 0)) ||
+      (coverage.status !== "available" &&
+        (coverage.selected_fact_count !== 0 || coverage.attention_count !== 0))
+    ) {
+      return null;
+    }
+    return coverage as HermesDailyFarmBriefSourceSelectionCoverage;
+  } catch {
+    return null;
+  }
+}
+
+export function createHermesDailyFarmBriefSourceSelectionCoverage(input: {
+  sourceType: HermesDailyFarmSourceType;
+  status: HermesDailyFarmSourceStatus;
+  freshness: HermesDailyFarmFreshness;
+  sourceRecordCount: number;
+  inputRecordCount: number;
+  selectedFactCount: number;
+  attentionCount: number;
+}): HermesDailyFarmBriefSourceSelectionCoverage | null {
+  return parseHermesDailyFarmBriefSourceSelectionCoverage({
+    schema_version: "hermes.daily_farm_brief.source_selection_coverage.v1",
+    source_type: input.sourceType,
+    status: input.status,
+    freshness: input.freshness,
+    source_record_count: input.sourceRecordCount,
+    input_record_count: input.inputRecordCount,
+    selected_fact_count: input.selectedFactCount,
+    attention_count: input.attentionCount,
+    available_but_no_selected_facts:
+      input.status === "available" && input.selectedFactCount === 0,
+    available_but_no_attention:
+      input.status === "available" && input.attentionCount === 0,
+  });
 }
 
 function isCanonicalIsoOrNull(value: unknown): value is string | null {

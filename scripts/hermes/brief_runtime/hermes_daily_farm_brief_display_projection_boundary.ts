@@ -92,7 +92,19 @@ export function createHermesDailyFarmBriefDisplayProjection(input: { latestCandi
     attention_items: attentionItems(candidate, projection),
     source_disclosure: HERMES_DAILY_FARM_SOURCE_ORDER.map((sourceType: HermesDailyFarmSourceType) => {
       const source = projection.summary.source_status.find((item) => item.source_type === sourceType) as HermesDailyFarmBriefProjectionSourceStatus;
-      return { source_type: sourceType, availability: availability(source.status), freshness: source.freshness };
+      const coverage = projection.summary.source_coverage.find((item) => item.source_type === sourceType);
+      if (!coverage) throw new Error("daily_farm_brief_display_coverage_missing");
+      return {
+        source_type: sourceType,
+        availability: availability(source.status),
+        freshness: source.freshness,
+        source_record_count: coverage.source_record_count,
+        input_record_count: coverage.input_record_count,
+        selected_fact_count: coverage.selected_fact_count,
+        attention_count: coverage.attention_count,
+        available_but_no_selected_facts: coverage.available_but_no_selected_facts,
+        available_but_no_attention: coverage.available_but_no_attention,
+      };
     }),
     limitations: limitations(candidate, projection),
     safety: HERMES_DAILY_FARM_BRIEF_DISPLAY_PROJECTION_SAFETY,

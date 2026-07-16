@@ -41,7 +41,17 @@ export type HermesDailyFarmBriefDisplaySeverity = "info" | "attention";
 export type HermesDailyFarmBriefDisplaySourceAvailability = "available" | "empty" | "limited" | "unavailable" | "unknown";
 export type HermesDailyFarmBriefDisplayPriority = { label: string; detail: string; severity: HermesDailyFarmBriefDisplaySeverity };
 export type HermesDailyFarmBriefDisplayAttentionItem = { label: string; detail: string; severity: "attention" };
-export type HermesDailyFarmBriefDisplaySourceDisclosure = { source_type: HermesDailyFarmSourceType; availability: HermesDailyFarmBriefDisplaySourceAvailability; freshness: HermesDailyFarmFreshness };
+export type HermesDailyFarmBriefDisplaySourceDisclosure = {
+  source_type: HermesDailyFarmSourceType;
+  availability: HermesDailyFarmBriefDisplaySourceAvailability;
+  freshness: HermesDailyFarmFreshness;
+  source_record_count: number | null;
+  input_record_count: number | null;
+  selected_fact_count: number | null;
+  attention_count: number | null;
+  available_but_no_selected_facts: boolean | null;
+  available_but_no_attention: boolean | null;
+};
 export type HermesDailyFarmBriefDisplayProjection = {
   schema_version: "hermes.daily_farm_brief.display_projection.v1";
   business_date: string;
@@ -100,6 +110,7 @@ function countDetail(detail: string, severity: HermesDailyFarmBriefDisplaySeveri
   return match !== null && Number(match[1]) <= 1_000_000;
 }
 function duplicateFree<T>(items: T[], signature: (item: T) => string): boolean { return new Set(items.map(signature)).size === items.length; }
+function safeCountOrNull(value: unknown): value is number | null { return value === null || (Number.isSafeInteger(value) && Number(value) >= 0 && Number(value) <= 1_000_000); }
 
 export function parseHermesDailyFarmBriefDisplayProjection(value: unknown): HermesDailyFarmBriefDisplayProjection | null {
   try {
@@ -123,7 +134,13 @@ export function parseHermesDailyFarmBriefDisplayProjection(value: unknown): Herm
     const disclosure: HermesDailyFarmBriefDisplaySourceDisclosure[] = [];
     for (let index = 0; index < projection.source_disclosure.length; index += 1) {
       const raw = projection.source_disclosure[index];
-      if (!isRecord(raw) || !exact(raw, ["source_type", "availability", "freshness"]) || raw.source_type !== HERMES_DAILY_FARM_SOURCE_ORDER[index] || !["available", "empty", "limited", "unavailable", "unknown"].includes(String(raw.availability)) || !["fresh", "stale", "unknown"].includes(String(raw.freshness))) return null;
+      if (!isRecord(raw) || !exact(raw, ["source_type", "availability", "freshness", "source_record_count", "input_record_count", "selected_fact_count", "attention_count", "available_but_no_selected_facts", "available_but_no_attention"]) || raw.source_type !== HERMES_DAILY_FARM_SOURCE_ORDER[index] || !["available", "empty", "limited", "unavailable", "unknown"].includes(String(raw.availability)) || !["fresh", "stale", "unknown"].includes(String(raw.freshness)) || ![raw.source_record_count, raw.input_record_count, raw.selected_fact_count, raw.attention_count].every(safeCountOrNull) || ![raw.available_but_no_selected_facts, raw.available_but_no_attention].every((item) => item === null || typeof item === "boolean")) return null;
+      const counts = [raw.source_record_count, raw.input_record_count, raw.selected_fact_count, raw.attention_count];
+      const flags = [raw.available_but_no_selected_facts, raw.available_but_no_attention];
+      if ((!counts.every((item) => item === null) && counts.some((item) => item === null)) || (!flags.every((item) => item === null) && flags.some((item) => item === null))) return null;
+      if (counts.every((item) => typeof item === "number")) {
+        if (Number(raw.input_record_count) > Number(raw.source_record_count) || Number(raw.selected_fact_count) > Number(raw.input_record_count) || Number(raw.attention_count) > Number(raw.selected_fact_count) || raw.available_but_no_selected_facts !== (raw.availability === "available" && raw.selected_fact_count === 0) || raw.available_but_no_attention !== (raw.availability === "available" && raw.attention_count === 0) || (raw.availability !== "available" && (raw.selected_fact_count !== 0 || raw.attention_count !== 0))) return null;
+      }
       disclosure.push(raw as HermesDailyFarmBriefDisplaySourceDisclosure);
     }
     if (!duplicateFree(disclosure, (item) => item.source_type)) return null;

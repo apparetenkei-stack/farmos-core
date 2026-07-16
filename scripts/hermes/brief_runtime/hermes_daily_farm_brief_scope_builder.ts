@@ -209,6 +209,9 @@ export function buildHermesDailyFarmBriefScopeIndex(input: {
       unscoped_crop_cycle_count: unscopedCropCycles,
       unresolved_field_reference_count: unresolvedFields,
       unresolved_crop_cycle_reference_count: unresolvedCycles,
+      source_coverage: brief.source_summary.map(
+        ({ record_count: _recordCount, ...coverage }) => structuredClone(coverage),
+      ),
     },
     limitations: [...new Set([...brief.limitations, ...(snapshot.sources.field.status === "unavailable" ? ["independent_field_source_unavailable"] : [])])].sort().slice(0, 50),
     safety: { ...HERMES_DAILY_FARM_BRIEF_PROJECTION_SAFETY },

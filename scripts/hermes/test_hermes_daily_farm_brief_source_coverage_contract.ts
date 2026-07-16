@@ -1,8 +1,10 @@
 import assert from "node:assert/strict";
 import {
   classifyHermesDailyFarmBriefSourceCoverage,
+  createHermesDailyFarmBriefSourceSelectionCoverage,
   isHermesDailyFarmBriefFullRealDataOrigin,
   parseHermesDailyFarmBriefSourceCoverageEvidence,
+  parseHermesDailyFarmBriefSourceSelectionCoverage,
   type HermesDailyFarmBriefSourceCoverageInput,
 } from "./brief_runtime/hermes_daily_farm_brief_source_coverage_contract";
 
@@ -96,5 +98,58 @@ assert.equal(parseHermesDailyFarmBriefSourceCoverageEvidence({ ...inventory, une
 assert.equal(parseHermesDailyFarmBriefSourceCoverageEvidence({ ...inventory, fact_count: -1 }), null);
 assert.equal(parseHermesDailyFarmBriefSourceCoverageEvidence({ ...inventory, availability: "empty" }), null);
 assert.equal(parseHermesDailyFarmBriefSourceCoverageEvidence({ ...inventory, freshness: "fresh", freshness_reason_code: null }), null);
+
+const inventorySelection = createHermesDailyFarmBriefSourceSelectionCoverage({
+  sourceType: "inventory",
+  status: "available",
+  freshness: "fresh",
+  sourceRecordCount: 7,
+  inputRecordCount: 7,
+  selectedFactCount: 0,
+  attentionCount: 0,
+});
+assert.ok(inventorySelection);
+assert.equal(inventorySelection.source_record_count, 7);
+assert.equal(inventorySelection.input_record_count, 7);
+assert.equal(inventorySelection.selected_fact_count, 0);
+assert.equal(inventorySelection.attention_count, 0);
+assert.equal(inventorySelection.available_but_no_selected_facts, true);
+assert.equal(inventorySelection.available_but_no_attention, true);
+assert.notEqual(inventorySelection.status, "empty");
+
+const truncatedSelection = createHermesDailyFarmBriefSourceSelectionCoverage({
+  sourceType: "work_log",
+  status: "available",
+  freshness: "fresh",
+  sourceRecordCount: 100,
+  inputRecordCount: 10,
+  selectedFactCount: 0,
+  attentionCount: 0,
+});
+assert.equal(truncatedSelection?.source_record_count, 100);
+assert.equal(truncatedSelection?.input_record_count, 10);
+assert.equal(parseHermesDailyFarmBriefSourceSelectionCoverage({ ...inventorySelection, status: "empty" }), null);
+assert.equal(parseHermesDailyFarmBriefSourceSelectionCoverage({ ...inventorySelection, input_record_count: 8 }), null);
+assert.equal(parseHermesDailyFarmBriefSourceSelectionCoverage({ ...inventorySelection, input_record_count: 0, selected_fact_count: 1, available_but_no_selected_facts: false }), null);
+assert.equal(parseHermesDailyFarmBriefSourceSelectionCoverage({ ...inventorySelection, selected_fact_count: 8, available_but_no_selected_facts: false }), null);
+assert.equal(parseHermesDailyFarmBriefSourceSelectionCoverage({ ...inventorySelection, attention_count: 1 }), null);
+assert.equal(parseHermesDailyFarmBriefSourceSelectionCoverage({ ...inventorySelection, available_but_no_attention: false }), null);
+
+for (const status of ["empty", "unavailable", "invalid"] as const) {
+  const zeroCountSelection = createHermesDailyFarmBriefSourceSelectionCoverage({
+    sourceType: "hermes_note",
+    status,
+    freshness: "unknown",
+    sourceRecordCount: 0,
+    inputRecordCount: 0,
+    selectedFactCount: 0,
+    attentionCount: 0,
+  });
+  assert.ok(zeroCountSelection);
+  assert.equal(zeroCountSelection.source_record_count, 0);
+  assert.equal(zeroCountSelection.input_record_count, 0);
+  assert.equal(zeroCountSelection.selected_fact_count, 0);
+  assert.equal(zeroCountSelection.attention_count, 0);
+}
 
 console.log("Hermes Daily Farm Brief source coverage contract tests passed.");

@@ -20,6 +20,7 @@ import {
   normalizeHermesDailyFarmBriefScopeId,
 } from "./hermes_daily_farm_brief_scope_builder";
 import type { HermesDailyFarmSnapshot } from "./hermes_daily_farm_snapshot_contract";
+import type { HermesDailyFarmBriefSourceSelectionCoverage } from "./hermes_daily_farm_brief_source_coverage_contract";
 import {
   createHermesDailyFarmSnapshot,
   parseHermesDailyFarmSnapshot,
@@ -51,6 +52,7 @@ export type HermesDailyFarmBriefRealDataSafePreview = {
     freshness: string;
     record_count: number;
   }>;
+  source_coverage: HermesDailyFarmBriefSourceSelectionCoverage[];
   fact_count: number;
   warning_count: number;
   info_count: number;
@@ -410,6 +412,9 @@ function createSafePreview(input: {
         record_count: source.record_count,
       };
     }),
+    source_coverage: input.brief.source_summary.map(
+      ({ record_count: _recordCount, ...coverage }) => structuredClone(coverage),
+    ),
     fact_count: input.brief.facts.length,
     warning_count: input.brief.facts.filter((fact) => fact.severity === "warning")
       .length,

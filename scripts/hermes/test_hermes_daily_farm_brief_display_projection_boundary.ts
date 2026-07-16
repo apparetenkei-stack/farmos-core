@@ -36,15 +36,43 @@ function sourceStatus(role: "administrator" | "general_staff") {
     source_type: sourceType,
     status: role === "administrator" ? (index === 2 ? "unavailable" as const : index === 4 ? "empty" as const : "available" as const) : (index === 0 ? "available" as const : index === 4 ? "empty" as const : "limited" as const),
     freshness: index === 3 ? "stale" as const : index === 4 ? "unknown" as const : "fresh" as const,
-    record_count: role === "administrator" ? (index === 4 ? 0 : 1) : null,
+    record_count: role === "administrator" ? (index === 2 || index === 4 ? 0 : 1) : null,
   }));
+}
+
+function sourceCoverage(role: "administrator" | "general_staff") {
+  return sourceStatus(role).map((source) => {
+    if (role === "general_staff") return {
+      source_type: source.source_type,
+      status: source.status,
+      freshness: source.freshness,
+      source_record_count: null,
+      input_record_count: null,
+      selected_fact_count: null,
+      attention_count: null,
+      available_but_no_selected_facts: null,
+      available_but_no_attention: null,
+    };
+    const count = source.record_count as number;
+    return {
+      source_type: source.source_type,
+      status: source.status,
+      freshness: source.freshness,
+      source_record_count: count,
+      input_record_count: count,
+      selected_fact_count: 0,
+      attention_count: 0,
+      available_but_no_selected_facts: source.status === "available",
+      available_but_no_attention: source.status === "available",
+    };
+  });
 }
 
 function projection(role: "administrator" | "general_staff", mode: "all" | "allowed" | "empty" = "all"): HermesDailyFarmBriefRoleProjection {
   const scopes = role === "administrator" ? structuredClone(ADMIN_SCOPES) : mode === "allowed" ? [structuredClone(ADMIN_SCOPES[1])] : [];
   const value: HermesDailyFarmBriefRoleProjection = {
     schema_version: "hermes.daily_farm_brief.role_projection.v1", role, generated_at: GENERATED_AT, timezone: "Asia/Tokyo", brief_status: "ready", visible_scope_count: scopes.length, scopes,
-    summary: { crop_scope_count: scopes.filter((item) => item.scope_type === "crop").length, field_scope_count: scopes.filter((item) => item.scope_type === "field").length, crop_cycle_scope_count: scopes.filter((item) => item.scope_type === "crop_cycle").length, warning_count: scopes.reduce((sum, item) => sum + item.warning_count, 0), info_count: scopes.reduce((sum, item) => sum + item.info_count, 0), source_status: sourceStatus(role), unscoped_work_log_count: role === "administrator" ? 0 : null, unscoped_crop_cycle_count: role === "administrator" ? 0 : null, unresolved_field_reference_count: role === "administrator" ? 0 : null, unresolved_crop_cycle_reference_count: role === "administrator" ? 0 : null },
+    summary: { crop_scope_count: scopes.filter((item) => item.scope_type === "crop").length, field_scope_count: scopes.filter((item) => item.scope_type === "field").length, crop_cycle_scope_count: scopes.filter((item) => item.scope_type === "crop_cycle").length, warning_count: scopes.reduce((sum, item) => sum + item.warning_count, 0), info_count: scopes.reduce((sum, item) => sum + item.info_count, 0), source_status: sourceStatus(role), unscoped_work_log_count: role === "administrator" ? 0 : null, unscoped_crop_cycle_count: role === "administrator" ? 0 : null, unresolved_field_reference_count: role === "administrator" ? 0 : null, unresolved_crop_cycle_reference_count: role === "administrator" ? 0 : null, source_coverage: sourceCoverage(role) },
     limitations: role === "administrator" ? ["independent_field_source_unavailable", "secret_internal_code"] : ["scope_access_limited"], safety: HERMES_DAILY_FARM_BRIEF_PROJECTION_SAFETY,
   };
   const parsed = parseHermesDailyFarmBriefRoleProjection(value); assert(parsed); return parsed;
@@ -68,6 +96,21 @@ export async function runDay118DisplayProjectionScenario() {
   assert(parseHermesDailyFarmBriefDisplayProjection(current)); assert.equal(current.display_state, "current"); assert.equal(current.title, "今日の農場状況"); assert.equal(current.priorities.length, 2); assert.equal(current.priorities[0].severity, "attention"); assert.equal(current.source_disclosure.length, HERMES_DAILY_FARM_SOURCE_ORDER.length); assert.equal(repositoryReadCount, 0);
   assert.equal(JSON.stringify(adminCandidate), beforeCandidate); assert.equal(JSON.stringify(adminProjection), beforeProjection);
   assert.equal(JSON.stringify(createHermesDailyFarmBriefDisplayProjection({ latestCandidate: adminCandidate, roleProjection: adminProjection })), JSON.stringify(current));
+  const unavailableFieldDisclosure = current.source_disclosure.find((item) => item.source_type === "field");
+  assert.deepEqual(unavailableFieldDisclosure && {
+    availability: unavailableFieldDisclosure.availability,
+    source_record_count: unavailableFieldDisclosure.source_record_count,
+    input_record_count: unavailableFieldDisclosure.input_record_count,
+    selected_fact_count: unavailableFieldDisclosure.selected_fact_count,
+    attention_count: unavailableFieldDisclosure.attention_count,
+  }, {
+    availability: "unavailable",
+    source_record_count: 0,
+    input_record_count: 0,
+    selected_fact_count: 0,
+    attention_count: 0,
+  });
+  assert.equal(current.attention_items.some((item) => item.label === "圃場" && item.detail === "対象データを現在参照できません。"), true);
 
   const stale = createHermesDailyFarmBriefDisplayProjection({ latestCandidate: candidate(adminProjection, true), roleProjection: adminProjection }); assert(stale); assert.equal(stale.display_state, "stale"); assert(stale.summary.endsWith("この情報は最新でない可能性があります。")); assert(stale.limitations.includes("前営業日の情報を表示しています。")); assert(stale.attention_items.some((item) => item.label === "Daily Brief" && item.detail === "前営業日の情報を表示しています。"));
   const staffAllowedProjection = projection("general_staff", "allowed");
@@ -103,7 +146,8 @@ export async function runDay118DisplayProjectionScenario() {
   assertReject("{invalid-json");
 
   const serialized = JSON.stringify(current);
-  for (const forbidden of [ADMIN_SCOPES[0].scope_key, "record_id", "field_id", "crop_cycle_id", "source_record_id", "principal_ref", "allowed_scope_keys", "snapshot_id", "brief_id", "facts", "independent_field_source_unavailable", "secret_internal_code", "fixture-secret", "fixture-token"]) assert(!serialized.includes(forbidden));
+  for (const forbidden of [ADMIN_SCOPES[0].scope_key, "record_id", "field_id", "crop_cycle_id", "source_record_id", "principal_ref", "allowed_scope_keys", "snapshot_id", "brief_id", "raw_facts", "independent_field_source_unavailable", "secret_internal_code", "fixture-secret", "fixture-token"]) assert(!serialized.includes(forbidden));
+  assert.equal(Object.hasOwn(current, "facts"), false);
   assert.equal(current.safety, HERMES_DAILY_FARM_BRIEF_DISPLAY_PROJECTION_SAFETY); assert.equal(current.safety.database_write_performed, false); assert.equal(current.safety.proposal_write_performed, false); assert.equal(current.safety.model_execution_performed, false); assert.equal(repositoryReadCount, 0);
   const safetyTamper = clone(current) as unknown as { safety: Record<string, unknown> }; safetyTamper.safety.database_write_performed = true; assertReject(safetyTamper);
   return { states: ["current", "stale"], roles: ["administrator", "general_staff"], bodyless_states_rejected: ["generation_in_progress", "generation_failed", "unavailable"], priority_count: current.priorities.length, attention_item_count: current.attention_items.length, repository_read_count: repositoryReadCount, deterministic: true, safety: HERMES_DAILY_FARM_BRIEF_DISPLAY_PROJECTION_SAFETY };

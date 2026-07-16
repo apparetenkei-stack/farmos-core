@@ -64,10 +64,19 @@ export async function runDay119LatestDisplayScenario() {
   assert.equal(artifacts.latest_candidate.role, artifacts.role_projection.role); assert.equal(artifacts.latest_candidate.generated_at, artifacts.role_projection.generated_at); assert.equal(artifacts.latest_candidate.brief_status, artifacts.role_projection.brief_status); assert.equal(artifacts.latest_candidate.visible_scope_count, artifacts.role_projection.visible_scope_count); assert.deepEqual(artifacts.latest_candidate.source_status, artifacts.role_projection.summary.source_status); assert(createHermesDailyFarmBriefDisplayProjection({ latestCandidate: artifacts.latest_candidate, roleProjection: artifacts.role_projection }));
 
   const current = await invoke({ source: data.source }); assert.equal(current.response.status, 200); assertHeaders(current.response); const currentParsed = parseHermesDailyFarmBriefLatestDisplayApiResponse(current.body); assert(currentParsed?.result === "ok"); assert.equal(currentParsed.display_state, "current"); assert(currentParsed.display); assert.equal(current.counts.source, 1); assert.equal(current.counts.authentication, 1); assert.equal(current.counts.actor, 1);
+  const workLogDisclosure = currentParsed.display.source_disclosure.find((item) => item.source_type === "work_log");
+  assert.equal(workLogDisclosure?.availability, "available");
+  assert.equal(workLogDisclosure?.source_record_count, 2);
+  assert.equal(workLogDisclosure?.input_record_count, 2);
+  assert.equal(workLogDisclosure?.selected_fact_count, 0);
+  assert.equal(workLogDisclosure?.attention_count, 0);
+  assert.equal(workLogDisclosure?.available_but_no_selected_facts, true);
+  assert.equal(workLogDisclosure?.available_but_no_attention, true);
   const staleSource = { ...structuredClone(data.source), business_date: "2026-07-14" };
   const stale = await invoke({ source: staleSource }); const staleParsed = parseHermesDailyFarmBriefLatestDisplayApiResponse(stale.body); assert(staleParsed?.result === "ok" && staleParsed.display_state === "stale" && staleParsed.display); assert(staleParsed.display.summary.endsWith("この情報は最新でない可能性があります。")); assert(staleParsed.display.attention_items.some((item) => item.label === "Daily Brief")); assert(staleParsed.display.limitations.includes("前営業日の情報を表示しています。"));
 
   const staff = await invoke({ source: data.source, actor: actor("general_staff", [data.allowedScopeKey]) }); const staffParsed = parseHermesDailyFarmBriefLatestDisplayApiResponse(staff.body); assert(staffParsed?.result === "ok" && staffParsed.display); assert(staffParsed.display.priorities.some((item) => item.label === data.allowedLabel)); assert(!staffParsed.display.priorities.some((item) => item.label === data.outsideLabel)); assert(!staff.text.includes(data.allowedScopeKey)); assert(!staff.text.includes(data.outsideScopeKey));
+  assert(staffParsed.display.source_disclosure.every((item) => item.source_record_count === null && item.input_record_count === null && item.selected_fact_count === null && item.attention_count === null));
   const emptyStaff = await invoke({ source: data.source, actor: actor("general_staff", []) }); const emptyParsed = parseHermesDailyFarmBriefLatestDisplayApiResponse(emptyStaff.body); assert(emptyParsed?.result === "ok" && emptyParsed.display); assert.deepEqual(emptyParsed.display.priorities, []);
 
   const statusStates = new Map<string, string>([["in_progress", "generation_in_progress"], ["failed", "generation_failed"], ["unavailable", "unavailable"]]);

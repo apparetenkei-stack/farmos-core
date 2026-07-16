@@ -1,11 +1,10 @@
 import type {
-  HermesDailyFarmFreshness,
   HermesDailyFarmSourceType,
 } from "./hermes_daily_farm_brief_policy";
 import type {
   HermesDailyFarmSnapshot,
-  HermesDailyFarmSourceStatus,
 } from "./hermes_daily_farm_snapshot_contract";
+import type { HermesDailyFarmBriefSourceSelectionCoverage } from "./hermes_daily_farm_brief_source_coverage_contract";
 
 export type HermesDailyFarmBriefFactCode =
   | "source_empty"
@@ -39,11 +38,10 @@ export type HermesDailyFarmBriefFact = {
   };
 };
 
-export type HermesDailyFarmBriefSourceSummary = {
-  source_type: HermesDailyFarmSourceType;
-  status: HermesDailyFarmSourceStatus;
+export type HermesDailyFarmBriefSourceSummary =
+  HermesDailyFarmBriefSourceSelectionCoverage & {
+  /** Day106 compatibility alias; equal to source_record_count. */
   record_count: number;
-  freshness: HermesDailyFarmFreshness;
 };
 
 export type HermesDailyFarmBrief = {

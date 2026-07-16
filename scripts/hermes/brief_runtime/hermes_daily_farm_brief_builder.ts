@@ -14,6 +14,10 @@ import type {
 } from "./hermes_daily_farm_brief_contract";
 import type { HermesDailyFarmSnapshot } from "./hermes_daily_farm_snapshot_contract";
 import { parseHermesDailyFarmSnapshot } from "./hermes_daily_farm_snapshot_adapter";
+import {
+  createHermesDailyFarmBriefSourceSelectionCoverage,
+  parseHermesDailyFarmBriefSourceSelectionCoverage,
+} from "./hermes_daily_farm_brief_source_coverage_contract";
 
 type JsonRecord = Record<string, unknown>;
 type FactCandidate = Omit<
@@ -22,9 +26,6 @@ type FactCandidate = Omit<
 >;
 
 const ID_PATTERN = /^[0-9A-Za-z][0-9A-Za-z._:-]{0,127}$/u;
-const SOURCE_STATUSES = ["available", "empty", "unavailable", "invalid"];
-const FRESHNESS_VALUES = ["fresh", "stale", "unknown"];
-
 const FACT_CONTRACT: Record<
   HermesDailyFarmBriefFactCode,
   {
@@ -246,6 +247,26 @@ function createFactCandidates(snapshot: HermesDailyFarmSnapshot): FactCandidate[
   return facts.sort(compareFacts);
 }
 
+function selectedRecordCounts(
+  facts: HermesDailyFarmBriefFact[],
+  sourceType: HermesDailyFarmSourceType,
+): { selected: number; attention: number } {
+  const recordFacts = facts.filter(
+    (fact) =>
+      fact.source_type === sourceType &&
+      fact.category !== "source_state" &&
+      fact.source_record_id !== null,
+  );
+  return {
+    selected: new Set(recordFacts.map((fact) => fact.source_record_id)).size,
+    attention: new Set(
+      recordFacts
+        .filter((fact) => fact.severity === "warning")
+        .map((fact) => fact.source_record_id),
+    ).size,
+  };
+}
+
 export function calculateHermesDailyFarmBriefStatus(
   summaries: HermesDailyFarmBriefSourceSummary[],
 ): HermesDailyFarmBrief["status"] | null {
@@ -326,11 +347,20 @@ export function buildHermesDailyFarmBrief(input: {
   });
   const sourceSummary = HERMES_DAILY_FARM_SOURCE_ORDER.map((sourceType) => {
     const source = snapshot.sources[sourceType];
-    return {
-      source_type: sourceType,
+    const selected = selectedRecordCounts(facts, sourceType);
+    const coverage = createHermesDailyFarmBriefSourceSelectionCoverage({
+      sourceType,
       status: source.status,
-      record_count: source.record_count,
       freshness: source.freshness,
+      sourceRecordCount: source.record_count,
+      inputRecordCount: source.records.length,
+      selectedFactCount: selected.selected,
+      attentionCount: selected.attention,
+    });
+    if (coverage === null) throw new Error("daily_farm_brief_source_coverage_invalid");
+    return {
+      ...coverage,
+      record_count: source.record_count,
     };
   });
   const brief: HermesDailyFarmBrief = {
@@ -429,22 +459,23 @@ export function parseHermesDailyFarmBriefFact(
 }
 
 function parseSourceSummary(value: unknown): HermesDailyFarmBriefSourceSummary | null {
-  if (
-    !isRecord(value) ||
-    !hasExactKeys(value, ["source_type", "status", "record_count", "freshness"]) ||
-    !HERMES_DAILY_FARM_SOURCE_ORDER.includes(
-      value.source_type as HermesDailyFarmSourceType,
-    ) ||
-    !SOURCE_STATUSES.includes(String(value.status)) ||
-    !Number.isInteger(value.record_count) ||
-    Number(value.record_count) < 0 ||
-    !FRESHNESS_VALUES.includes(String(value.freshness)) ||
-    (value.status === "empty" && value.record_count !== 0) ||
-    (value.status === "available" && Number(value.record_count) === 0)
-  ) {
-    return null;
-  }
-  return value as HermesDailyFarmBriefSourceSummary;
+  if (!isRecord(value) || !hasExactKeys(value, [
+    "schema_version",
+    "source_type",
+    "status",
+    "freshness",
+    "source_record_count",
+    "input_record_count",
+    "selected_fact_count",
+    "attention_count",
+    "available_but_no_selected_facts",
+    "available_but_no_attention",
+    "record_count",
+  ])) return null;
+  const { record_count: recordCount, ...selection } = value;
+  const coverage = parseHermesDailyFarmBriefSourceSelectionCoverage(selection);
+  if (coverage === null || recordCount !== coverage.source_record_count) return null;
+  return { ...coverage, record_count: recordCount } as HermesDailyFarmBriefSourceSummary;
 }
 
 export function parseHermesDailyFarmBrief(
@@ -533,8 +564,12 @@ export function parseHermesDailyFarmBrief(
     const canonicalSummaries = summaries as HermesDailyFarmBriefSourceSummary[];
     if (
       !HERMES_DAILY_FARM_SOURCE_ORDER.every(
-        (sourceType, index) =>
-          canonicalSummaries[index].source_type === sourceType,
+        (sourceType, index) => {
+          const selected = selectedRecordCounts(canonicalFacts, sourceType);
+          return canonicalSummaries[index].source_type === sourceType &&
+            canonicalSummaries[index].selected_fact_count === selected.selected &&
+            canonicalSummaries[index].attention_count === selected.attention;
+        },
       ) ||
       calculateHermesDailyFarmBriefStatus(canonicalSummaries) !== brief.status
     ) {
