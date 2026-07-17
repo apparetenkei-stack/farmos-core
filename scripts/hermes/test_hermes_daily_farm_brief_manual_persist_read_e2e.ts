@@ -28,16 +28,28 @@ import { serveHermesDailyFarmBriefLatestRead } from "./brief_runtime/hermes_dail
 import { parseHermesDailyFarmBriefLatestApiResponse } from "./brief_runtime/hermes_daily_farm_brief_latest_api_contract";
 import { HermesDailyFarmBriefFixtureReadRepository } from "./brief_runtime/hermes_daily_farm_brief_persisted_latest_source_boundary";
 
-const MAIN_DATE = "2026-07-13";
-const ROLLBACK_DATE = "2026-07-12";
 const PRINCIPAL = "day116-administrator";
 const API_URL = "http://localhost/api/hermes/daily-farm-brief/latest";
+
+function at(businessDate: string, minutesAfterJstMidnight: number): string {
+  return new Date(Date.parse(`${businessDate}T00:00:00+09:00`) + minutesAfterJstMidnight * 60_000).toISOString();
+}
 
 function executor() {
   const value = createHermesDailyFarmBriefDockerPostgresExecutor(HERMES_DAILY_FARM_BRIEF_DAY114_DATABASE);
   assert(value);
   return value;
 }
+
+async function allocateUnusedBusinessDates(): Promise<[string, string]> {
+  const result = await executor().executeSingleConnection(`select coalesce(jsonb_agg(business_date::text order by business_date), '[]'::jsonb)::text from (select candidate::date as business_date from generate_series(date '2000-01-01', date '2025-12-31', interval '1 day') as dates(candidate) where not exists (select 1 from ai.daily_farm_brief_records where business_date = candidate::date) order by candidate limit 2) available;`);
+  assert(result.ok);
+  const dates = JSON.parse(result.output) as unknown;
+  assert(Array.isArray(dates) && dates.length === 2 && dates.every((date) => typeof date === "string" && /^\d{4}-\d{2}-\d{2}$/u.test(date)));
+  return [dates[0] as string, dates[1] as string];
+}
+
+const [ROLLBACK_DATE, MAIN_DATE] = await allocateUnusedBusinessDates();
 
 async function isolationEvidence() {
   const result = await executor().executeSingleConnection("select jsonb_build_object('database',current_database(),'address',coalesce(inet_server_addr()::text,'local_socket'))::text;");
@@ -85,7 +97,7 @@ async function canonicalEvidence(date: string) {
 
 async function negativeHttp(provider: HermesDailyFarmBriefDenyByDefaultAuthenticationProvider | HermesDailyFarmBriefFixtureAuthenticationProvider, directory: HermesDailyFarmBriefFixtureActorDirectory, request = new Request(API_URL)) {
   const read = new HermesDailyFarmBriefBusinessDateBoundedReadRepository(new HermesDailyFarmBriefIsolatedPostgresReadRepository(executor()), MAIN_DATE);
-  const response = await serveHermesDailyFarmBriefLatestRead({ request, dependencies: createHermesDailyFarmBriefLatestServerDependencies({ authenticationProvider: provider, actorDirectory: directory, readRepository: read, clock: () => "2026-07-13T02:30:00.000Z" }) });
+  const response = await serveHermesDailyFarmBriefLatestRead({ request, dependencies: createHermesDailyFarmBriefLatestServerDependencies({ authenticationProvider: provider, actorDirectory: directory, readRepository: read, clock: () => at(MAIN_DATE, 150) }) });
   return { response, body: await response.json(), reads: read.readCount };
 }
 
@@ -94,10 +106,10 @@ export async function runDay116Scenario() {
   for (const target of ["farmos_core_local", "farmos_core_restore_test", "postgres", "farmos_core_production"]) assert.equal(classifyHermesDailyFarmBriefDay114DatabaseTarget(target).allowed, false);
   assert.notEqual(classifyHermesDailyFarmBriefDatabaseTarget(HERMES_DAILY_FARM_BRIEF_DAY114_DATABASE), "production_candidate");
   assert(await isolationEvidence());
-  const unauthorized = orchestrateHermesDailyFarmBriefGeneration({ requestCreation: { triggerType: "manual", requestedAt: "2026-07-12T16:00:00.000Z", actorRole: "general_staff", authorizationVerified: false, serverForceRegenerationAllowed: false, requestIdFactory: () => "day116-unauthorized" }, existingState: null });
+  const unauthorized = orchestrateHermesDailyFarmBriefGeneration({ requestCreation: { triggerType: "manual", requestedAt: at(MAIN_DATE, 0), actorRole: "general_staff", authorizationVerified: false, serverForceRegenerationAllowed: false, requestIdFactory: () => "day116-unauthorized" }, existingState: null });
   assert.equal(unauthorized?.decision, "reject_unauthorized");
 
-  const firstFixture = runInput({ suffix: "main-v1", date: MAIN_DATE, requestedAt: "2026-07-12T16:00:00.000Z", executionRequestedAt: "2026-07-12T16:05:00.000Z", generatedAt: "2026-07-12T16:10:00.000Z", executedAt: "2026-07-12T16:11:00.000Z", persistenceAt: "2026-07-12T16:12:00.000Z", latestAt: "2026-07-12T18:00:00.000Z", expected: null });
+  const firstFixture = runInput({ suffix: "main-v1", date: MAIN_DATE, requestedAt: at(MAIN_DATE, 0), executionRequestedAt: at(MAIN_DATE, 5), generatedAt: at(MAIN_DATE, 10), executedAt: at(MAIN_DATE, 11), persistenceAt: at(MAIN_DATE, 12), latestAt: at(MAIN_DATE, 120), expected: null });
   for (const target of ["farmos_core_local", "farmos_core_restore_test", "postgres", "farmos_core_production"]) {
     let probeCalls = 0;
     const rejected = await runHermesDailyFarmBriefManualPersistReadE2E({ ...firstFixture.input, databaseTarget: target, verifyIsolation: async () => { probeCalls += 1; return null; } });
@@ -108,20 +120,20 @@ export async function runDay116Scenario() {
   assert(["completed", "reused"].includes(first.status)); assert.equal(first.stage, "completed"); assert.equal(first.generation_decision, "generate"); assert.equal(first.execution_status, "completed"); assert.equal(first.http_status, 200); assert.equal(first.latest_display_state, "current"); assert.equal(first.latest_role, "administrator"); assert.deepEqual(first.call_counts, { integration: 1, scope: 1, projection: 1, persistence_transaction: 1, repository_read: 1 });
   const serialized = JSON.stringify(first); for (const forbidden of ["day116-daily-brief", "day116-execution-main-v1", "day116-snapshot-main-v1", "day116-field-main-v1", PRINCIPAL, HERMES_DAILY_FARM_BRIEF_DAY114_DATABASE]) assert(!serialized.includes(forbidden));
   assert(!Object.hasOwn(first, "record_id")); assert(!Object.hasOwn(first, "snapshot")); assert(!Object.hasOwn(first, "scope_index")); assert(!Object.hasOwn(first, "principal_ref"));
-  const afterFirst = await canonicalEvidence(MAIN_DATE); assert.equal(afterFirst.canonical_count, 1); assert([1, 2].includes(afterFirst.version_count));
-  const replayFixture = runInput({ suffix: "main-v1", date: MAIN_DATE, requestedAt: "2026-07-12T16:00:00.000Z", executionRequestedAt: "2026-07-12T16:05:00.000Z", generatedAt: "2026-07-12T16:10:00.000Z", executedAt: "2026-07-12T16:11:00.000Z", persistenceAt: "2026-07-12T16:12:00.000Z", latestAt: "2026-07-12T18:00:00.000Z", expected: null });
+  const afterFirst = await canonicalEvidence(MAIN_DATE); assert.equal(afterFirst.canonical_count, 1); assert.equal(afterFirst.version_count, 1);
+  const replayFixture = runInput({ suffix: "main-v1", date: MAIN_DATE, requestedAt: at(MAIN_DATE, 0), executionRequestedAt: at(MAIN_DATE, 5), generatedAt: at(MAIN_DATE, 10), executedAt: at(MAIN_DATE, 11), persistenceAt: at(MAIN_DATE, 12), latestAt: at(MAIN_DATE, 120), expected: null });
   const replay = await runHermesDailyFarmBriefManualPersistReadE2E(replayFixture.input); assert.equal(replay.status, "reused");
   assert.deepEqual(await canonicalEvidence(MAIN_DATE), afterFirst);
 
-  const rollbackV1Fixture = runInput({ suffix: "rollback-v1", date: ROLLBACK_DATE, requestedAt: "2026-07-11T16:00:00.000Z", executionRequestedAt: "2026-07-11T16:05:00.000Z", generatedAt: "2026-07-11T16:10:00.000Z", executedAt: "2026-07-11T16:11:00.000Z", persistenceAt: "2026-07-11T16:12:00.000Z", latestAt: "2026-07-11T18:00:00.000Z", expected: null });
+  const rollbackV1Fixture = runInput({ suffix: "rollback-v1", date: ROLLBACK_DATE, requestedAt: at(ROLLBACK_DATE, 0), executionRequestedAt: at(ROLLBACK_DATE, 5), generatedAt: at(ROLLBACK_DATE, 10), executedAt: at(ROLLBACK_DATE, 11), persistenceAt: at(ROLLBACK_DATE, 12), latestAt: at(ROLLBACK_DATE, 120), expected: null });
   const rollbackV1 = await runHermesDailyFarmBriefManualPersistReadE2E(rollbackV1Fixture.input); assert(["completed", "reused"].includes(rollbackV1.status));
-  const rollbackV2Fixture = runInput({ suffix: "rollback-v2", date: ROLLBACK_DATE, requestedAt: "2026-07-11T17:00:00.000Z", executionRequestedAt: "2026-07-11T17:05:00.000Z", generatedAt: "2026-07-11T17:10:00.000Z", executedAt: "2026-07-11T17:11:00.000Z", persistenceAt: "2026-07-11T17:12:00.000Z", latestAt: "2026-07-11T18:00:00.000Z", expected: 1, force: true, existing: existingCompleted(ROLLBACK_DATE, "2026-07-11T16:10:00.000Z"), write: new HermesDailyFarmBriefIsolatedPostgresWriteRepository(executor(), true) });
+  const rollbackV2Fixture = runInput({ suffix: "rollback-v2", date: ROLLBACK_DATE, requestedAt: at(ROLLBACK_DATE, 60), executionRequestedAt: at(ROLLBACK_DATE, 65), generatedAt: at(ROLLBACK_DATE, 70), executedAt: at(ROLLBACK_DATE, 71), persistenceAt: at(ROLLBACK_DATE, 72), latestAt: at(ROLLBACK_DATE, 120), expected: 1, force: true, existing: existingCompleted(ROLLBACK_DATE, at(ROLLBACK_DATE, 10)), write: new HermesDailyFarmBriefIsolatedPostgresWriteRepository(executor(), true) });
   const rollback = await runHermesDailyFarmBriefManualPersistReadE2E(rollbackV2Fixture.input); assert.equal(rollback.status, "failed_closed"); assert.equal(rollback.stage, "persistence"); assert.deepEqual(await canonicalEvidence(ROLLBACK_DATE), { canonical_count: 1, version_count: 1, receipt_count: 1 });
   const rollbackRead = new HermesDailyFarmBriefBusinessDateBoundedReadRepository(new HermesDailyFarmBriefIsolatedPostgresReadRepository(executor()), ROLLBACK_DATE);
-  const rollbackLatest = await serveHermesDailyFarmBriefLatestRead({ request: new Request(API_URL), dependencies: createHermesDailyFarmBriefLatestServerDependencies({ authenticationProvider: new HermesDailyFarmBriefFixtureAuthenticationProvider(authentication()), actorDirectory: new HermesDailyFarmBriefFixtureActorDirectory({ [PRINCIPAL]: actor() }), readRepository: rollbackRead, clock: () => "2026-07-12T02:30:00.000Z" }) });
+  const rollbackLatest = await serveHermesDailyFarmBriefLatestRead({ request: new Request(API_URL), dependencies: createHermesDailyFarmBriefLatestServerDependencies({ authenticationProvider: new HermesDailyFarmBriefFixtureAuthenticationProvider(authentication()), actorDirectory: new HermesDailyFarmBriefFixtureActorDirectory({ [PRINCIPAL]: actor() }), readRepository: rollbackRead, clock: () => at(ROLLBACK_DATE, 150) }) });
   assert.equal(rollbackLatest.status, 200); assert.equal(parseHermesDailyFarmBriefLatestApiResponse(await rollbackLatest.json())?.latest?.display_state, "current");
 
-  const secondFixture = runInput({ suffix: "main-v2", date: MAIN_DATE, requestedAt: "2026-07-12T17:00:00.000Z", executionRequestedAt: "2026-07-12T17:05:00.000Z", generatedAt: "2026-07-12T17:10:00.000Z", executedAt: "2026-07-12T17:11:00.000Z", persistenceAt: "2026-07-12T17:12:00.000Z", latestAt: "2026-07-12T18:00:00.000Z", expected: 1, force: true, existing: existingCompleted(MAIN_DATE, "2026-07-12T16:10:00.000Z") });
+  const secondFixture = runInput({ suffix: "main-v2", date: MAIN_DATE, requestedAt: at(MAIN_DATE, 60), executionRequestedAt: at(MAIN_DATE, 65), generatedAt: at(MAIN_DATE, 70), executedAt: at(MAIN_DATE, 71), persistenceAt: at(MAIN_DATE, 72), latestAt: at(MAIN_DATE, 120), expected: 1, force: true, existing: existingCompleted(MAIN_DATE, at(MAIN_DATE, 10)) });
   const second = await runHermesDailyFarmBriefManualPersistReadE2E(secondFixture.input); assert(["completed", "reused"].includes(second.status)); assert.deepEqual(await canonicalEvidence(MAIN_DATE), { canonical_count: 1, version_count: 2, receipt_count: 2 });
 
   const unauthenticated = await negativeHttp(new HermesDailyFarmBriefDenyByDefaultAuthenticationProvider(), new HermesDailyFarmBriefFixtureActorDirectory({})); assert.equal(unauthenticated.response.status, 401); assert.equal(unauthenticated.reads, 0);
@@ -131,7 +143,7 @@ export async function runDay116Scenario() {
   const query = await negativeHttp(new HermesDailyFarmBriefDenyByDefaultAuthenticationProvider(), new HermesDailyFarmBriefFixtureActorDirectory({}), new Request(`${API_URL}?role=administrator`)); assert.equal(query.response.status, 400); assert.equal(query.reads, 0);
   const post = await negativeHttp(new HermesDailyFarmBriefDenyByDefaultAuthenticationProvider(), new HermesDailyFarmBriefFixtureActorDirectory({}), new Request(API_URL, { method: "POST" })); assert.equal(post.response.status, 405); assert.equal(post.reads, 0);
   const invalidRead = new HermesDailyFarmBriefFixtureReadRepository({ schema_version: "invalid", records: [] });
-  const invalidResponse = await serveHermesDailyFarmBriefLatestRead({ request: new Request(API_URL), dependencies: createHermesDailyFarmBriefLatestServerDependencies({ authenticationProvider: new HermesDailyFarmBriefFixtureAuthenticationProvider(authentication()), actorDirectory: new HermesDailyFarmBriefFixtureActorDirectory({ [PRINCIPAL]: actor() }), readRepository: invalidRead, clock: () => "2026-07-13T02:30:00.000Z" }) }); assert.equal(invalidResponse.status, 500);
+  const invalidResponse = await serveHermesDailyFarmBriefLatestRead({ request: new Request(API_URL), dependencies: createHermesDailyFarmBriefLatestServerDependencies({ authenticationProvider: new HermesDailyFarmBriefFixtureAuthenticationProvider(authentication()), actorDirectory: new HermesDailyFarmBriefFixtureActorDirectory({ [PRINCIPAL]: actor() }), readRepository: invalidRead, clock: () => at(MAIN_DATE, 150) }) }); assert.equal(invalidResponse.status, 500);
   assert.equal(HERMES_DAILY_FARM_BRIEF_DAY116_SAFETY.production_database_connection_performed, false); assert.equal(HERMES_DAILY_FARM_BRIEF_DAY116_SAFETY.retry_performed, false);
   return { database_target: "isolated_day114_test", manual_request_authorized: true, generation_decision: "generate", execution_status: "completed", persistence_status: second.persistence_status, authenticated_http_status: second.http_status, display_state: second.latest_display_state, role: second.latest_role, visible_scope_count: second.visible_scope_count, rollback_verified: true, canonical_uniqueness: true, retry_count: 0, production_database_connection_performed: false, production_database_write_performed: false, secret_exposed: false, day117_handoff: "farming_application_daily_brief_display" };
 }

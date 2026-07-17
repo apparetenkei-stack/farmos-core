@@ -22,6 +22,7 @@ import {
 import {
   createHermesDailyFarmBriefPilotIdentityBoundary,
 } from "./hermes_daily_farm_brief_pilot_authentication";
+import { createHermesDailyFarmBriefProductionRepositoryBundle } from "./hermes_daily_farm_brief_production_repository_bundle";
 
 export function createHermesDailyFarmBriefLatestServerDependencies(input: {
   authenticationProvider: HermesDailyFarmBriefServerAuthenticationProvider;
@@ -69,9 +70,14 @@ export function createHermesDailyFarmBriefPilotLatestServerBoundary(input: {
   executor?: HermesDailyFarmBriefProductionReadExecutor;
 }) {
   const identity = createHermesDailyFarmBriefPilotIdentityBoundary(input.environment);
-  const repository = identity.state === "ready"
-    ? createHermesDailyFarmBriefProductionReadRepository(input.environment, input.executor)
-    : { state: "denied" as const, repository: new HermesDailyFarmBriefDenyByDefaultReadRepository(), config: null };
+  const repositoryBundle = identity.state === "ready" && input.executor === undefined
+    ? createHermesDailyFarmBriefProductionRepositoryBundle(input.environment)
+    : null;
+  const repository = repositoryBundle !== null
+    ? { state: repositoryBundle.state, repository: repositoryBundle.readRepository }
+    : identity.state === "ready"
+      ? createHermesDailyFarmBriefProductionReadRepository(input.environment, input.executor)
+      : { state: "denied" as const, repository: new HermesDailyFarmBriefDenyByDefaultReadRepository(), config: null };
   const ready = identity.state === "ready" && repository.state === "ready";
   const authenticationProvider = ready ? identity.authenticationProvider : new HermesDailyFarmBriefDenyByDefaultAuthenticationProvider();
   const actorDirectory = ready ? identity.actorDirectory : new HermesDailyFarmBriefDenyByDefaultActorDirectory();
