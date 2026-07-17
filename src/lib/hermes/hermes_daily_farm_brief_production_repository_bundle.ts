@@ -16,6 +16,11 @@ import {
   type HermesDailyFarmBriefProductionReadRepositoryConfig,
 } from "../../../scripts/hermes/brief_runtime/hermes_daily_farm_brief_production_readiness_contract";
 import {
+  classifyHermesDailyFarmBriefProductionWriteReadiness,
+  type HermesDailyFarmBriefProductionWriteReadinessResult,
+  type HermesDailyFarmBriefWriteReadinessEvidence,
+} from "../../../scripts/hermes/brief_runtime/hermes_daily_farm_brief_production_write_readiness_contract";
+import {
   HERMES_DAILY_FARM_BRIEF_PRODUCTION_READ_QUERY,
   HermesDailyFarmBriefProductionPostgresReadRepository,
   createHermesDailyFarmBriefProductionPoolSslConfig,
@@ -46,6 +51,7 @@ export type HermesDailyFarmBriefRepositoryIdentityEvidence = {
 
 export type HermesDailyFarmBriefProductionWriteExecutor = {
   executeCanonicalTransition(command: HermesDailyFarmBriefPersistenceCommand): Promise<unknown>;
+  diagnoseWriteReadiness?: (input: { targetDate: string; expectedCurrentVersion: number | null }) => Promise<HermesDailyFarmBriefWriteReadinessEvidence>;
 };
 
 export type HermesDailyFarmBriefProductionRepositoryExecutor =
@@ -56,6 +62,7 @@ export type HermesDailyFarmBriefRepositoryBundle = {
   write_state: "enabled" | "disabled";
   readRepository: HermesDailyFarmBriefPersistedReadRepository & { readCount?: number };
   writeRepository: HermesDailyFarmBriefPersistenceWriteRepository;
+  diagnoseWriteReadiness: (input: { command: unknown; targetDate: string; expectedCurrentVersion: number | null }) => Promise<HermesDailyFarmBriefProductionWriteReadinessResult>;
 };
 
 const bundleTokens = new WeakMap<object, symbol>();
@@ -142,6 +149,73 @@ class SharedPostgresExecutor implements HermesDailyFarmBriefProductionRepository
       throw error;
     } finally { client?.release(); }
   }
+
+  async diagnoseWriteReadiness(input: { targetDate: string; expectedCurrentVersion: number | null }): Promise<HermesDailyFarmBriefWriteReadinessEvidence> {
+    let client: PoolClient | null = null;
+    let rollbackVerified = false;
+    try {
+      client = await this.pool.connect();
+      await client.query("begin isolation level read committed read write");
+      await this.settings(client);
+      const identity = await client.query<{ transaction_read_only: string }>("select current_setting('transaction_read_only') as transaction_read_only");
+      const transactionReadOnly = identity.rows[0]?.transaction_read_only !== "off";
+      const objects = await client.query<{
+        records_exists: boolean;
+        commands_exists: boolean;
+        function_exists: boolean;
+        function_signature_matches: boolean;
+        execute_privilege: boolean;
+        relation_privileges: boolean;
+      }>(`
+        select
+          to_regclass('ai.daily_farm_brief_records') is not null as records_exists,
+          to_regclass('ai.daily_farm_brief_persistence_commands') is not null as commands_exists,
+          exists (
+            select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+            where n.nspname = 'ai' and p.proname = 'persist_daily_farm_brief_command'
+          ) as function_exists,
+          coalesce(to_regprocedure('ai.persist_daily_farm_brief_command(jsonb,text,text,boolean)') is not null
+            and pg_get_function_result(to_regprocedure('ai.persist_daily_farm_brief_command(jsonb,text,text,boolean)')) = 'jsonb', false) as function_signature_matches,
+          coalesce(has_function_privilege(current_user, to_regprocedure('ai.persist_daily_farm_brief_command(jsonb,text,text,boolean)'), 'EXECUTE'), false) as execute_privilege,
+          coalesce(has_table_privilege(current_user, to_regclass('ai.daily_farm_brief_records'), 'SELECT,INSERT,UPDATE'), false)
+            and coalesce(has_table_privilege(current_user, to_regclass('ai.daily_farm_brief_persistence_commands'), 'SELECT,INSERT'), false) as relation_privileges
+      `);
+      const row = objects.rows[0];
+      let canonicalRecordCount = 0;
+      let expectedVersionMatches = input.expectedCurrentVersion === null;
+      if (row?.records_exists) {
+        const canonical = await client.query<{ canonical_count: string; expected_matches: boolean }>(`
+          select count(*)::text as canonical_count,
+            case when $2::integer is null then count(*) = 0
+                 else count(*) = 1 and bool_and(version = $2::integer) end as expected_matches
+          from ai.daily_farm_brief_records
+          where record_kind = 'projectable_brief' and business_date = $1::date and record_status = 'canonical'
+        `, [input.targetDate, input.expectedCurrentVersion]);
+        canonicalRecordCount = Number(canonical.rows[0]?.canonical_count ?? "0");
+        expectedVersionMatches = canonical.rows[0]?.expected_matches === true;
+      }
+      await client.query("rollback");
+      rollbackVerified = true;
+      return {
+        connection_available: true,
+        transaction_read_only: transactionReadOnly,
+        records_relation_exists: row?.records_exists === true,
+        commands_relation_exists: row?.commands_exists === true,
+        function_exists: row?.function_exists === true,
+        function_signature_matches: row?.function_signature_matches === true,
+        execute_privilege: row?.execute_privilege === true,
+        relation_privileges: row?.relation_privileges === true,
+        canonical_record_count: Number.isSafeInteger(canonicalRecordCount) ? canonicalRecordCount : 0,
+        expected_version_matches: expectedVersionMatches,
+        rollback_verified: true,
+      };
+    } finally {
+      if (client !== null && !rollbackVerified) {
+        try { await client.query("rollback"); } catch { /* fail closed */ }
+      }
+      client?.release();
+    }
+  }
 }
 
 function registerBundle(input: HermesDailyFarmBriefRepositoryBundle, token: symbol, writeKind: "fixture" | "database"): HermesDailyFarmBriefRepositoryBundle {
@@ -153,7 +227,7 @@ function registerBundle(input: HermesDailyFarmBriefRepositoryBundle, token: symb
 }
 
 export function createHermesDailyFarmBriefFixtureRepositoryBundle(repository: HermesDailyFarmBriefPersistedReadRepository & HermesDailyFarmBriefPersistenceWriteRepository & { readCount?: number }): HermesDailyFarmBriefRepositoryBundle {
-  return registerBundle({ state: "ready", write_state: "enabled", readRepository: repository, writeRepository: repository }, Symbol("daily-brief-fixture-bundle"), "fixture");
+  return registerBundle({ state: "ready", write_state: "enabled", readRepository: repository, writeRepository: repository, diagnoseWriteReadiness: async (input) => classifyHermesDailyFarmBriefProductionWriteReadiness({ ...input, evidence: { connection_available: true, transaction_read_only: false, records_relation_exists: true, commands_relation_exists: true, function_exists: true, function_signature_matches: true, execute_privilege: true, relation_privileges: true, canonical_record_count: 0, expected_version_matches: input.expectedCurrentVersion === null, rollback_verified: true } }) }, Symbol("daily-brief-fixture-bundle"), "fixture");
 }
 
 export function createHermesDailyFarmBriefProductionRepositoryBundle(environment: Readonly<Record<string, string | undefined>>, injectedExecutor?: HermesDailyFarmBriefProductionRepositoryExecutor): HermesDailyFarmBriefRepositoryBundle {
@@ -164,14 +238,23 @@ export function createHermesDailyFarmBriefProductionRepositoryBundle(environment
   const relationOverridePresent = environment[HERMES_DAILY_FARM_BRIEF_RELATION_OVERRIDE_ENV.records] !== undefined || environment[HERMES_DAILY_FARM_BRIEF_RELATION_OVERRIDE_ENV.commands] !== undefined;
   if (config === null || !host || !user || !credential || relationOverridePresent) {
     const deniedRead = { readCount: 0, async readRecordCandidates() { this.readCount += 1; return { schema_version: "hermes.daily_farm_brief.persisted_repository_result.v1", status: "unavailable", transaction_read_only: true, records: [] }; } };
-    return registerBundle({ state: "denied", write_state: "disabled", readRepository: deniedRead, writeRepository: new HermesDailyFarmBriefDenyByDefaultPersistenceRepository() }, Symbol("daily-brief-denied-bundle"), "database");
+    return registerBundle({ state: "denied", write_state: "disabled", readRepository: deniedRead, writeRepository: new HermesDailyFarmBriefDenyByDefaultPersistenceRepository(), diagnoseWriteReadiness: async (input) => classifyHermesDailyFarmBriefProductionWriteReadiness({ ...input, connectionFailure: true }) }, Symbol("daily-brief-denied-bundle"), "database");
   }
   const executor = injectedExecutor ?? new SharedPostgresExecutor(config, { host, user, credential });
   const token = Symbol("daily-brief-production-bundle");
   const readRepository = new HermesDailyFarmBriefProductionPostgresReadRepository(executor);
   const writeEnabled = environment[HERMES_DAILY_FARM_BRIEF_PRODUCTION_WRITE_ENABLED_ENV] === "true";
   const writeRepository = writeEnabled ? new HermesDailyFarmBriefProductionPostgresWriteRepository(executor) : new HermesDailyFarmBriefDenyByDefaultPersistenceRepository();
-  return registerBundle({ state: "ready", write_state: writeEnabled ? "enabled" : "disabled", readRepository, writeRepository }, token, "database");
+  const diagnoseWriteReadiness = async (input: { command: unknown; targetDate: string; expectedCurrentVersion: number | null }) => {
+    if (executor.diagnoseWriteReadiness === undefined) return classifyHermesDailyFarmBriefProductionWriteReadiness({ ...input, connectionFailure: true });
+    try {
+      const evidence = await executor.diagnoseWriteReadiness({ targetDate: input.targetDate, expectedCurrentVersion: input.expectedCurrentVersion });
+      return classifyHermesDailyFarmBriefProductionWriteReadiness({ ...input, evidence });
+    } catch {
+      return classifyHermesDailyFarmBriefProductionWriteReadiness({ ...input, connectionFailure: true });
+    }
+  };
+  return registerBundle({ state: "ready", write_state: writeEnabled ? "enabled" : "disabled", readRepository, writeRepository, diagnoseWriteReadiness }, token, "database");
 }
 
 export function inspectHermesDailyFarmBriefRepositoryBundle(bundle: unknown): HermesDailyFarmBriefRepositoryIdentityEvidence {

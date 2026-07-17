@@ -283,6 +283,8 @@
     "test-hermes-daily-farm-brief-source-coverage-contract": "tsx scripts/hermes/test_hermes_daily_farm_brief_source_coverage_contract.ts",
     "test-hermes-daily-farm-brief-authorized-real-data-persistence": "tsx scripts/hermes/test_hermes_daily_farm_brief_authorized_real_data_persistence.ts",
     "test-hermes-daily-farm-brief-production-repository-bundle": "tsx scripts/hermes/test_hermes_daily_farm_brief_production_repository_bundle.ts",
+    "test-hermes-daily-farm-brief-production-write-readiness": "tsx scripts/hermes/test_hermes_daily_farm_brief_production_write_readiness.ts",
+    "run-hermes-daily-farm-brief-production-write-readiness-diagnostic": "node --env-file=.env.local --import tsx scripts/hermes/run_hermes_daily_farm_brief_production_write_readiness_diagnostic.ts",
     "run-hermes-daily-farm-brief-authorized-real-data-persistence": "tsx scripts/hermes/run_hermes_daily_farm_brief_authorized_real_data_persistence.ts",
     "test-hermes-field-crop-cycle-note-boundary": "tsx scripts/hermes/test_hermes_field_crop_cycle_note_boundary.ts",
     "test-hermes-inventory-work-log-suggestion-boundary": "tsx scripts/hermes/test_hermes_inventory_work_log_suggestion_boundary.ts",

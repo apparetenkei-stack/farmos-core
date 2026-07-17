@@ -12,8 +12,11 @@ import {
 } from "./brief_runtime/hermes_daily_farm_brief_persistence_write_boundary";
 import type { HermesDailyFarmBriefAuthenticatedActorContext } from "./brief_runtime/hermes_daily_farm_brief_latest_api_contract";
 import {
+  HERMES_DAILY_FARM_BRIEF_PRODUCTION_WRITE_ENABLED_ENV,
   createHermesDailyFarmBriefFixtureRepositoryBundle,
+  createHermesDailyFarmBriefProductionRepositoryBundle,
   type HermesDailyFarmBriefRepositoryBundle,
+  type HermesDailyFarmBriefProductionRepositoryExecutor,
 } from "../../src/lib/hermes/hermes_daily_farm_brief_production_repository_bundle";
 
 const TARGET_DATE = "2026-07-17" as const;
@@ -83,6 +86,23 @@ const mismatchedBundle = { ...createHermesDailyFarmBriefFixtureRepositoryBundle(
 const mismatch = await runHermesDailyFarmBriefAuthorizedRealDataPersistence(input(mismatchRepository, { repositoryBundle: mismatchedBundle }));
 assert.equal(mismatch.target_repository_identity_check, "not_matched");
 assert.equal(mismatchRepository.transactionCallCount, 0);
+
+let blockedProductionWrites = 0;
+const blockedExecutor: HermesDailyFarmBriefProductionRepositoryExecutor = {
+  async executeReadOnly() { return { database_matches: true, user_present: true, transaction_read_only: true, rows: [] }; },
+  async executeCanonicalTransition() { blockedProductionWrites += 1; throw new Error("not expected"); },
+  async diagnoseWriteReadiness() { return { connection_available: true, transaction_read_only: false, records_relation_exists: true, commands_relation_exists: true, function_exists: true, function_signature_matches: true, execute_privilege: false, relation_privileges: false, canonical_record_count: 0, expected_version_matches: true, rollback_verified: true }; },
+};
+const blockedProductionBundle = createHermesDailyFarmBriefProductionRepositoryBundle({
+  HERMES_DAILY_BRIEF_DATABASE_ENABLED: "true", HERMES_DAILY_BRIEF_DATABASE_HOST: "db.internal", HERMES_DAILY_BRIEF_DATABASE_PORT: "5432", HERMES_DAILY_BRIEF_DATABASE_NAME: "farmos_core_production", HERMES_DAILY_BRIEF_DATABASE_USER: "hermes_reader", HERMES_DAILY_BRIEF_DATABASE_PASSWORD: "test-value-c", HERMES_DAILY_BRIEF_DATABASE_SSL_MODE: "verify-full", HERMES_DAILY_BRIEF_DATABASE_CONNECT_TIMEOUT_MS: "1000", HERMES_DAILY_BRIEF_DATABASE_STATEMENT_TIMEOUT_MS: "3000", HERMES_DAILY_BRIEF_DATABASE_LOCK_TIMEOUT_MS: "500", [HERMES_DAILY_FARM_BRIEF_PRODUCTION_WRITE_ENABLED_ENV]: "true",
+}, blockedExecutor);
+const blockedProduction = await runHermesDailyFarmBriefAuthorizedRealDataPersistence(input(new HermesDailyFarmBriefFixturePersistenceRepository(), { repositoryBundle: blockedProductionBundle }));
+assert.equal(blockedProduction.result, "failed_closed");
+assert.equal(blockedProduction.persistence_failure_code, "execute_privilege_missing");
+assert.equal(blockedProduction.call_counts.persistence_transaction, 0);
+assert.equal(blockedProduction.database_write_performed, false);
+assert.equal(blockedProduction.transaction_committed, false);
+assert.equal(blockedProductionWrites, 0);
 
 let datePrepareCalls = 0;
 const dateMismatch = await runHermesDailyFarmBriefAuthorizedRealDataPersistence(input(new HermesDailyFarmBriefFixturePersistenceRepository(), { generatedAt: "2026-07-18T01:00:00.000Z", prepare: async () => { datePrepareCalls += 1; return null; } }));

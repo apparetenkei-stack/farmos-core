@@ -30,6 +30,7 @@ import {
   persistHermesDailyFarmBrief,
 } from "./hermes_daily_farm_brief_persistence_write_boundary";
 import type { HermesDailyFarmBriefSourceSelectionCoverage } from "./hermes_daily_farm_brief_source_coverage_contract";
+import type { HermesDailyFarmBriefWriteReadinessClassification } from "./hermes_daily_farm_brief_production_write_readiness_contract";
 import {
   inspectHermesDailyFarmBriefRepositoryBundle,
   type HermesDailyFarmBriefRepositoryBundle,
@@ -96,6 +97,8 @@ export type HermesDailyFarmBriefAuthorizedRealDataPersistenceResult = {
     repository_read: 0 | 1;
   };
   database_write_performed: boolean;
+  transaction_committed: boolean;
+  persistence_failure_code: HermesDailyFarmBriefWriteReadinessClassification | null;
   safety: typeof HERMES_DAILY_FARM_BRIEF_REAL_DATA_PERSISTENCE_SAFETY;
 };
 
@@ -185,9 +188,33 @@ function base(input: RunInput, partial: Partial<HermesDailyFarmBriefAuthorizedRe
     general_staff_counts_redacted: null,
     call_counts: { operational_read: 0, memory_read: 0, scope_build: 0, role_projection: 0, persistence_transaction: 0, repository_read: 0 },
     database_write_performed: false,
+    transaction_committed: false,
+    persistence_failure_code: null,
     safety: HERMES_DAILY_FARM_BRIEF_REAL_DATA_PERSISTENCE_SAFETY,
     ...partial,
   };
+}
+
+export function buildHermesDailyFarmBriefAuthorizedRealDataPersistenceCommand(input: {
+  prepared: HermesDailyFarmBriefPreparedRealDataPersistence;
+  targetDate: "2026-07-17";
+  generatedAt: string;
+  expectedCurrentVersion: number | null;
+}) {
+  return buildHermesDailyFarmBriefProjectablePersistenceCommand({
+    executionResult: input.prepared.execution_result,
+    latestSource: input.prepared.latest_source,
+    expectedCurrentVersion: input.expectedCurrentVersion,
+    requestedAt: input.generatedAt,
+    commandIdFactory: () => `day123-real-command-${input.targetDate}`,
+    recordIdFactory: (date) => `daily-farm-brief-${date}-projectable`,
+  });
+}
+
+function safePersistenceFailureCode(error: string | null): HermesDailyFarmBriefWriteReadinessClassification {
+  if (error === "version_conflict" || error === "concurrency_conflict" || error === "invalid_existing_chain" || error === "idempotency_conflict" || error === "source_execution_conflict") return "existing_record_conflict";
+  if (error === "invalid_command" || error === "invalid_record" || error === "future_timestamp" || error === "invalid_repository_result") return "command_invalid";
+  return "unknown_failure";
 }
 
 function actorValid(actor: HermesDailyFarmBriefAuthenticatedActorContext, role: "administrator" | "general_staff"): boolean {
@@ -215,15 +242,19 @@ export async function runHermesDailyFarmBriefAuthorizedRealDataPersistence(input
   });
   if (input.mode === "dry_run" || !enabled || !matched) return preflight;
   if (!actorValid(input.administratorActor, "administrator") || !actorValid(input.generalStaffActor, "general_staff")) return { ...preflight, result: "rejected", stage: "configuration" };
-  const command = buildHermesDailyFarmBriefProjectablePersistenceCommand({ executionResult: prepared.execution_result, latestSource: prepared.latest_source, expectedCurrentVersion: input.expectedCurrentVersion, requestedAt: input.generatedAt, commandIdFactory: () => `day123-real-command-${input.targetDate}`, recordIdFactory: (date) => `daily-farm-brief-${date}-projectable` });
-  if (command === null) return { ...preflight, result: "failed_closed", stage: "persistence" };
+  const command = buildHermesDailyFarmBriefAuthorizedRealDataPersistenceCommand({ prepared, targetDate: input.targetDate, generatedAt: input.generatedAt, expectedCurrentVersion: input.expectedCurrentVersion });
+  if (command === null) return { ...preflight, result: "failed_closed", stage: "persistence", persistence_failure_code: "command_invalid" };
+  if (identity.write_kind === "database") {
+    const readiness = await input.repositoryBundle.diagnoseWriteReadiness({ command, targetDate: input.targetDate, expectedCurrentVersion: input.expectedCurrentVersion });
+    if (readiness.classification !== "ready") return { ...preflight, result: "failed_closed", stage: "persistence", persistence_failure_code: readiness.classification };
+  }
   const persisted = await persistHermesDailyFarmBrief({ command, repository: input.repositoryBundle.writeRepository, clock: () => input.generatedAt });
   const wroteDatabase = persisted.status === "persisted" && identity.write_kind === "database";
-  if (persisted.status !== "persisted" && persisted.status !== "reused") return { ...preflight, result: persisted.status === "rejected" ? "rejected" : "failed_closed", stage: "persistence", call_counts: { ...preflight.call_counts, persistence_transaction: persisted.repository_transaction_call_count }, database_write_performed: wroteDatabase };
+  if (persisted.status !== "persisted" && persisted.status !== "reused") return { ...preflight, result: persisted.status === "rejected" ? "rejected" : "failed_closed", stage: "persistence", call_counts: { ...preflight.call_counts, persistence_transaction: persisted.repository_transaction_call_count }, database_write_performed: wroteDatabase, transaction_committed: false, persistence_failure_code: safePersistenceFailureCode(persisted.error_code) };
   const readCountBefore = input.repositoryBundle.readRepository.readCount ?? 0;
   const selected = await readHermesDailyFarmBriefPersistedLatestSource({ repository: input.repositoryBundle.readRepository, requestedBusinessDate: input.targetDate, now: input.generatedAt });
   const repositoryReads = (input.repositoryBundle.readRepository.readCount ?? readCountBefore) - readCountBefore === 1 ? 1 : 0;
-  if (selected.status !== "selected" || selected.source?.source_kind !== "projectable_brief" || selected.source.business_date !== input.targetDate) return { ...preflight, result: "failed_closed", stage: "read_after_write", call_counts: { ...preflight.call_counts, persistence_transaction: 1, repository_read: repositoryReads }, database_write_performed: wroteDatabase };
+  if (selected.status !== "selected" || selected.source?.source_kind !== "projectable_brief" || selected.source.business_date !== input.targetDate) return { ...preflight, result: "failed_closed", stage: "read_after_write", call_counts: { ...preflight.call_counts, persistence_transaction: 1, repository_read: repositoryReads }, database_write_performed: wroteDatabase, transaction_committed: persisted.safety.transaction_committed };
   const authentication = { schema_version: "hermes.daily_farm_brief.authentication_result.v1", status: "authenticated", principal_ref: input.administratorActor.principal_ref } as const;
   const responseFor = (actor: HermesDailyFarmBriefAuthenticatedActorContext) => serveHermesDailyFarmBriefLatestDisplay({ request: new Request("http://localhost/api/hermes/daily-farm-brief/latest-display"), dependencies: { authenticate: async () => ({ ...authentication, principal_ref: actor.principal_ref }), resolveActorContext: async () => actor, readLatestSource: async () => selected.source, clock: () => input.generatedAt } });
   const administratorResponse = await responseFor(input.administratorActor);
@@ -235,7 +266,7 @@ export async function runHermesDailyFarmBriefAuthorizedRealDataPersistence(input
   const staffRedacted = generalStaffDisplay !== null && generalStaffDisplay.source_disclosure.every((source) => source.source_record_count === null && source.input_record_count === null && source.selected_fact_count === null && source.attention_count === null && source.available_but_no_selected_facts === null && source.available_but_no_attention === null);
   const safeSerialized = JSON.stringify({ administratorBody, generalStaffBody });
   const exposed = [input.administratorActor.principal_ref, input.generalStaffActor.principal_ref, command.record.record_id, command.source_execution_reference].some((value) => safeSerialized.includes(value));
-  if (administratorResponse.status !== 200 || administratorDisplay?.display_state !== "current" || administratorDisplay.business_date !== input.targetDate || generalStaffResponse.status !== 200 || !staffRedacted || exposed) return { ...preflight, result: "failed_closed", stage: "read_after_write", call_counts: { ...preflight.call_counts, persistence_transaction: 1, repository_read: repositoryReads }, database_write_performed: wroteDatabase };
+  if (administratorResponse.status !== 200 || administratorDisplay?.display_state !== "current" || administratorDisplay.business_date !== input.targetDate || generalStaffResponse.status !== 200 || !staffRedacted || exposed) return { ...preflight, result: "failed_closed", stage: "read_after_write", call_counts: { ...preflight.call_counts, persistence_transaction: 1, repository_read: repositoryReads }, database_write_performed: wroteDatabase, transaction_committed: persisted.safety.transaction_committed };
   return {
     ...preflight,
     result: persisted.status === "reused" ? "reused" : "inserted",
@@ -247,5 +278,6 @@ export async function runHermesDailyFarmBriefAuthorizedRealDataPersistence(input
     general_staff_counts_redacted: true,
     call_counts: { ...preflight.call_counts, persistence_transaction: 1, repository_read: repositoryReads },
     database_write_performed: wroteDatabase,
+    transaction_committed: persisted.safety.transaction_committed,
   };
 }
