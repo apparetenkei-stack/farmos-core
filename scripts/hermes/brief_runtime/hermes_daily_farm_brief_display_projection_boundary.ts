@@ -13,6 +13,7 @@ import {
   parseHermesDailyFarmBriefDisplayProjection,
   type HermesDailyFarmBriefDisplayAttentionItem,
   type HermesDailyFarmBriefDisplayPriority,
+  type HermesDailyFarmBriefDisplayPriorityV2,
   type HermesDailyFarmBriefDisplayProjection,
   type HermesDailyFarmBriefDisplaySourceAvailability,
   HERMES_DAILY_FARM_BRIEF_DISPLAY_PROJECTION_V2_SAFETY,
@@ -133,22 +134,37 @@ export function createHermesDailyFarmBriefDisplayProjectionV2(input: {
   });
   if (v1 === null || roleProjection === null || attentionProjection === null) return null;
 
-  const prioritiesV2 = v1.priorities.map((priority) => {
-    const matchingScopes = roleProjection.scopes.filter((scope) => {
-      const severity = scope.warning_count > 0 ? "attention" : scope.info_count > 0 ? "info" : null;
-      const detail = scope.warning_count > 0
-        ? `確認事項が${scope.warning_count}件あります。`
-        : scope.info_count > 0
-          ? `参考情報が${scope.info_count}件あります。`
-          : null;
-      return scope.display_label === priority.label && severity === priority.severity && detail === priority.detail;
+  type PriorityGroup = {
+    label: string;
+    severity: HermesDailyFarmBriefDisplayPriorityV2["severity"];
+    scopeType: (typeof HERMES_DAILY_FARM_SCOPE_TYPE_ORDER)[number];
+    scopes: HermesDailyFarmBriefRoleProjection["scopes"];
+  };
+  const groups = new Map<string, PriorityGroup>();
+  for (const scope of roleProjection.scopes) {
+    const severity = scope.warning_count > 0 ? "attention" : scope.info_count > 0 ? "info" : null;
+    if (severity === null) continue;
+    const key = `${scope.display_label}\0${severity}`;
+    const group = groups.get(key);
+    if (group) group.scopes.push(scope);
+    else groups.set(key, { label: scope.display_label, severity, scopeType: scope.scope_type, scopes: [scope] });
+  }
+  const prioritiesV2: HermesDailyFarmBriefDisplayPriorityV2[] = [...groups.values()]
+    .sort((left, right) => (left.severity === right.severity ? 0 : left.severity === "attention" ? -1 : 1) || HERMES_DAILY_FARM_SCOPE_TYPE_ORDER.indexOf(left.scopeType) - HERMES_DAILY_FARM_SCOPE_TYPE_ORDER.indexOf(right.scopeType) || left.label.localeCompare(right.label))
+    .slice(0, HERMES_DAILY_FARM_BRIEF_DISPLAY_PROJECTION_LIMITS.priorities)
+    .map((group) => {
+      const count = group.scopes.reduce((sum, scope) => sum + (group.severity === "attention" ? scope.warning_count : scope.info_count), 0);
+      const details = group.scopes
+        .flatMap((scope) => attentionProjection.details_by_scope.get(scope.scope_key) ?? [])
+        .sort(compareHermesDailyFarmBriefAttentionDetails);
+      const unique = [...new Map(details.map((detail) => [hermesDailyFarmBriefAttentionDetailSignature(detail), detail])).values()];
+      return {
+        label: group.label,
+        detail: group.severity === "attention" ? `確認事項が${count}件あります。` : `参考情報が${count}件あります。`,
+        severity: group.severity,
+        attention_details: unique,
+      };
     });
-    const details = matchingScopes
-      .flatMap((scope) => attentionProjection.details_by_scope.get(scope.scope_key) ?? [])
-      .sort(compareHermesDailyFarmBriefAttentionDetails);
-    const unique = [...new Map(details.map((detail) => [hermesDailyFarmBriefAttentionDetailSignature(detail), detail])).values()];
-    return { ...priority, attention_details: unique };
-  });
   return parseHermesDailyFarmBriefDisplayProjectionV2({
     ...v1,
     schema_version: "hermes.daily_farm_brief.display_projection.v2",
