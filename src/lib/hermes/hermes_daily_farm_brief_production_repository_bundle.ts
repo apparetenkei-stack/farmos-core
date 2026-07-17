@@ -500,6 +500,11 @@ export const HERMES_DAILY_FARM_BRIEF_PRIVILEGE_APPLY_ENV = {
 export const HERMES_DAILY_FARM_BRIEF_PRIVILEGE_APPLY_CONFIRMATION = "confirm-day123-privilege-hardening" as const;
 
 export type HermesDailyFarmBriefPrivilegeApplyExecutor = {
+  inspectReviewedHardeningReadiness?: (input: {
+    ownerRole: string;
+    runtimeRole: string;
+    expectedCatalogFingerprint: string;
+  }) => Promise<unknown>;
   executeReviewedHardening(input: {
     ownerRole: string;
     runtimeRole: string;
@@ -507,6 +512,50 @@ export type HermesDailyFarmBriefPrivilegeApplyExecutor = {
     priorState: HermesDailyFarmBriefRawPrivilegeCandidates["priorState"];
   }): Promise<unknown>;
 };
+
+export type HermesDailyFarmBriefPrivilegeAdministratorPreflight = {
+  schema_version: "hermes.daily_farm_brief.privilege_administrator_preflight.v1";
+  admin_connection_target_matches_runtime: boolean;
+  admin_principal_eligible: boolean;
+  catalog_fingerprint_matched: boolean;
+  transaction_rolled_back: boolean;
+  retry_count: 0;
+  production_change_performed: false;
+  raw_role_exposed: false;
+  secret_exposed: false;
+};
+
+const EMPTY_ADMINISTRATOR_PREFLIGHT: HermesDailyFarmBriefPrivilegeAdministratorPreflight = {
+  schema_version: "hermes.daily_farm_brief.privilege_administrator_preflight.v1",
+  admin_connection_target_matches_runtime: false,
+  admin_principal_eligible: false,
+  catalog_fingerprint_matched: false,
+  transaction_rolled_back: false,
+  retry_count: 0,
+  production_change_performed: false,
+  raw_role_exposed: false,
+  secret_exposed: false,
+};
+
+export async function inspectHermesDailyFarmBriefPrivilegeAdministratorReadiness(input: {
+  repositoryBundle: HermesDailyFarmBriefRepositoryBundle;
+  candidateToken: HermesDailyFarmBriefPrivilegeCandidateToken | null;
+  executor: HermesDailyFarmBriefPrivilegeApplyExecutor;
+}): Promise<HermesDailyFarmBriefPrivilegeAdministratorPreflight> {
+  if (input.candidateToken === null || input.executor.inspectReviewedHardeningReadiness === undefined) return EMPTY_ADMINISTRATOR_PREFLIGHT;
+  const candidate = privilegeCandidateTokens.get(input.candidateToken as object);
+  const bundleToken = bundleTokens.get(input.repositoryBundle as object);
+  if (candidate === undefined || bundleToken === undefined || candidate.repositoryToken !== bundleToken) return EMPTY_ADMINISTRATOR_PREFLIGHT;
+  try {
+    const raw = await input.executor.inspectReviewedHardeningReadiness({ ownerRole: candidate.raw.ownerRole, runtimeRole: candidate.raw.runtimeRole, expectedCatalogFingerprint: candidate.raw.catalogFingerprint });
+    if (typeof raw !== "object" || raw === null || Array.isArray(raw)) return EMPTY_ADMINISTRATOR_PREFLIGHT;
+    const value = raw as Record<string, unknown>;
+    if (Object.keys(value).length !== 9 || value.schema_version !== EMPTY_ADMINISTRATOR_PREFLIGHT.schema_version || typeof value.admin_connection_target_matches_runtime !== "boolean" || typeof value.admin_principal_eligible !== "boolean" || typeof value.catalog_fingerprint_matched !== "boolean" || typeof value.transaction_rolled_back !== "boolean" || value.retry_count !== 0 || value.production_change_performed !== false || value.raw_role_exposed !== false || value.secret_exposed !== false) return EMPTY_ADMINISTRATOR_PREFLIGHT;
+    return value as HermesDailyFarmBriefPrivilegeAdministratorPreflight;
+  } catch {
+    return EMPTY_ADMINISTRATOR_PREFLIGHT;
+  }
+}
 
 export type HermesDailyFarmBriefPrivilegeApplyResult = {
   schema_version: "hermes.daily_farm_brief.privilege_apply_result.v1";

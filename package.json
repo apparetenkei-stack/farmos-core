@@ -287,6 +287,7 @@
     "test-hermes-daily-farm-brief-security-definer-sql-contract": "tsx scripts/hermes/test_hermes_daily_farm_brief_security_definer_sql_contract.ts",
     "test-hermes-daily-farm-brief-security-definer-hardening": "tsx scripts/hermes/test_hermes_daily_farm_brief_security_definer_hardening.ts",
     "test-hermes-daily-farm-brief-privilege-candidate-resolution": "tsx scripts/hermes/test_hermes_daily_farm_brief_privilege_candidate_resolution.ts",
+    "test-hermes-daily-farm-brief-privilege-administrator-executor": "tsx scripts/hermes/test_hermes_daily_farm_brief_privilege_administrator_executor.ts",
     "run-hermes-daily-farm-brief-reviewed-privilege-apply": "node --env-file=.env.local --import tsx scripts/hermes/run_hermes_daily_farm_brief_reviewed_privilege_apply.ts",
     "run-hermes-daily-farm-brief-production-write-readiness-diagnostic": "node --env-file=.env.local --import tsx scripts/hermes/run_hermes_daily_farm_brief_production_write_readiness_diagnostic.ts",
     "run-hermes-daily-farm-brief-authorized-real-data-persistence": "tsx scripts/hermes/run_hermes_daily_farm_brief_authorized_real_data_persistence.ts",

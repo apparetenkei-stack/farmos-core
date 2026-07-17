@@ -6,6 +6,7 @@ import {
   HERMES_DAILY_FARM_BRIEF_PRIVILEGE_APPLY_ENV,
   applyHermesDailyFarmBriefReviewedPrivilegeHardening,
   createHermesDailyFarmBriefProductionRepositoryBundle,
+  inspectHermesDailyFarmBriefPrivilegeAdministratorReadiness,
   type HermesDailyFarmBriefProductionRepositoryExecutor,
   type HermesDailyFarmBriefRawPrivilegeCandidates,
 } from "../../src/lib/hermes/hermes_daily_farm_brief_production_repository_bundle";
@@ -47,6 +48,26 @@ assert.equal(valid.preflight.function_change_required, true);
 assert.equal(valid.preflight.grant_execute_required, true);
 assert.ok(valid.token);
 
+let administratorPreflightCalls = 0;
+const administratorPreflight = await inspectHermesDailyFarmBriefPrivilegeAdministratorReadiness({
+  repositoryBundle: valid.bundle,
+  candidateToken: valid.token,
+  executor: {
+    async executeReviewedHardening() { throw new Error("not expected"); },
+    async inspectReviewedHardeningReadiness(input) {
+      administratorPreflightCalls += 1;
+      assert.deepEqual(Object.keys(input).sort(), ["expectedCatalogFingerprint", "ownerRole", "runtimeRole"]);
+      assert.equal(input.ownerRole, OWNER_VALUE);
+      assert.equal(input.runtimeRole, RUNTIME_VALUE);
+      return { schema_version: "hermes.daily_farm_brief.privilege_administrator_preflight.v1", admin_connection_target_matches_runtime: true, admin_principal_eligible: true, catalog_fingerprint_matched: true, transaction_rolled_back: true, retry_count: 0, production_change_performed: false, raw_role_exposed: false, secret_exposed: false };
+    },
+  },
+});
+assert.equal(administratorPreflight.admin_principal_eligible, true);
+assert.equal(administratorPreflight.catalog_fingerprint_matched, true);
+assert.equal(administratorPreflight.transaction_rolled_back, true);
+assert.equal(administratorPreflightCalls, 1);
+
 for (const candidate of [
   raw({ runtimeRole: OWNER_VALUE }),
   raw({ ownerEligible: false }),
@@ -64,6 +85,7 @@ let applyCalls = 0;
 const applyExecutor = {
   async executeReviewedHardening(input: { ownerRole: string; runtimeRole: string; expectedCatalogFingerprint: string }) {
     applyCalls += 1;
+    assert.deepEqual(Object.keys(input).sort(), ["expectedCatalogFingerprint", "ownerRole", "priorState", "runtimeRole"]);
     assert.equal(input.ownerRole, OWNER_VALUE);
     assert.equal(input.runtimeRole, RUNTIME_VALUE);
     assert.equal(input.expectedCatalogFingerprint, "a".repeat(64));
@@ -88,8 +110,17 @@ const rolledBack = await applyHermesDailyFarmBriefReviewedPrivilegeHardening({ e
 assert.equal(rolledBack.status, "failed_closed");
 assert.equal(rolledBack.transaction_committed, false);
 assert.equal(rolledBack.production_change_performed, false);
+const transactionFailure = await applyHermesDailyFarmBriefReviewedPrivilegeHardening({ environment: { [HERMES_DAILY_FARM_BRIEF_PRIVILEGE_APPLY_ENV.enabled]: "true", [HERMES_DAILY_FARM_BRIEF_PRIVILEGE_APPLY_ENV.confirmation]: HERMES_DAILY_FARM_BRIEF_PRIVILEGE_APPLY_CONFIRMATION }, repositoryBundle: valid.bundle, candidateToken: valid.token, executor: { async executeReviewedHardening() { throw new Error("fixture transaction failure"); } } });
+assert.equal(transactionFailure.status, "failed_closed");
+assert.equal(transactionFailure.transaction_committed, false);
+assert.equal(transactionFailure.production_change_performed, false);
+const committedExecutor = { async executeReviewedHardening() { return { schema_version: "hermes.daily_farm_brief.privilege_apply_transaction.v1", catalog_fingerprint_matched: true, transaction_committed: true, transaction_rolled_back: false }; } };
+const committedOnce = await applyHermesDailyFarmBriefReviewedPrivilegeHardening({ environment: { [HERMES_DAILY_FARM_BRIEF_PRIVILEGE_APPLY_ENV.enabled]: "true", [HERMES_DAILY_FARM_BRIEF_PRIVILEGE_APPLY_ENV.confirmation]: HERMES_DAILY_FARM_BRIEF_PRIVILEGE_APPLY_CONFIRMATION }, repositoryBundle: valid.bundle, candidateToken: valid.token, executor: committedExecutor });
+const committedAgain = await applyHermesDailyFarmBriefReviewedPrivilegeHardening({ environment: { [HERMES_DAILY_FARM_BRIEF_PRIVILEGE_APPLY_ENV.enabled]: "true", [HERMES_DAILY_FARM_BRIEF_PRIVILEGE_APPLY_ENV.confirmation]: HERMES_DAILY_FARM_BRIEF_PRIVILEGE_APPLY_CONFIRMATION }, repositoryBundle: valid.bundle, candidateToken: valid.token, executor: committedExecutor });
+assert.equal(committedOnce.status, "applied");
+assert.equal(committedAgain.status, "applied");
 
-const serialized = JSON.stringify({ preflight: valid.preflight, disabled, missingConfirmation, override, fingerprintMismatch, rolledBack });
+const serialized = JSON.stringify({ preflight: valid.preflight, administratorPreflight, disabled, missingConfirmation, override, fingerprintMismatch, rolledBack, transactionFailure, committedOnce, committedAgain });
 for (const forbidden of [OWNER_VALUE, RUNTIME_VALUE, DATABASE_CREDENTIAL_VALUE, VALID_ENV.HERMES_DAILY_BRIEF_DATABASE_NAME, VALID_ENV.HERMES_DAILY_BRIEF_DATABASE_USER]) assert.equal(serialized.includes(forbidden), false);
 
 console.log(JSON.stringify({ result: "pass", boundary: "hermes_daily_farm_brief_privilege_candidate_resolution", safe_owner_auto_resolution: true, runtime_auto_resolution: true, ownership_alignment: true, caller_override_rejected: true, default_disabled: true, confirmation_required: true, catalog_fingerprint_mismatch: "rejected", rollback_only: true, retry_count: 0, production_change_performed: false, raw_role_exposed: false, secret_exposed: false }));
