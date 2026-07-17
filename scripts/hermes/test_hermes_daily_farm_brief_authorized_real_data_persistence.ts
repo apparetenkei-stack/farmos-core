@@ -9,6 +9,7 @@ import {
 } from "./brief_runtime/hermes_daily_farm_brief_authorized_real_data_persistence";
 import {
   HermesDailyFarmBriefFixturePersistenceRepository,
+  persistHermesDailyFarmBrief,
 } from "./brief_runtime/hermes_daily_farm_brief_persistence_write_boundary";
 import type { HermesDailyFarmBriefAuthenticatedActorContext } from "./brief_runtime/hermes_daily_farm_brief_latest_api_contract";
 import {
@@ -62,7 +63,7 @@ function stalePrepared() {
 function input(repository: HermesDailyFarmBriefFixturePersistenceRepository, overrides: Partial<Parameters<typeof runHermesDailyFarmBriefAuthorizedRealDataPersistence>[0]> = {}) {
   const { repositoryBundle, ...rest } = overrides;
   return {
-    mode: "persist" as const, environment: environment(), targetDate: TARGET_DATE, generatedAt: GENERATED_AT, prepare: () => prepared(), expectedCurrentVersion: null,
+    mode: "persist" as const, environment: environment(), targetDate: TARGET_DATE, generatedAt: GENERATED_AT, prepare: () => prepared(),
     repositoryBundle: repositoryBundle ?? createHermesDailyFarmBriefFixtureRepositoryBundle(repository), administratorActor: actor("administrator"), generalStaffActor: actor("general_staff"), ...rest,
   };
 }
@@ -93,10 +94,12 @@ assert.equal(mismatch.target_repository_identity_check, "not_matched");
 assert.equal(mismatchRepository.transactionCallCount, 0);
 
 let blockedProductionWrites = 0;
+let blockedReadinessExpectedVersion: number | null | undefined;
 const blockedExecutor: HermesDailyFarmBriefProductionRepositoryExecutor = {
   async executeReadOnly() { return { database_matches: true, user_present: true, transaction_read_only: true, rows: [] }; },
+  async resolveCanonicalCurrentVersion() { return { schema_version: "hermes.daily_farm_brief.canonical_current_version_resolution.v1", status: "resolved", current_version: 1, transaction_read_only: true, transaction_end: "commit", database_write_performed: false, write_executor_called: false, retry_count: 0, raw_record_exposed: false, raw_identifier_exposed: false, secret_exposed: false }; },
   async executeCanonicalTransition() { blockedProductionWrites += 1; throw new Error("not expected"); },
-  async diagnoseWriteReadiness() { return { connection_available: true, transaction_read_only: false, records_relation_exists: true, commands_relation_exists: true, function_exists: true, function_signature_matches: true, function_security_definer: true, function_search_path_safe: true, schema_public_create: false, schema_owner_safe: true, public_execute: false, runtime_execute_privilege: false, runtime_direct_dml: false, owner_relation_privileges: true, owner_role_safe: true, relation_owners_match_function_owner: true, owner_candidate_eligible: true, runtime_candidate_eligible: true, canonical_record_count: 0, expected_version_matches: true, rollback_verified: true }; },
+  async diagnoseWriteReadiness(input) { blockedReadinessExpectedVersion = input.expectedCurrentVersion; return { connection_available: true, transaction_read_only: false, records_relation_exists: true, commands_relation_exists: true, function_exists: true, function_signature_matches: true, function_security_definer: true, function_search_path_safe: true, schema_public_create: false, schema_owner_safe: true, public_execute: false, runtime_execute_privilege: false, runtime_direct_dml: false, owner_relation_privileges: true, owner_role_safe: true, relation_owners_match_function_owner: true, owner_candidate_eligible: true, runtime_candidate_eligible: true, canonical_record_count: 1, expected_version_matches: input.expectedCurrentVersion === 1, rollback_verified: true }; },
 };
 const blockedProductionBundle = createHermesDailyFarmBriefProductionRepositoryBundle({
   HERMES_DAILY_BRIEF_DATABASE_ENABLED: "true", HERMES_DAILY_BRIEF_DATABASE_HOST: "db.internal", HERMES_DAILY_BRIEF_DATABASE_PORT: "5432", HERMES_DAILY_BRIEF_DATABASE_NAME: "farmos_core_production", HERMES_DAILY_BRIEF_DATABASE_USER: "hermes_reader", HERMES_DAILY_BRIEF_DATABASE_PASSWORD: "test-value-c", HERMES_DAILY_BRIEF_DATABASE_SSL_MODE: "verify-full", HERMES_DAILY_BRIEF_DATABASE_CONNECT_TIMEOUT_MS: "1000", HERMES_DAILY_BRIEF_DATABASE_STATEMENT_TIMEOUT_MS: "3000", HERMES_DAILY_BRIEF_DATABASE_LOCK_TIMEOUT_MS: "500", [HERMES_DAILY_FARM_BRIEF_PRODUCTION_WRITE_ENABLED_ENV]: "true",
@@ -108,15 +111,27 @@ assert.equal(blockedProduction.call_counts.persistence_transaction, 0);
 assert.equal(blockedProduction.database_write_performed, false);
 assert.equal(blockedProduction.transaction_committed, false);
 assert.equal(blockedProductionWrites, 0);
+assert.equal(blockedProduction.expected_current_version, 1);
+assert.equal(blockedReadinessExpectedVersion, 1);
 
 let datePrepareCalls = 0;
 const dateMismatch = await runHermesDailyFarmBriefAuthorizedRealDataPersistence(input(new HermesDailyFarmBriefFixturePersistenceRepository(), { generatedAt: "2026-07-18T01:00:00.000Z", prepare: async () => { datePrepareCalls += 1; return null; } }));
 assert.equal(dateMismatch.stage, "date");
 assert.equal(datePrepareCalls, 0);
 
-const repository = new HermesDailyFarmBriefFixturePersistenceRepository();
+class CapturingFixtureRepository extends HermesDailyFarmBriefFixturePersistenceRepository {
+  lastCommand: Parameters<HermesDailyFarmBriefFixturePersistenceRepository["executeCanonicalTransition"]>[0] | null = null;
+  override async executeCanonicalTransition(command: Parameters<HermesDailyFarmBriefFixturePersistenceRepository["executeCanonicalTransition"]>[0]) {
+    this.lastCommand = structuredClone(command);
+    return super.executeCanonicalTransition(command);
+  }
+}
+
+const repository = new CapturingFixtureRepository();
 const inserted = await runHermesDailyFarmBriefAuthorizedRealDataPersistence(input(repository));
 assert.equal(inserted.result, "inserted");
+assert.equal(inserted.current_version_resolution, "resolved");
+assert.equal(inserted.expected_current_version, null);
 assert.equal(inserted.read_after_write, "pass");
 assert.equal(inserted.latest_selector, "pass");
 assert.equal(inserted.latest_display_projection, "pass");
@@ -126,6 +141,10 @@ assert.deepEqual(inserted.call_counts, { operational_read: 1, memory_read: 1, sc
 assert.equal(inserted.database_write_performed, false);
 assert.equal(inserted.safety.application_database_write_performed, false);
 assert.equal(inserted.safety.proposal_saved, false);
+assert.ok(repository.lastCommand);
+const exactPayloadReplay = await persistHermesDailyFarmBrief({ command: structuredClone(repository.lastCommand), repository, clock: () => GENERATED_AT });
+assert.equal(exactPayloadReplay.status, "reused");
+assert.equal(exactPayloadReplay.retry_count, 0);
 
 const staleRepository = new HermesDailyFarmBriefFixturePersistenceRepository();
 const stale = await runHermesDailyFarmBriefAuthorizedRealDataPersistence(input(staleRepository, { prepare: () => stalePrepared() }));
@@ -137,12 +156,24 @@ assert.equal(stale.latest_display_projection, "pass");
 assert.equal(stale.administrator_display_state, "stale");
 assert.equal(stale.general_staff_counts_redacted, true);
 
-const reused = await runHermesDailyFarmBriefAuthorizedRealDataPersistence(input(repository));
-assert.equal(reused.result, "reused");
+const nextPrepared = async () => {
+  const value = await prepared(true);
+  if (value === null) return null;
+  return { ...value, execution_result: { ...value.execution_result, execution_id: `${value.execution_result.execution_id}-v2` } };
+};
+const updated = await runHermesDailyFarmBriefAuthorizedRealDataPersistence(input(repository, { prepare: nextPrepared }));
+assert.equal(updated.result, "inserted");
+assert.equal(updated.expected_current_version, 1);
+assert.deepEqual((repository.inspectRecords() as Array<{ version: number; record_status: string }>).map(({ version, record_status }) => ({ version, record_status })), [{ version: 1, record_status: "superseded" }, { version: 2, record_status: "canonical" }]);
 
+const callsBeforeConflict = repository.transactionCallCount;
+const recordsBeforeConflict = repository.inspectRecords();
 const conflict = await runHermesDailyFarmBriefAuthorizedRealDataPersistence(input(repository, { prepare: () => prepared(true) }));
 assert.equal(conflict.result, "rejected");
 assert.equal(conflict.stage, "persistence");
+assert.equal(repository.transactionCallCount - callsBeforeConflict, 1);
+assert.deepEqual(repository.inspectRecords(), recordsBeforeConflict);
+assert.equal(conflict.database_write_performed, false);
 
 const rollbackRepository = new HermesDailyFarmBriefFixturePersistenceRepository();
 rollbackRepository.failNextTransaction();
@@ -167,4 +198,4 @@ const serialized = JSON.stringify(inserted);
 for (const forbidden of ["record_id", "source_record_id", "scope_index", "principal_ref", "allowed_scope_keys", "credential", "field-0", "cycle-0"]) assert.equal(serialized.includes(forbidden), false);
 assert.equal(inserted.safety.secret_exposed, false);
 
-console.log(JSON.stringify({ result: "pass", boundary: "hermes_daily_farm_brief_authorized_real_data_persistence", default_disabled: true, dry_run_write_count: 0, repository_identity_mismatch_write_count: 0, insert: "pass", idempotent_reuse: "pass", conflicting_reuse: "rejected", rollback: "pass", read_after_write: "pass", latest_selector: "pass", latest_display: "pass", operational_read_maximum: 1, memory_read_maximum: 1, app_database_write_performed: false, proposal_saved: false, secret_exposed: false }));
+console.log(JSON.stringify({ result: "pass", boundary: "hermes_daily_farm_brief_authorized_real_data_persistence", default_disabled: true, dry_run_write_count: 0, repository_identity_mismatch_write_count: 0, insert: "pass", exact_payload_reuse: "reused", existing_v1_to_v2: "pass", version_conflict_retry_count: 0, conflicting_reuse: "rejected", rollback: "pass", read_after_write: "pass", latest_selector: "pass", latest_display: "pass", operational_read_maximum: 1, memory_read_maximum: 1, app_database_write_performed: false, proposal_saved: false, secret_exposed: false }));

@@ -83,6 +83,8 @@ export type HermesDailyFarmBriefAuthorizedRealDataPersistenceResult = {
   relation_validation: "passed" | "failed_closed" | "not_checked";
   target_repository_identity_check: "matched" | "not_matched";
   persistence_enabled: boolean;
+  current_version_resolution: "not_run" | "resolved" | "failed_closed";
+  expected_current_version: number | null;
   read_after_write: "pass" | "not_run";
   latest_selector: "pass" | "not_run";
   latest_display_projection: "pass" | "not_run";
@@ -163,7 +165,6 @@ type RunInput = {
   targetDate: "2026-07-17";
   generatedAt: string;
   prepare: () => Promise<HermesDailyFarmBriefPreparedRealDataPersistence | null>;
-  expectedCurrentVersion: number | null;
   repositoryBundle: HermesDailyFarmBriefRepositoryBundle;
   administratorActor: HermesDailyFarmBriefAuthenticatedActorContext;
   generalStaffActor: HermesDailyFarmBriefAuthenticatedActorContext;
@@ -181,6 +182,8 @@ function base(input: RunInput, partial: Partial<HermesDailyFarmBriefAuthorizedRe
     relation_validation: "not_checked",
     target_repository_identity_check: "not_matched",
     persistence_enabled: false,
+    current_version_resolution: "not_run",
+    expected_current_version: null,
     read_after_write: "not_run",
     latest_selector: "not_run",
     latest_display_projection: "not_run",
@@ -242,19 +245,23 @@ export async function runHermesDailyFarmBriefAuthorizedRealDataPersistence(input
   });
   if (input.mode === "dry_run" || !enabled || !matched) return preflight;
   if (!actorValid(input.administratorActor, "administrator") || !actorValid(input.generalStaffActor, "general_staff")) return { ...preflight, result: "rejected", stage: "configuration" };
-  const command = buildHermesDailyFarmBriefAuthorizedRealDataPersistenceCommand({ prepared, targetDate: input.targetDate, generatedAt: input.generatedAt, expectedCurrentVersion: input.expectedCurrentVersion });
-  if (command === null) return { ...preflight, result: "failed_closed", stage: "persistence", persistence_failure_code: "command_invalid" };
+  const currentVersionResolution = await input.repositoryBundle.resolveCanonicalCurrentVersion(input.targetDate);
+  if (currentVersionResolution.status !== "resolved") return { ...preflight, result: "failed_closed", stage: "persistence", current_version_resolution: "failed_closed", persistence_failure_code: "unknown_failure" };
+  const expectedCurrentVersion = currentVersionResolution.current_version;
+  const resolvedPreflight = { ...preflight, current_version_resolution: "resolved" as const, expected_current_version: expectedCurrentVersion };
+  const command = buildHermesDailyFarmBriefAuthorizedRealDataPersistenceCommand({ prepared, targetDate: input.targetDate, generatedAt: input.generatedAt, expectedCurrentVersion });
+  if (command === null) return { ...resolvedPreflight, result: "failed_closed", stage: "persistence", persistence_failure_code: "command_invalid" };
   if (identity.write_kind === "database") {
-    const readiness = await input.repositoryBundle.diagnoseWriteReadiness({ command, targetDate: input.targetDate, expectedCurrentVersion: input.expectedCurrentVersion });
-    if (readiness.classification !== "ready") return { ...preflight, result: "failed_closed", stage: "persistence", persistence_failure_code: readiness.classification };
+    const readiness = await input.repositoryBundle.diagnoseWriteReadiness({ command, targetDate: input.targetDate, expectedCurrentVersion });
+    if (readiness.classification !== "ready") return { ...resolvedPreflight, result: "failed_closed", stage: "persistence", persistence_failure_code: readiness.classification };
   }
   const persisted = await persistHermesDailyFarmBrief({ command, repository: input.repositoryBundle.writeRepository, clock: () => input.generatedAt });
   const wroteDatabase = persisted.status === "persisted" && identity.write_kind === "database";
-  if (persisted.status !== "persisted" && persisted.status !== "reused") return { ...preflight, result: persisted.status === "rejected" ? "rejected" : "failed_closed", stage: "persistence", call_counts: { ...preflight.call_counts, persistence_transaction: persisted.repository_transaction_call_count }, database_write_performed: wroteDatabase, transaction_committed: false, persistence_failure_code: safePersistenceFailureCode(persisted.error_code) };
+  if (persisted.status !== "persisted" && persisted.status !== "reused") return { ...resolvedPreflight, result: persisted.status === "rejected" ? "rejected" : "failed_closed", stage: "persistence", call_counts: { ...resolvedPreflight.call_counts, persistence_transaction: persisted.repository_transaction_call_count }, database_write_performed: wroteDatabase, transaction_committed: false, persistence_failure_code: safePersistenceFailureCode(persisted.error_code) };
   const readCountBefore = input.repositoryBundle.readRepository.readCount ?? 0;
   const selected = await readHermesDailyFarmBriefPersistedLatestSource({ repository: input.repositoryBundle.readRepository, requestedBusinessDate: input.targetDate, now: input.generatedAt });
   const repositoryReads = (input.repositoryBundle.readRepository.readCount ?? readCountBefore) - readCountBefore === 1 ? 1 : 0;
-  if (selected.status !== "selected" || selected.source?.source_kind !== "projectable_brief" || selected.source.business_date !== input.targetDate) return { ...preflight, result: "failed_closed", stage: "read_after_write", call_counts: { ...preflight.call_counts, persistence_transaction: 1, repository_read: repositoryReads }, database_write_performed: wroteDatabase, transaction_committed: persisted.safety.transaction_committed };
+  if (selected.status !== "selected" || selected.source?.source_kind !== "projectable_brief" || selected.source.business_date !== input.targetDate) return { ...resolvedPreflight, result: "failed_closed", stage: "read_after_write", call_counts: { ...resolvedPreflight.call_counts, persistence_transaction: 1, repository_read: repositoryReads }, database_write_performed: wroteDatabase, transaction_committed: persisted.safety.transaction_committed };
   const authentication = { schema_version: "hermes.daily_farm_brief.authentication_result.v1", status: "authenticated", principal_ref: input.administratorActor.principal_ref } as const;
   const responseFor = (actor: HermesDailyFarmBriefAuthenticatedActorContext) => serveHermesDailyFarmBriefLatestDisplay({ request: new Request("http://localhost/api/hermes/daily-farm-brief/latest-display"), dependencies: { authenticate: async () => ({ ...authentication, principal_ref: actor.principal_ref }), resolveActorContext: async () => actor, readLatestSource: async () => selected.source, clock: () => input.generatedAt } });
   const administratorResponse = await responseFor(input.administratorActor);
@@ -269,9 +276,9 @@ export async function runHermesDailyFarmBriefAuthorizedRealDataPersistence(input
   const administratorDisplayVerified =
     administratorDisplay?.display_state === "current" ||
     administratorDisplay?.display_state === "stale";
-  if (administratorResponse.status !== 200 || !administratorDisplayVerified || administratorDisplay.business_date !== input.targetDate || generalStaffResponse.status !== 200 || !staffRedacted || exposed) return { ...preflight, result: "failed_closed", stage: "read_after_write", call_counts: { ...preflight.call_counts, persistence_transaction: 1, repository_read: repositoryReads }, database_write_performed: wroteDatabase, transaction_committed: persisted.safety.transaction_committed };
+  if (administratorResponse.status !== 200 || !administratorDisplayVerified || administratorDisplay.business_date !== input.targetDate || generalStaffResponse.status !== 200 || !staffRedacted || exposed) return { ...resolvedPreflight, result: "failed_closed", stage: "read_after_write", call_counts: { ...resolvedPreflight.call_counts, persistence_transaction: 1, repository_read: repositoryReads }, database_write_performed: wroteDatabase, transaction_committed: persisted.safety.transaction_committed };
   return {
-    ...preflight,
+    ...resolvedPreflight,
     result: persisted.status === "reused" ? "reused" : "inserted",
     stage: "completed",
     read_after_write: "pass",
@@ -279,7 +286,7 @@ export async function runHermesDailyFarmBriefAuthorizedRealDataPersistence(input
     latest_display_projection: "pass",
     administrator_display_state: administratorDisplay.display_state,
     general_staff_counts_redacted: true,
-    call_counts: { ...preflight.call_counts, persistence_transaction: 1, repository_read: repositoryReads },
+    call_counts: { ...resolvedPreflight.call_counts, persistence_transaction: 1, repository_read: repositoryReads },
     database_write_performed: wroteDatabase,
     transaction_committed: persisted.safety.transaction_committed,
   };

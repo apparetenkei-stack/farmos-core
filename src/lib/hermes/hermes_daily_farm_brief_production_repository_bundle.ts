@@ -31,6 +31,12 @@ import {
 export const HERMES_DAILY_FARM_BRIEF_RECORDS_RELATION = "ai.daily_farm_brief_records" as const;
 export const HERMES_DAILY_FARM_BRIEF_COMMANDS_RELATION = "ai.daily_farm_brief_persistence_commands" as const;
 export const HERMES_DAILY_FARM_BRIEF_PRODUCTION_WRITE_ENABLED_ENV = "HERMES_DAILY_FARM_BRIEF_DATABASE_WRITE_ENABLED" as const;
+export const HERMES_DAILY_FARM_BRIEF_CURRENT_VERSION_QUERY = `
+  select count(*)::text as canonical_count,
+    case when count(*) = 1 then min(version) else null end as current_version
+  from ai.daily_farm_brief_records
+  where record_kind = 'projectable_brief' and business_date = $1::date and record_status = 'canonical'
+` as const;
 export const HERMES_DAILY_FARM_BRIEF_RELATION_OVERRIDE_ENV = {
   records: "HERMES_DAILY_FARM_BRIEF_DATABASE_RECORDS_RELATION",
   commands: "HERMES_DAILY_FARM_BRIEF_DATABASE_COMMANDS_RELATION",
@@ -52,8 +58,23 @@ export type HermesDailyFarmBriefRepositoryIdentityEvidence = {
 
 export type HermesDailyFarmBriefProductionWriteExecutor = {
   executeCanonicalTransition(command: HermesDailyFarmBriefPersistenceCommand): Promise<unknown>;
+  resolveCanonicalCurrentVersion?: (targetDate: string) => Promise<unknown>;
   diagnoseWriteReadiness?: (input: { targetDate: string; expectedCurrentVersion: number | null }) => Promise<HermesDailyFarmBriefWriteReadinessEvidence>;
   resolvePrivilegeCandidates?: () => Promise<HermesDailyFarmBriefRawPrivilegeCandidates>;
+};
+
+export type HermesDailyFarmBriefCanonicalCurrentVersionResolution = {
+  schema_version: "hermes.daily_farm_brief.canonical_current_version_resolution.v1";
+  status: "resolved" | "failed_closed";
+  current_version: number | null;
+  transaction_read_only: boolean;
+  transaction_end: "commit" | "rollback" | "not_started";
+  database_write_performed: false;
+  write_executor_called: false;
+  retry_count: 0;
+  raw_record_exposed: false;
+  raw_identifier_exposed: false;
+  secret_exposed: false;
 };
 
 export type HermesDailyFarmBriefRawPrivilegeCandidates = {
@@ -108,9 +129,107 @@ export type HermesDailyFarmBriefRepositoryBundle = {
   write_state: "enabled" | "disabled";
   readRepository: HermesDailyFarmBriefPersistedReadRepository & { readCount?: number };
   writeRepository: HermesDailyFarmBriefPersistenceWriteRepository;
+  resolveCanonicalCurrentVersion: (targetDate: string) => Promise<HermesDailyFarmBriefCanonicalCurrentVersionResolution>;
   diagnoseWriteReadiness: (input: { command: unknown; targetDate: string; expectedCurrentVersion: number | null }) => Promise<HermesDailyFarmBriefProductionWriteReadinessResult>;
   resolvePrivilegeCandidates: () => Promise<{ preflight: HermesDailyFarmBriefPrivilegeCandidatePreflight; token: HermesDailyFarmBriefPrivilegeCandidateToken | null }>;
 };
+
+const failedCurrentVersionResolution = (): HermesDailyFarmBriefCanonicalCurrentVersionResolution => ({
+  schema_version: "hermes.daily_farm_brief.canonical_current_version_resolution.v1",
+  status: "failed_closed",
+  current_version: null,
+  transaction_read_only: false,
+  transaction_end: "not_started",
+  database_write_performed: false,
+  write_executor_called: false,
+  retry_count: 0,
+  raw_record_exposed: false,
+  raw_identifier_exposed: false,
+  secret_exposed: false,
+});
+
+const resolvedCurrentVersion = (currentVersion: number | null): HermesDailyFarmBriefCanonicalCurrentVersionResolution => ({
+  schema_version: "hermes.daily_farm_brief.canonical_current_version_resolution.v1",
+  status: "resolved",
+  current_version: currentVersion,
+  transaction_read_only: true,
+  transaction_end: "commit",
+  database_write_performed: false,
+  write_executor_called: false,
+  retry_count: 0,
+  raw_record_exposed: false,
+  raw_identifier_exposed: false,
+  secret_exposed: false,
+});
+
+function parseCurrentVersionResolution(value: unknown): HermesDailyFarmBriefCanonicalCurrentVersionResolution | null {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return null;
+  const candidate = value as Record<string, unknown>;
+  const keys = ["schema_version", "status", "current_version", "transaction_read_only", "transaction_end", "database_write_performed", "write_executor_called", "retry_count", "raw_record_exposed", "raw_identifier_exposed", "secret_exposed"];
+  if (Object.keys(candidate).length !== keys.length || !keys.every((key) => Object.hasOwn(candidate, key))) return null;
+  if (candidate.schema_version !== "hermes.daily_farm_brief.canonical_current_version_resolution.v1" || !["resolved", "failed_closed"].includes(String(candidate.status)) || candidate.database_write_performed !== false || candidate.write_executor_called !== false || candidate.retry_count !== 0 || candidate.raw_record_exposed !== false || candidate.raw_identifier_exposed !== false || candidate.secret_exposed !== false) return null;
+  if (candidate.status === "resolved" && (candidate.transaction_read_only !== true || candidate.transaction_end !== "commit")) return null;
+  if (candidate.status === "failed_closed" && (candidate.current_version !== null || typeof candidate.transaction_read_only !== "boolean" || !["rollback", "not_started"].includes(String(candidate.transaction_end)))) return null;
+  if (candidate.current_version !== null && (!Number.isSafeInteger(candidate.current_version) || Number(candidate.current_version) <= 0)) return null;
+  return structuredClone(candidate) as HermesDailyFarmBriefCanonicalCurrentVersionResolution;
+}
+
+type CurrentVersionQueryClient = {
+  query<T extends Record<string, unknown> = Record<string, unknown>>(query: string, values?: unknown[]): Promise<{ rows: T[] }>;
+};
+
+function isBusinessDate(value: unknown): value is string {
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/u.test(value)) return false;
+  const parsed = Date.parse(`${value}T00:00:00.000Z`);
+  return Number.isFinite(parsed) && new Date(parsed).toISOString().slice(0, 10) === value;
+}
+
+export async function resolveHermesDailyFarmBriefCanonicalCurrentVersionReadOnlyTransaction(input: {
+  client: CurrentVersionQueryClient;
+  targetDate: string;
+  initialize: () => Promise<void>;
+}): Promise<HermesDailyFarmBriefCanonicalCurrentVersionResolution> {
+  let transactionStarted = false;
+  let transactionClosed = false;
+  try {
+    if (!isBusinessDate(input.targetDate)) throw new Error("daily_brief_current_version_target_date_invalid");
+    await input.client.query("begin transaction read only");
+    transactionStarted = true;
+    await input.initialize();
+    const result = await input.client.query<{ canonical_count: unknown; current_version: unknown }>(HERMES_DAILY_FARM_BRIEF_CURRENT_VERSION_QUERY, [input.targetDate]);
+    if (result.rows.length !== 1) throw new Error("daily_brief_current_version_contract_failed");
+    const row = result.rows[0];
+    const canonicalCount = typeof row.canonical_count === "string" && /^[0-9]+$/u.test(row.canonical_count) ? Number(row.canonical_count) : Number.NaN;
+    const currentVersion = row.current_version;
+    if (!Number.isSafeInteger(canonicalCount) || canonicalCount < 0 || canonicalCount > 1) throw new Error("daily_brief_current_version_contract_failed");
+    if (canonicalCount === 0 && currentVersion !== null) throw new Error("daily_brief_current_version_contract_failed");
+    if (canonicalCount === 1 && (!Number.isSafeInteger(currentVersion) || Number(currentVersion) <= 0)) throw new Error("daily_brief_current_version_contract_failed");
+    await input.client.query("commit");
+    transactionClosed = true;
+    return {
+      schema_version: "hermes.daily_farm_brief.canonical_current_version_resolution.v1",
+      status: "resolved",
+      current_version: canonicalCount === 0 ? null : currentVersion as number,
+      transaction_read_only: true,
+      transaction_end: "commit",
+      database_write_performed: false,
+      write_executor_called: false,
+      retry_count: 0,
+      raw_record_exposed: false,
+      raw_identifier_exposed: false,
+      secret_exposed: false,
+    };
+  } catch {
+    if (transactionStarted && !transactionClosed) {
+      try { await input.client.query("rollback"); } catch { /* fail closed */ }
+    }
+    return {
+      ...failedCurrentVersionResolution(),
+      transaction_read_only: transactionStarted,
+      transaction_end: transactionStarted ? "rollback" : "not_started",
+    };
+  }
+}
 
 const bundleTokens = new WeakMap<object, symbol>();
 const repositoryTokens = new WeakMap<object, symbol>();
@@ -226,6 +345,23 @@ class SharedPostgresExecutor implements HermesDailyFarmBriefProductionRepository
       if (client !== null) { try { await client.query("rollback"); } catch { /* fail closed */ } }
       throw error;
     } finally { client?.release(); }
+  }
+  async resolveCanonicalCurrentVersion(targetDate: string): Promise<HermesDailyFarmBriefCanonicalCurrentVersionResolution> {
+    let client: PoolClient | null = null;
+    try {
+      client = await this.pool.connect();
+      const currentClient = client;
+      return await resolveHermesDailyFarmBriefCanonicalCurrentVersionReadOnlyTransaction({
+        client: currentClient,
+        targetDate,
+        initialize: async () => {
+          await this.settings(currentClient);
+          await this.identity(currentClient, "on");
+        },
+      });
+    } finally {
+      client?.release();
+    }
   }
   async executeCanonicalTransition(command: HermesDailyFarmBriefPersistenceCommand): Promise<unknown> {
     const { command_id: _commandId, ...payload } = command;
@@ -439,10 +575,22 @@ function registerBundle(input: HermesDailyFarmBriefRepositoryBundle, token: symb
   return Object.freeze(input);
 }
 
-export function createHermesDailyFarmBriefFixtureRepositoryBundle(repository: HermesDailyFarmBriefPersistedReadRepository & HermesDailyFarmBriefPersistenceWriteRepository & { readCount?: number }): HermesDailyFarmBriefRepositoryBundle {
+export function createHermesDailyFarmBriefFixtureRepositoryBundle(repository: HermesDailyFarmBriefPersistedReadRepository & HermesDailyFarmBriefPersistenceWriteRepository & { readCount?: number; inspectRecords?: () => unknown[] }): HermesDailyFarmBriefRepositoryBundle {
   const raw: HermesDailyFarmBriefRawPrivilegeCandidates = { ownerRole: "fixture_daily_brief_owner", runtimeRole: "fixture_daily_brief_runtime", recordsOwnerRole: "fixture_daily_brief_owner", commandsOwnerRole: "fixture_daily_brief_owner", ownerEligible: true, runtimeEligible: true, runtimeMatchesConnectionPrincipal: true, functionSignatureMatches: true, transactionRolledBack: true, catalogFingerprint: "0".repeat(64), priorState: { securityDefiner: true, searchPathFixed: true, publicExecute: false, runtimeExecute: true, runtimeDirectDml: false } };
   const token = Symbol("daily-brief-fixture-bundle");
-  return registerBundle({ state: "ready", write_state: "enabled", readRepository: repository, writeRepository: repository, diagnoseWriteReadiness: async (input) => classifyHermesDailyFarmBriefProductionWriteReadiness({ ...input, evidence: { connection_available: true, transaction_read_only: false, records_relation_exists: true, commands_relation_exists: true, function_exists: true, function_signature_matches: true, function_security_definer: true, function_search_path_safe: true, schema_public_create: false, schema_owner_safe: true, public_execute: false, runtime_execute_privilege: true, runtime_direct_dml: false, owner_relation_privileges: true, owner_role_safe: true, relation_owners_match_function_owner: true, owner_candidate_eligible: true, runtime_candidate_eligible: true, canonical_record_count: 0, expected_version_matches: input.expectedCurrentVersion === null, rollback_verified: true } }), resolvePrivilegeCandidates: async () => privilegeResolution(raw, token) }, token, "fixture");
+  const resolveCanonicalCurrentVersion = async (targetDate: string): Promise<HermesDailyFarmBriefCanonicalCurrentVersionResolution> => {
+    try {
+      if (!isBusinessDate(targetDate)) return failedCurrentVersionResolution();
+      const records = repository.inspectRecords?.();
+      if (!Array.isArray(records)) return failedCurrentVersionResolution();
+      const canonical = records.filter((value) => typeof value === "object" && value !== null && !Array.isArray(value) && (value as Record<string, unknown>).record_kind === "projectable_brief" && (value as Record<string, unknown>).business_date === targetDate && (value as Record<string, unknown>).record_status === "canonical");
+      if (canonical.length === 0) return resolvedCurrentVersion(null);
+      if (canonical.length !== 1) return failedCurrentVersionResolution();
+      const version = (canonical[0] as Record<string, unknown>).version;
+      return Number.isSafeInteger(version) && Number(version) > 0 ? resolvedCurrentVersion(version as number) : failedCurrentVersionResolution();
+    } catch { return failedCurrentVersionResolution(); }
+  };
+  return registerBundle({ state: "ready", write_state: "enabled", readRepository: repository, writeRepository: repository, resolveCanonicalCurrentVersion, diagnoseWriteReadiness: async (input) => classifyHermesDailyFarmBriefProductionWriteReadiness({ ...input, evidence: { connection_available: true, transaction_read_only: false, records_relation_exists: true, commands_relation_exists: true, function_exists: true, function_signature_matches: true, function_security_definer: true, function_search_path_safe: true, schema_public_create: false, schema_owner_safe: true, public_execute: false, runtime_execute_privilege: true, runtime_direct_dml: false, owner_relation_privileges: true, owner_role_safe: true, relation_owners_match_function_owner: true, owner_candidate_eligible: true, runtime_candidate_eligible: true, canonical_record_count: input.expectedCurrentVersion === null ? 0 : 1, expected_version_matches: true, rollback_verified: true } }), resolvePrivilegeCandidates: async () => privilegeResolution(raw, token) }, token, "fixture");
 }
 
 export function createHermesDailyFarmBriefProductionRepositoryBundle(environment: Readonly<Record<string, string | undefined>>, injectedExecutor?: HermesDailyFarmBriefProductionRepositoryExecutor): HermesDailyFarmBriefRepositoryBundle {
@@ -453,13 +601,18 @@ export function createHermesDailyFarmBriefProductionRepositoryBundle(environment
   const relationOverridePresent = environment[HERMES_DAILY_FARM_BRIEF_RELATION_OVERRIDE_ENV.records] !== undefined || environment[HERMES_DAILY_FARM_BRIEF_RELATION_OVERRIDE_ENV.commands] !== undefined;
   if (config === null || !host || !user || !credential || relationOverridePresent) {
     const deniedRead = { readCount: 0, async readRecordCandidates() { this.readCount += 1; return { schema_version: "hermes.daily_farm_brief.persisted_repository_result.v1", status: "unavailable", transaction_read_only: true, records: [] }; } };
-    return registerBundle({ state: "denied", write_state: "disabled", readRepository: deniedRead, writeRepository: new HermesDailyFarmBriefDenyByDefaultPersistenceRepository(), diagnoseWriteReadiness: async (input) => classifyHermesDailyFarmBriefProductionWriteReadiness({ ...input, connectionFailure: true }), resolvePrivilegeCandidates: async () => ({ preflight: EMPTY_PRIVILEGE_PREFLIGHT, token: null }) }, Symbol("daily-brief-denied-bundle"), "database");
+    return registerBundle({ state: "denied", write_state: "disabled", readRepository: deniedRead, writeRepository: new HermesDailyFarmBriefDenyByDefaultPersistenceRepository(), resolveCanonicalCurrentVersion: async () => failedCurrentVersionResolution(), diagnoseWriteReadiness: async (input) => classifyHermesDailyFarmBriefProductionWriteReadiness({ ...input, connectionFailure: true }), resolvePrivilegeCandidates: async () => ({ preflight: EMPTY_PRIVILEGE_PREFLIGHT, token: null }) }, Symbol("daily-brief-denied-bundle"), "database");
   }
   const executor = injectedExecutor ?? new SharedPostgresExecutor(config, { host, user, credential });
   const token = Symbol("daily-brief-production-bundle");
   const readRepository = new HermesDailyFarmBriefProductionPostgresReadRepository(executor);
   const writeEnabled = environment[HERMES_DAILY_FARM_BRIEF_PRODUCTION_WRITE_ENABLED_ENV] === "true";
   const writeRepository = writeEnabled ? new HermesDailyFarmBriefProductionPostgresWriteRepository(executor) : new HermesDailyFarmBriefDenyByDefaultPersistenceRepository();
+  const resolveCanonicalCurrentVersion = async (targetDate: string): Promise<HermesDailyFarmBriefCanonicalCurrentVersionResolution> => {
+    if (!isBusinessDate(targetDate) || executor.resolveCanonicalCurrentVersion === undefined) return failedCurrentVersionResolution();
+    try { return parseCurrentVersionResolution(await executor.resolveCanonicalCurrentVersion(targetDate)) ?? failedCurrentVersionResolution(); }
+    catch { return failedCurrentVersionResolution(); }
+  };
   const diagnoseWriteReadiness = async (input: { command: unknown; targetDate: string; expectedCurrentVersion: number | null }) => {
     if (executor.diagnoseWriteReadiness === undefined) return classifyHermesDailyFarmBriefProductionWriteReadiness({ ...input, connectionFailure: true });
     try {
@@ -474,7 +627,7 @@ export function createHermesDailyFarmBriefProductionRepositoryBundle(environment
     try { return privilegeResolution(await executor.resolvePrivilegeCandidates(), token); }
     catch { return { preflight: EMPTY_PRIVILEGE_PREFLIGHT, token: null }; }
   };
-  return registerBundle({ state: "ready", write_state: writeEnabled ? "enabled" : "disabled", readRepository, writeRepository, diagnoseWriteReadiness, resolvePrivilegeCandidates }, token, "database");
+  return registerBundle({ state: "ready", write_state: writeEnabled ? "enabled" : "disabled", readRepository, writeRepository, resolveCanonicalCurrentVersion, diagnoseWriteReadiness, resolvePrivilegeCandidates }, token, "database");
 }
 
 export function inspectHermesDailyFarmBriefRepositoryBundle(bundle: unknown): HermesDailyFarmBriefRepositoryIdentityEvidence {

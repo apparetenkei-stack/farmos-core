@@ -24,24 +24,27 @@ delete environment[HERMES_DAILY_FARM_BRIEF_REAL_DATA_PERSISTENCE_ENV.enabled];
 delete environment[HERMES_DAILY_FARM_BRIEF_REAL_DATA_PERSISTENCE_ENV.confirmation];
 
 const bundle = createHermesDailyFarmBriefProductionRepositoryBundle(environment);
+const currentVersionResolution = await bundle.resolveCanonicalCurrentVersion(targetDate);
+const expectedCurrentVersion = currentVersionResolution.status === "resolved" ? currentVersionResolution.current_version : null;
 const prepared = await prepareHermesDailyFarmBriefRealDataPersistence({
   targetDate,
   generatedAt,
   readOperationalSources: () => readHermesOperationalReadonlySources(),
   readMemoryContext: () => readHermesMemoryContext(),
 });
-const command = prepared === null ? null : buildHermesDailyFarmBriefAuthorizedRealDataPersistenceCommand({
+const command = prepared === null || currentVersionResolution.status !== "resolved" ? null : buildHermesDailyFarmBriefAuthorizedRealDataPersistenceCommand({
   prepared,
   targetDate,
   generatedAt,
-  expectedCurrentVersion: null,
+  expectedCurrentVersion,
 });
-const result = await bundle.diagnoseWriteReadiness({ command, targetDate, expectedCurrentVersion: null });
+const result = await bundle.diagnoseWriteReadiness({ command, targetDate, expectedCurrentVersion });
 const candidateResolution = await bundle.resolvePrivilegeCandidates();
 
 console.log(JSON.stringify({
   result: "pass",
   boundary: "hermes_daily_farm_brief_production_write_readiness",
+  current_version_resolution: currentVersionResolution,
   ...result,
   actual_persistence_enabled: false,
   persistence_transaction_call_count: 0,

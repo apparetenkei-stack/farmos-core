@@ -5,6 +5,8 @@ import {
   buildHermesDailyFarmBriefAuthorizedRealDataPersistenceCommand,
   prepareHermesDailyFarmBriefRealDataPersistence,
 } from "./brief_runtime/hermes_daily_farm_brief_authorized_real_data_persistence";
+import { createHermesDailyFarmBriefFixtureRepositoryBundle } from "../../src/lib/hermes/hermes_daily_farm_brief_production_repository_bundle";
+import { HermesDailyFarmBriefFixturePersistenceRepository } from "./brief_runtime/hermes_daily_farm_brief_persistence_write_boundary";
 import {
   classifyHermesDailyFarmBriefProductionWriteReadiness,
   type HermesDailyFarmBriefWriteReadinessEvidence,
@@ -30,6 +32,17 @@ const prepared = await prepareHermesDailyFarmBriefRealDataPersistence({ targetDa
 assert.ok(prepared);
 const command = buildHermesDailyFarmBriefAuthorizedRealDataPersistenceCommand({ prepared, targetDate: TARGET_DATE, generatedAt: GENERATED_AT, expectedCurrentVersion: null });
 assert.ok(command);
+
+const existingRepository = new HermesDailyFarmBriefFixturePersistenceRepository([command.record]);
+const existingBundle = createHermesDailyFarmBriefFixtureRepositoryBundle(existingRepository);
+const existingResolution = await existingBundle.resolveCanonicalCurrentVersion(TARGET_DATE);
+assert.equal(existingResolution.status, "resolved");
+assert.equal(existingResolution.current_version, 1);
+const updateCommand = buildHermesDailyFarmBriefAuthorizedRealDataPersistenceCommand({ prepared, targetDate: TARGET_DATE, generatedAt: GENERATED_AT, expectedCurrentVersion: existingResolution.current_version });
+assert.ok(updateCommand);
+assert.equal(updateCommand.expected_current_version, existingResolution.current_version);
+const updateReadiness = await existingBundle.diagnoseWriteReadiness({ command: updateCommand, targetDate: TARGET_DATE, expectedCurrentVersion: existingResolution.current_version });
+assert.equal(updateReadiness.classification, "ready");
 
 const readyEvidence: HermesDailyFarmBriefWriteReadinessEvidence = { connection_available: true, transaction_read_only: false, records_relation_exists: true, commands_relation_exists: true, function_exists: true, function_signature_matches: true, function_security_definer: true, function_search_path_safe: true, schema_public_create: false, schema_owner_safe: true, public_execute: false, runtime_execute_privilege: true, runtime_direct_dml: false, owner_relation_privileges: true, owner_role_safe: true, relation_owners_match_function_owner: true, owner_candidate_eligible: true, runtime_candidate_eligible: true, canonical_record_count: 0, expected_version_matches: true, rollback_verified: true };
 const classify = (evidence: HermesDailyFarmBriefWriteReadinessEvidence, value: unknown = command) => classifyHermesDailyFarmBriefProductionWriteReadiness({ command: value, targetDate: TARGET_DATE, expectedCurrentVersion: null, evidence });

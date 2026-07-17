@@ -17,7 +17,6 @@ const result = await runHermesDailyFarmBriefAuthorizedRealDataPersistence({
   targetDate,
   generatedAt,
   prepare: () => prepareHermesDailyFarmBriefRealDataPersistence({ targetDate, generatedAt, readOperationalSources: () => readHermesOperationalReadonlySources(), readMemoryContext: () => readHermesMemoryContext() }),
-  expectedCurrentVersion: null,
   repositoryBundle,
   administratorActor: { schema_version: "hermes.daily_farm_brief.authenticated_actor_context.v1", principal_ref: "day123-server-administrator", role: "administrator", allowed_scope_keys: [], authorization_verified: true },
   generalStaffActor: { schema_version: "hermes.daily_farm_brief.authenticated_actor_context.v1", principal_ref: "day123-server-general-staff", role: "general_staff", allowed_scope_keys: [], authorization_verified: true },
