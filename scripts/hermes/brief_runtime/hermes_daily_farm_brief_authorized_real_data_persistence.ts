@@ -86,7 +86,7 @@ export type HermesDailyFarmBriefAuthorizedRealDataPersistenceResult = {
   read_after_write: "pass" | "not_run";
   latest_selector: "pass" | "not_run";
   latest_display_projection: "pass" | "not_run";
-  administrator_display_state: "current" | null;
+  administrator_display_state: "current" | "stale" | null;
   general_staff_counts_redacted: boolean | null;
   call_counts: {
     operational_read: 0 | 1;
@@ -266,7 +266,10 @@ export async function runHermesDailyFarmBriefAuthorizedRealDataPersistence(input
   const staffRedacted = generalStaffDisplay !== null && generalStaffDisplay.source_disclosure.every((source) => source.source_record_count === null && source.input_record_count === null && source.selected_fact_count === null && source.attention_count === null && source.available_but_no_selected_facts === null && source.available_but_no_attention === null);
   const safeSerialized = JSON.stringify({ administratorBody, generalStaffBody });
   const exposed = [input.administratorActor.principal_ref, input.generalStaffActor.principal_ref, command.record.record_id, command.source_execution_reference].some((value) => safeSerialized.includes(value));
-  if (administratorResponse.status !== 200 || administratorDisplay?.display_state !== "current" || administratorDisplay.business_date !== input.targetDate || generalStaffResponse.status !== 200 || !staffRedacted || exposed) return { ...preflight, result: "failed_closed", stage: "read_after_write", call_counts: { ...preflight.call_counts, persistence_transaction: 1, repository_read: repositoryReads }, database_write_performed: wroteDatabase, transaction_committed: persisted.safety.transaction_committed };
+  const administratorDisplayVerified =
+    administratorDisplay?.display_state === "current" ||
+    administratorDisplay?.display_state === "stale";
+  if (administratorResponse.status !== 200 || !administratorDisplayVerified || administratorDisplay.business_date !== input.targetDate || generalStaffResponse.status !== 200 || !staffRedacted || exposed) return { ...preflight, result: "failed_closed", stage: "read_after_write", call_counts: { ...preflight.call_counts, persistence_transaction: 1, repository_read: repositoryReads }, database_write_performed: wroteDatabase, transaction_committed: persisted.safety.transaction_committed };
   return {
     ...preflight,
     result: persisted.status === "reused" ? "reused" : "inserted",
@@ -274,7 +277,7 @@ export async function runHermesDailyFarmBriefAuthorizedRealDataPersistence(input
     read_after_write: "pass",
     latest_selector: "pass",
     latest_display_projection: "pass",
-    administrator_display_state: "current",
+    administrator_display_state: administratorDisplay.display_state,
     general_staff_counts_redacted: true,
     call_counts: { ...preflight.call_counts, persistence_transaction: 1, repository_read: repositoryReads },
     database_write_performed: wroteDatabase,

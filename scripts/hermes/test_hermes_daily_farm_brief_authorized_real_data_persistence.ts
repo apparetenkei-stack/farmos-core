@@ -21,21 +21,22 @@ import {
 
 const TARGET_DATE = "2026-07-17" as const;
 const GENERATED_AT = "2026-07-17T01:00:00.000Z";
+const STALE_SOURCE_GENERATED_AT = "2026-07-16T01:00:00.000Z";
 
-function source<T>(type: "inventory" | "work_log" | "field" | "crop_cycle", records: T[]) {
+function source<T>(type: "inventory" | "work_log" | "field" | "crop_cycle", records: T[], generatedAt = GENERATED_AT) {
   const endpoint = type === "inventory" ? "/api/farmos-core/inventory-summary" : type === "work_log" ? "/api/farmos-core/recent-work-logs" : type === "field" ? "/api/farmos-core/fields" : "/api/farmos-core/crop-cycles";
   const responseSource = type === "inventory" ? "apparetenkei_inventory_readonly" : type === "work_log" ? "apparetenkei_work_logs_readonly" : type === "field" ? "apparetenkei_fields_readonly" : "apparetenkei_crop_cycles_readonly";
-  return { result: "ok" as const, source_type: type, endpoint_path: endpoint, http_method: "GET" as const, fetch_performed: true, available: true, transaction_read_only: true as const, requested_limit: 100, http_status: 200, response_source: responseSource, generated_at: GENERATED_AT, record_count: records.length, records, has_more: false, error_code: null, write_performed: false as const, restricted_fields_exposed: false as const, credentials_exposed: false as const };
+  return { result: "ok" as const, source_type: type, endpoint_path: endpoint, http_method: "GET" as const, fetch_performed: true, available: true, transaction_read_only: true as const, requested_limit: 100, http_status: 200, response_source: responseSource, generated_at: generatedAt, record_count: records.length, records, has_more: false, error_code: null, write_performed: false as const, restricted_fields_exposed: false as const, credentials_exposed: false as const };
 }
 
-function operational(input: { changed?: boolean } = {}): HermesOperationalReadonlyClientResult {
+function operational(input: { changed?: boolean; sourceGeneratedAt?: string } = {}): HermesOperationalReadonlyClientResult {
   const inventory = Array.from({ length: 7 }, (_, index) => ({ id: `inventory-${index}`, name: `material ${index}`, baseType: "material", currentQuantity: index + 1, unit: "kg" }));
   const fields = Array.from({ length: 71 }, (_, index) => ({ reference: `field-${index}`, display_name: `field ${index}`, active_state: "unknown" as const, source_updated_at: null }));
   const cropCycles = Array.from({ length: 40 }, (_, index) => ({ reference: `cycle-${index}`, field_references: [`field-${index}`], crop_display_name: `crop ${index}`, cycle_state: "unknown" as const, operational_start_date: "2026-07-01", source_updated_at: null }));
   const workLogs = Array.from({ length: 100 }, (_, index) => ({ id: `work-${index}`, startedAt: index < 6 ? null : GENERATED_AT, fieldId: `field-${index % 40}`, workTypeId: null, workTypeName: input.changed && index === 0 ? "changed work" : `work ${index}`, durationMinutes: 30, targetCrop: `crop ${index % 40}`, cropCycleId: `cycle-${index % 40}`, machineId: null, implementId: null, yieldAmount: null, yieldUnit: null, appliedMaterials: null }));
   return {
     result: "ok", checked: "hermes_operational_readonly_client", boundary: "day92_hermes_operational_readonly_client",
-    inventory: source("inventory", inventory), work_log: source("work_log", workLogs), field: source("field", fields), crop_cycle: source("crop_cycle", cropCycles),
+    inventory: source("inventory", inventory, input.sourceGeneratedAt), work_log: source("work_log", workLogs, input.sourceGeneratedAt), field: source("field", fields, input.sourceGeneratedAt), crop_cycle: source("crop_cycle", cropCycles, input.sourceGeneratedAt),
     inventory_source_connected: true, work_log_source_connected: true, field_source_connected: true, crop_cycle_source_connected: true, external_fetch_performed: true,
     hermes_context_injection_performed: false, suggestion_generation_performed: false, proposal_created: false, proposal_saved: false, proposal_apply_performed: false,
     app_db_write_performed: false, core_db_write_performed: false, audit_write_performed: false, database_write_performed: false, credentials_exposed: false, arbitrary_endpoint_allowed: false, arbitrary_method_allowed: false,
@@ -52,6 +53,10 @@ function environment(confirmed = true): Record<string, string> {
 
 function prepared(changed = false) {
   return prepareHermesDailyFarmBriefRealDataPersistence({ targetDate: TARGET_DATE, generatedAt: GENERATED_AT, readOperationalSources: async () => operational({ changed }), readMemoryContext: async () => ({ result: "error" }) });
+}
+
+function stalePrepared() {
+  return prepareHermesDailyFarmBriefRealDataPersistence({ targetDate: TARGET_DATE, generatedAt: GENERATED_AT, readOperationalSources: async () => operational({ sourceGeneratedAt: STALE_SOURCE_GENERATED_AT }), readMemoryContext: async () => ({ result: "error" }) });
 }
 
 function input(repository: HermesDailyFarmBriefFixturePersistenceRepository, overrides: Partial<Parameters<typeof runHermesDailyFarmBriefAuthorizedRealDataPersistence>[0]> = {}) {
@@ -121,6 +126,16 @@ assert.deepEqual(inserted.call_counts, { operational_read: 1, memory_read: 1, sc
 assert.equal(inserted.database_write_performed, false);
 assert.equal(inserted.safety.application_database_write_performed, false);
 assert.equal(inserted.safety.proposal_saved, false);
+
+const staleRepository = new HermesDailyFarmBriefFixturePersistenceRepository();
+const stale = await runHermesDailyFarmBriefAuthorizedRealDataPersistence(input(staleRepository, { prepare: () => stalePrepared() }));
+assert.equal(stale.result, "inserted");
+assert.equal(stale.stage, "completed");
+assert.equal(stale.read_after_write, "pass");
+assert.equal(stale.latest_selector, "pass");
+assert.equal(stale.latest_display_projection, "pass");
+assert.equal(stale.administrator_display_state, "stale");
+assert.equal(stale.general_staff_counts_redacted, true);
 
 const reused = await runHermesDailyFarmBriefAuthorizedRealDataPersistence(input(repository));
 assert.equal(reused.result, "reused");
