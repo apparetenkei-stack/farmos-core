@@ -198,9 +198,7 @@ function createSource<T>(input: {
     nowIso: input.nowIso,
   });
   const invalid = input.invalid === true || timestampInvalid;
-  const freshness = input.sourceType === "field" || input.sourceType === "crop_cycle"
-    ? "unknown"
-    : evaluateHermesDailyFarmFreshness({ sourceType: input.sourceType, generatedAt: input.generatedAt, nowIso: input.nowIso });
+  const freshness = evaluateHermesDailyFarmFreshness({ sourceType: input.sourceType, generatedAt: input.generatedAt, nowIso: input.nowIso });
   const status: HermesDailyFarmSourceStatus = invalid
     ? "invalid"
     : !input.available
@@ -308,25 +306,42 @@ function normalizeWorkLogSource(
 
 function normalizeFieldSource(value: unknown, nowIso: string): HermesDailyFarmSource<HermesDailyFarmMemoryRecord> {
   if (!validateOperationalSource(value, "field")) return invalidSource("field", nowIso);
+  const generatedAt = value.records.reduce<string | null>((latest, item) => {
+    const record = item as JsonRecord;
+    const updatedAt = record.source_updated_at ?? record.updated_at;
+    return typeof updatedAt === "string" && isCanonicalIso(updatedAt) && (latest === null || Date.parse(updatedAt) > Date.parse(latest)) ? updatedAt : latest;
+  }, null);
   const records = sortNullableIds(value.records.map((item) => {
     const record = item as JsonRecord;
-    return { id: safeId(record.reference), label: safeText(record.display_name), status: "unknown", source_timestamp: null };
+    const updatedAt = record.source_updated_at ?? record.updated_at;
+    return { id: safeId(record.reference), label: safeText(record.display_name), status: "unknown", source_timestamp: isCanonicalIso(updatedAt) ? updatedAt : null };
   })).slice(0, HERMES_DAILY_FARM_BRIEF_POLICY.source_record_limits.field);
-  return createSource({ sourceType: "field", available: value.available === true && value.result === "ok", generatedAt: value.generated_at as string | null, records, recordCount: Number(value.record_count), limitations: ["source_timestamp_observation_only"], nowIso });
+  return createSource({ sourceType: "field", available: value.available === true && value.result === "ok", generatedAt, records, recordCount: Number(value.record_count), limitations: generatedAt === null ? ["source_updated_at_unavailable"] : [], nowIso });
 }
 
 function normalizeOperationalCropCycleSource(input: { value: unknown; fieldValue: unknown; nowIso: string }): HermesDailyFarmSource<HermesDailyFarmMemoryRecord> {
   if (!validateOperationalSource(input.value, "crop_cycle")) return invalidSource("crop_cycle", input.nowIso);
-  if (!validateOperationalSource(input.fieldValue, "field")) {
-    return input.value.result === "ok" && input.value.records.length > 0 ? invalidSource("crop_cycle", input.nowIso) : createSource({ sourceType: "crop_cycle", available: false, generatedAt: null, records: [], recordCount: 0, limitations: ["crop_cycle_source_unavailable"], nowIso: input.nowIso });
+  const fieldSource = validateOperationalSource(input.fieldValue, "field") ? input.fieldValue : null;
+  const fieldReady = fieldSource?.result === "ok";
+  if (!fieldReady) {
+    if (input.value.result !== "ok") return createSource({ sourceType: "crop_cycle", available: false, generatedAt: null, records: [], recordCount: 0, limitations: ["crop_cycle_source_unavailable"], nowIso: input.nowIso });
   }
-  const fieldReferences = new Set(input.fieldValue.records.map((item) => (item as JsonRecord).reference));
-  if (input.value.records.some((item) => (item as JsonRecord).field_references instanceof Array && ((item as JsonRecord).field_references as unknown[]).some((reference) => !fieldReferences.has(reference)))) return invalidSource("crop_cycle", input.nowIso);
+  if (fieldReady) {
+    const fieldReferences = new Set(fieldSource.records.map((item) => (item as JsonRecord).reference));
+    if (input.value.records.some((item) => (item as JsonRecord).field_references instanceof Array && ((item as JsonRecord).field_references as unknown[]).some((reference) => !fieldReferences.has(reference)))) return invalidSource("crop_cycle", input.nowIso);
+  }
+  const generatedAt = input.value.records.reduce<string | null>((latest, item) => {
+    const record = item as JsonRecord;
+    const updatedAt = record.source_updated_at ?? record.updated_at;
+    return typeof updatedAt === "string" && isCanonicalIso(updatedAt) && (latest === null || Date.parse(updatedAt) > Date.parse(latest)) ? updatedAt : latest;
+  }, null);
   const records = sortNullableIds(input.value.records.map((item) => {
     const record = item as JsonRecord;
-    return { id: safeId(record.reference), label: safeText(record.crop_display_name), status: "unknown", source_timestamp: null };
+    const updatedAt = record.source_updated_at ?? record.updated_at;
+    return { id: safeId(record.reference), label: safeText(record.crop_display_name), status: "unknown", source_timestamp: isCanonicalIso(updatedAt) ? updatedAt : null };
   })).slice(0, HERMES_DAILY_FARM_BRIEF_POLICY.source_record_limits.crop_cycle);
-  return createSource({ sourceType: "crop_cycle", available: input.value.available === true && input.value.result === "ok", generatedAt: input.value.generated_at as string | null, records, recordCount: Number(input.value.record_count), limitations: ["source_timestamp_observation_only"], nowIso: input.nowIso });
+  const relationLimitation = fieldReady ? [] : ["crop_cycle_field_relation_unverified"];
+  return createSource({ sourceType: "crop_cycle", available: input.value.available === true && input.value.result === "ok", generatedAt, records, recordCount: Number(input.value.record_count), limitations: [...relationLimitation, ...(generatedAt === null ? ["source_updated_at_unavailable"] : [])], nowIso: input.nowIso });
 }
 
 function validateMemoryArray(value: unknown): value is unknown[] {
@@ -637,9 +652,7 @@ function validateCanonicalSource(
     return false;
   }
 
-  const expectedFreshness = sourceType === "field" || sourceType === "crop_cycle"
-    ? "unknown"
-    : evaluateHermesDailyFarmFreshness({ sourceType, generatedAt: value.generated_at as string | null, nowIso });
+  const expectedFreshness = evaluateHermesDailyFarmFreshness({ sourceType, generatedAt: value.generated_at as string | null, nowIso });
   if (value.freshness !== expectedFreshness) {
     return false;
   }

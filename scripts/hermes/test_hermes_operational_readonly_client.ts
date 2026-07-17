@@ -57,11 +57,12 @@ function makeDay122Envelope(input: {
     schema_version: input.schemaVersion,
     source: input.source,
     generated_at: "2026-07-10T00:00:00.000Z",
+    available: true,
     readOnly: true,
     record_count: input.records.length,
     records: structuredClone(input.records),
     pagination: { limit: input.limit ?? 100, hasMore: false },
-    safety: { writePerformed: false, restrictedFieldsExposed: false },
+    safety: { restrictedFieldsExposed: false, writePerformed: false },
   };
 }
 
@@ -257,6 +258,27 @@ async function main(): Promise<void> {
   assert.equal(success.work_log.record_count, 1);
   assert.equal(success.field?.record_count, 71);
   assert.equal(success.crop_cycle?.record_count, 40);
+  assert.equal(success.inventory.generated_at, null);
+  assert.equal(success.work_log.generated_at, null);
+  assert.equal(success.field.generated_at, null);
+  assert.equal(success.crop_cycle.generated_at, null);
+  assert.deepEqual(success.field.response_contract_diagnostics?.top_level_keys, [
+    "available", "generated_at", "pagination", "readOnly", "record_count", "records", "result", "safety", "schema_version", "source",
+  ]);
+  assert.deepEqual(success.field.response_contract_diagnostics?.safety_keys, [
+    "restrictedFieldsExposed", "writePerformed",
+  ]);
+  assert.deepEqual(success.field.response_contract_diagnostics?.first_record_keys, [
+    "active_state", "display_name", "reference", "source_updated_at",
+  ]);
+  assert.equal(success.field.response_contract_diagnostics?.validator_failure_reason, null);
+  const serializedContractDiagnostics = JSON.stringify({
+    field: success.field.response_contract_diagnostics,
+    crop_cycle: success.crop_cycle.response_contract_diagnostics,
+  });
+  assert.equal(serializedContractDiagnostics.includes("field-reference-"), false);
+  assert.equal(serializedContractDiagnostics.includes("Field 1"), false);
+  assert.equal(serializedContractDiagnostics.includes("Cabbage"), false);
   assert.equal(success.inventory.records[0]?.currentQuantity, 0);
   assert.equal(success.work_log.records[0]?.durationMinutes, 0);
   assert.equal(success.work_log.records[0]?.yieldAmount, 0);
@@ -303,6 +325,25 @@ async function main(): Promise<void> {
     true,
   );
   assertGlobalSafety(success);
+
+  const UPDATED_AT = "2026-07-10T00:30:00.000Z";
+  const updatedAt = await readHermesOperationalReadonlySources({
+    env: makeEnv(),
+    fetchImpl: async (input) => {
+      const url = String(input);
+      const envelope = envelopeForUrl(url);
+      if (url.includes("/inventory-summary") || url.includes("/recent-work-logs")) {
+        envelope.updatedAt = UPDATED_AT;
+      } else {
+        for (const record of envelope.records as JsonRecord[]) record.source_updated_at = UPDATED_AT;
+      }
+      return new Response(JSON.stringify(envelope), { status: 200 });
+    },
+  });
+  assert.equal(updatedAt.inventory.generated_at, UPDATED_AT);
+  assert.equal(updatedAt.work_log.generated_at, UPDATED_AT);
+  assert.equal(updatedAt.field.generated_at, UPDATED_AT);
+  assert.equal(updatedAt.crop_cycle.generated_at, UPDATED_AT);
 
   const serializedSuccess = JSON.stringify(success);
   assert.equal(serializedSuccess.includes(TEST_TOKEN), false);
@@ -391,12 +432,55 @@ async function main(): Promise<void> {
   assert.equal(emptyDay122.crop_cycle?.result, "ok");
   assert.equal(emptyDay122.crop_cycle?.record_count, 0);
 
+  const emptyAllSources = await readHermesOperationalReadonlySources({
+    env: makeEnv(),
+    fetchImpl: async (input) => {
+      const url = String(input);
+      const envelope = envelopeForUrl(url);
+      envelope.records = [];
+      if (Object.hasOwn(envelope, "recordCount")) envelope.recordCount = 0;
+      else envelope.record_count = 0;
+      return new Response(JSON.stringify(envelope), { status: 200 });
+    },
+  });
+  assert.equal(emptyAllSources.result, "ok");
+  for (const source of [emptyAllSources.inventory, emptyAllSources.work_log, emptyAllSources.field, emptyAllSources.crop_cycle]) {
+    assert.equal(source.result, "ok");
+    assert.equal(source.available, true);
+    assert.equal(source.record_count, 0);
+  }
+
+  const omittedUpdatedAt = await readHermesOperationalReadonlySources({
+    env: makeEnv(),
+    fetchImpl: async (input) => {
+      const envelope = envelopeForUrl(String(input));
+      for (const record of envelope.records as JsonRecord[]) {
+        delete record.source_updated_at;
+        delete record.updated_at;
+      }
+      return new Response(JSON.stringify(envelope), { status: 200 });
+    },
+  });
+  assert.equal(omittedUpdatedAt.field.result, "ok");
+  assert.equal(omittedUpdatedAt.crop_cycle.result, "ok");
+  assert.equal(omittedUpdatedAt.field.generated_at, null);
+  assert.equal(omittedUpdatedAt.crop_cycle.generated_at, null);
+
   const fieldUnknownKey = await readHermesOperationalReadonlySources({ env: makeEnv(), fetchImpl: overrideFetch("fields", (envelope) => { (envelope.records as JsonRecord[])[0].unknown = true; }) });
   assert.equal(fieldUnknownKey.field?.error_code, "invalid_response");
+  assert.equal(fieldUnknownKey.field?.response_contract_diagnostics?.validator_failure_reason, "invalid_record_keys");
   const fieldMissingKey = await readHermesOperationalReadonlySources({ env: makeEnv(), fetchImpl: overrideFetch("fields", (envelope) => { delete (envelope.records as JsonRecord[])[0].display_name; }) });
   assert.equal(fieldMissingKey.field?.error_code, "invalid_response");
   const fieldMalformedEnvelope = await readHermesOperationalReadonlySources({ env: makeEnv(), fetchImpl: overrideFetch("fields", (envelope) => { envelope.extra = true; }) });
   assert.equal(fieldMalformedEnvelope.field?.error_code, "invalid_response");
+  assert.equal(fieldMalformedEnvelope.field?.response_contract_diagnostics?.validator_failure_reason, "invalid_top_level_keys");
+
+  const fieldMissingAvailable = await readHermesOperationalReadonlySources({ env: makeEnv(), fetchImpl: overrideFetch("fields", (envelope) => { delete envelope.available; }) });
+  assert.equal(fieldMissingAvailable.field.response_contract_diagnostics?.validator_failure_reason, "invalid_top_level_keys");
+  const fieldUnavailable = await readHermesOperationalReadonlySources({ env: makeEnv(), fetchImpl: overrideFetch("fields", (envelope) => { envelope.available = false; }) });
+  assert.equal(fieldUnavailable.field.response_contract_diagnostics?.validator_failure_reason, "invalid_available");
+  const fieldUnknownSafetyKey = await readHermesOperationalReadonlySources({ env: makeEnv(), fetchImpl: overrideFetch("fields", (envelope) => { (envelope.safety as JsonRecord).credentialsExposed = false; }) });
+  assert.equal(fieldUnknownSafetyKey.field.response_contract_diagnostics?.validator_failure_reason, "invalid_safety_keys");
 
   const fieldContractMutations: Array<(envelope: JsonRecord) => void> = [
     (envelope) => { envelope.schema_version = "farmos.core.fields.read.v0"; },
@@ -450,6 +534,19 @@ async function main(): Promise<void> {
   const orphanRelation = await readHermesOperationalReadonlySources({ env: makeEnv(), fetchImpl: overrideFetch("crop-cycles", (envelope) => { (envelope.records as JsonRecord[])[0].field_references = ["field-reference-absent"]; }) });
   assert.equal(orphanRelation.crop_cycle?.error_code, "invalid_response");
   assert.equal(orphanRelation.crop_cycle?.record_count, 0);
+
+  const independentFieldFailure = await readHermesOperationalReadonlySources({
+    env: makeEnv(),
+    fetchImpl: async (input) => {
+      const url = String(input);
+      return url.includes("/fields")
+        ? new Response(null, { status: 503 })
+        : new Response(JSON.stringify(envelopeForUrl(url)), { status: 200 });
+    },
+  });
+  assert.equal(independentFieldFailure.field.result, "error");
+  assert.equal(independentFieldFailure.crop_cycle.result, "ok");
+  assert.equal(independentFieldFailure.crop_cycle.record_count, cropCycleRecords.length);
 
   const unauthorized = await readHermesOperationalReadonlySources({ env: makeEnv(), fetchImpl: async () => new Response(null, { status: 401 }) });
   assert.equal(unauthorized.field?.error_code, "remote_http_error");

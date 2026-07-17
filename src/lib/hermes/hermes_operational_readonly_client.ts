@@ -66,7 +66,8 @@ export type HermesOperationalFieldRecord = {
   reference: string;
   display_name: string;
   active_state: "unknown";
-  source_updated_at: null;
+  source_updated_at?: string | null;
+  updated_at?: string | null;
 };
 
 export type HermesOperationalCropCycleRecord = {
@@ -75,7 +76,8 @@ export type HermesOperationalCropCycleRecord = {
   crop_display_name: string | null;
   cycle_state: "unknown";
   operational_start_date: string | null;
-  source_updated_at: null;
+  source_updated_at?: string | null;
+  updated_at?: string | null;
 };
 
 type HermesOperationalSourceType =
@@ -110,6 +112,33 @@ export type HermesOperationalReadonlyErrorCode =
   | "remote_http_error"
   | "invalid_response";
 
+export type HermesOperationalResponseValidationFailureReason =
+  | "invalid_top_level_keys"
+  | "invalid_schema_version"
+  | "invalid_result"
+  | "invalid_available"
+  | "invalid_response_source"
+  | "invalid_generated_at"
+  | "invalid_read_only"
+  | "invalid_record_count"
+  | "invalid_records"
+  | "invalid_record_keys"
+  | "invalid_record_reference"
+  | "invalid_source_updated_at"
+  | "invalid_pagination"
+  | "invalid_safety_keys"
+  | "invalid_safety_value";
+
+export type HermesOperationalResponseContractDiagnostics = {
+  top_level_keys: string[];
+  top_level_types: Record<string, string>;
+  safety_keys: string[];
+  safety_types: Record<string, string>;
+  first_record_keys: string[];
+  first_record_types: Record<string, string>;
+  validator_failure_reason: HermesOperationalResponseValidationFailureReason | null;
+};
+
 export type HermesOperationalReadonlySourceResult<TRecord> = {
   result: "ok" | "error";
   source_type: HermesOperationalSourceType;
@@ -126,6 +155,7 @@ export type HermesOperationalReadonlySourceResult<TRecord> = {
   records: TRecord[];
   has_more: boolean;
   error_code: HermesOperationalReadonlyErrorCode | null;
+  response_contract_diagnostics?: HermesOperationalResponseContractDiagnostics;
   write_performed: false;
   restricted_fields_exposed: false;
   credentials_exposed: false;
@@ -190,6 +220,7 @@ type ResolvedConfig =
 type ValidatedEnvelope<TRecord> = {
   source: HermesOperationalResponseSource;
   generatedAt: string;
+  sourceUpdatedAt: string | null;
   recordCount: number;
   records: TRecord[];
   pagination: {
@@ -259,6 +290,7 @@ const DAY122_ENVELOPE_KEYS = [
   "schema_version",
   "source",
   "generated_at",
+  "available",
   "readOnly",
   "record_count",
   "records",
@@ -266,9 +298,11 @@ const DAY122_ENVELOPE_KEYS = [
   "safety",
 ] as const;
 const DAY122_PAGINATION_KEYS = ["limit", "hasMore"] as const;
-const DAY122_SAFETY_KEYS = ["writePerformed", "restrictedFieldsExposed"] as const;
-const FIELD_RECORD_KEYS = ["reference", "display_name", "active_state", "source_updated_at"] as const;
-const CROP_CYCLE_RECORD_KEYS = ["reference", "field_references", "crop_display_name", "cycle_state", "operational_start_date", "source_updated_at"] as const;
+const DAY122_SAFETY_KEYS = ["restrictedFieldsExposed", "writePerformed"] as const;
+const FIELD_REQUIRED_RECORD_KEYS = ["reference", "display_name", "active_state"] as const;
+const FIELD_ALLOWED_RECORD_KEYS = new Set([...FIELD_REQUIRED_RECORD_KEYS, "source_updated_at", "updated_at"]);
+const CROP_CYCLE_REQUIRED_RECORD_KEYS = ["reference", "field_references", "crop_display_name", "cycle_state", "operational_start_date"] as const;
+const CROP_CYCLE_ALLOWED_RECORD_KEYS = new Set([...CROP_CYCLE_REQUIRED_RECORD_KEYS, "source_updated_at", "updated_at"]);
 const OPERATIONAL_SOURCE_RESULT_KEYS = [
   "result",
   "source_type",
@@ -289,6 +323,10 @@ const OPERATIONAL_SOURCE_RESULT_KEYS = [
   "restricted_fields_exposed",
   "credentials_exposed",
 ] as const;
+const OPERATIONAL_SOURCE_RESULT_ALLOWED_KEYS = new Set([
+  ...OPERATIONAL_SOURCE_RESULT_KEYS,
+  "response_contract_diagnostics",
+]);
 
 function isRecord(value: unknown): value is JsonRecord {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -300,6 +338,73 @@ function hasOnlyKeys(value: JsonRecord, allowed: Set<string>): boolean {
 
 function hasExactKeys(value: JsonRecord, expected: readonly string[]): boolean {
   return Object.keys(value).length === expected.length && expected.every((key) => Object.hasOwn(value, key));
+}
+
+function hasRequiredKeys(value: JsonRecord, required: readonly string[]): boolean {
+  return required.every((key) => Object.hasOwn(value, key));
+}
+
+function jsonTypeName(value: unknown): string {
+  if (value === null) return "null";
+  if (Array.isArray(value)) return "array";
+  return typeof value;
+}
+
+function sortedShape(value: unknown): { keys: string[]; types: Record<string, string> } {
+  if (!isRecord(value)) return { keys: [], types: {} };
+  const keys = Object.keys(value).sort();
+  return {
+    keys,
+    types: Object.fromEntries(keys.map((key) => [key, jsonTypeName(value[key])])),
+  };
+}
+
+function responseContractDiagnostics(
+  value: unknown,
+  validatorFailureReason: HermesOperationalResponseValidationFailureReason | null,
+): HermesOperationalResponseContractDiagnostics {
+  const topLevel = sortedShape(value);
+  const safety = sortedShape(isRecord(value) ? value.safety : undefined);
+  const records = isRecord(value) && Array.isArray(value.records) ? value.records : [];
+  const firstRecord = sortedShape(records[0]);
+  return {
+    top_level_keys: topLevel.keys,
+    top_level_types: topLevel.types,
+    safety_keys: safety.keys,
+    safety_types: safety.types,
+    first_record_keys: firstRecord.keys,
+    first_record_types: firstRecord.types,
+    validator_failure_reason: validatorFailureReason,
+  };
+}
+
+function validateResponseContractDiagnostics(value: unknown): boolean {
+  if (!isRecord(value) || !hasExactKeys(value, [
+    "top_level_keys",
+    "top_level_types",
+    "safety_keys",
+    "safety_types",
+    "first_record_keys",
+    "first_record_types",
+    "validator_failure_reason",
+  ])) return false;
+  const validKeys = (keys: unknown): keys is string[] => Array.isArray(keys) && keys.every((key) => typeof key === "string") && [...keys].sort().every((key, index) => key === keys[index]);
+  const validTypes = (types: unknown, keys: string[]): boolean => isRecord(types) && hasExactKeys(types, keys) && Object.values(types).every((type) => ["array", "bigint", "boolean", "function", "null", "number", "object", "string", "symbol", "undefined"].includes(String(type)));
+  const reasons: readonly (HermesOperationalResponseValidationFailureReason | null)[] = [
+    null, "invalid_top_level_keys", "invalid_schema_version", "invalid_result", "invalid_available",
+    "invalid_response_source", "invalid_generated_at", "invalid_read_only", "invalid_record_count",
+    "invalid_records", "invalid_record_keys", "invalid_record_reference", "invalid_source_updated_at",
+    "invalid_pagination", "invalid_safety_keys", "invalid_safety_value",
+  ];
+  return validKeys(value.top_level_keys) && validTypes(value.top_level_types, value.top_level_keys) &&
+    validKeys(value.safety_keys) && validTypes(value.safety_types, value.safety_keys) &&
+    validKeys(value.first_record_keys) && validTypes(value.first_record_types, value.first_record_keys) &&
+    reasons.includes(value.validator_failure_reason as HermesOperationalResponseValidationFailureReason | null);
+}
+
+function sourceUpdatedAt(value: JsonRecord): unknown {
+  if (Object.hasOwn(value, "source_updated_at") && Object.hasOwn(value, "updated_at")) return undefined;
+  return Object.hasOwn(value, "source_updated_at") ? value.source_updated_at : Object.hasOwn(value, "updated_at") ? value.updated_at : null;
 }
 
 function isCanonicalIso(value: unknown): value is string {
@@ -431,19 +536,47 @@ function validateWorkLogRecord(
 }
 
 function validateFieldRecord(value: unknown): value is HermesOperationalFieldRecord {
-  return isRecord(value) && hasExactKeys(value, FIELD_RECORD_KEYS) && isReference(value.reference) && isBoundedPlainText(value.display_name, MAX_DISPLAY_TEXT_CHARS) && value.active_state === "unknown" && value.source_updated_at === null;
+  return validateFieldRecordKeys(value) && validateFieldRecordReference(value) && validateRecordSourceUpdatedAt(value) && validateFieldRecordValues(value);
 }
 
 function validateCropCycleRecord(value: unknown): value is HermesOperationalCropCycleRecord {
-  if (!isRecord(value) || !hasExactKeys(value, CROP_CYCLE_RECORD_KEYS) || !isReference(value.reference) || !Array.isArray(value.field_references) || value.field_references.length > MAX_FIELD_REFERENCES || !value.field_references.every(isReference) || new Set(value.field_references).size !== value.field_references.length) return false;
-  return (value.crop_display_name === null || isBoundedPlainText(value.crop_display_name, MAX_DISPLAY_TEXT_CHARS)) && value.cycle_state === "unknown" && (value.operational_start_date === null || isCanonicalBusinessDate(value.operational_start_date)) && value.source_updated_at === null;
+  return validateCropCycleRecordKeys(value) && validateCropCycleRecordReference(value) && validateRecordSourceUpdatedAt(value) && validateCropCycleRecordValues(value);
+}
+
+function validateFieldRecordKeys(value: unknown): value is JsonRecord {
+  return isRecord(value) && hasOnlyKeys(value, FIELD_ALLOWED_RECORD_KEYS) && hasRequiredKeys(value, FIELD_REQUIRED_RECORD_KEYS);
+}
+
+function validateCropCycleRecordKeys(value: unknown): value is JsonRecord {
+  return isRecord(value) && hasOnlyKeys(value, CROP_CYCLE_ALLOWED_RECORD_KEYS) && hasRequiredKeys(value, CROP_CYCLE_REQUIRED_RECORD_KEYS);
+}
+
+function validateFieldRecordReference(value: JsonRecord): boolean {
+  return isReference(value.reference);
+}
+
+function validateCropCycleRecordReference(value: JsonRecord): boolean {
+  return isReference(value.reference) && Array.isArray(value.field_references) && value.field_references.length <= MAX_FIELD_REFERENCES && value.field_references.every(isReference) && new Set(value.field_references).size === value.field_references.length;
+}
+
+function validateRecordSourceUpdatedAt(value: JsonRecord): boolean {
+  const updatedAt = sourceUpdatedAt(value);
+  return updatedAt === null || isCanonicalIso(updatedAt);
+}
+
+function validateFieldRecordValues(value: JsonRecord): boolean {
+  return isBoundedPlainText(value.display_name, MAX_DISPLAY_TEXT_CHARS) && value.active_state === "unknown";
+}
+
+function validateCropCycleRecordValues(value: JsonRecord): boolean {
+  return (value.crop_display_name === null || isBoundedPlainText(value.crop_display_name, MAX_DISPLAY_TEXT_CHARS)) && value.cycle_state === "unknown" && (value.operational_start_date === null || isCanonicalBusinessDate(value.operational_start_date));
 }
 
 export function parseHermesOperationalReadonlySourceResult(
   value: unknown,
   sourceType: HermesOperationalSourceType,
 ): HermesOperationalReadonlySourceResult<HermesOperationalRecord> | null {
-  if (!isRecord(value) || !hasExactKeys(value, OPERATIONAL_SOURCE_RESULT_KEYS)) {
+  if (!isRecord(value) || !hasRequiredKeys(value, OPERATIONAL_SOURCE_RESULT_KEYS) || !hasOnlyKeys(value, OPERATIONAL_SOURCE_RESULT_ALLOWED_KEYS)) {
     return null;
   }
 
@@ -505,7 +638,8 @@ export function parseHermesOperationalReadonlySourceResult(
       !validErrorCodes.includes(value.error_code as HermesOperationalReadonlyErrorCode)) ||
     value.write_performed !== false ||
     value.restricted_fields_exposed !== false ||
-    value.credentials_exposed !== false
+    value.credentials_exposed !== false ||
+    (value.response_contract_diagnostics !== undefined && !validateResponseContractDiagnostics(value.response_contract_diagnostics))
   ) {
     return null;
   }
@@ -634,6 +768,7 @@ function createErrorSource<TRecord>(input: {
   errorCode: HermesOperationalReadonlyErrorCode;
   fetchPerformed?: boolean;
   httpStatus?: number | null;
+  responseContractDiagnostics?: HermesOperationalResponseContractDiagnostics;
 }): HermesOperationalReadonlySourceResult<TRecord> {
   return {
     result: "error",
@@ -651,6 +786,7 @@ function createErrorSource<TRecord>(input: {
     records: [],
     has_more: false,
     error_code: input.errorCode,
+    ...(input.responseContractDiagnostics === undefined ? {} : { response_contract_diagnostics: input.responseContractDiagnostics }),
     write_performed: false,
     restricted_fields_exposed: false,
     credentials_exposed: false,
@@ -669,6 +805,14 @@ function validateEnvelope<TRecord>(input: {
     return null;
   }
 
+  const camelUpdatedAtPresent = Object.hasOwn(input.value, "updatedAt");
+  const snakeUpdatedAtPresent = Object.hasOwn(input.value, "updated_at");
+  const sourceUpdatedAt = camelUpdatedAtPresent
+    ? input.value.updatedAt
+    : snakeUpdatedAtPresent
+      ? input.value.updated_at
+      : null;
+
   if (
     input.value.result !== "ok" ||
     input.value.source !== input.expectedSource ||
@@ -683,7 +827,9 @@ function validateEnvelope<TRecord>(input: {
     typeof input.value.pagination.hasMore !== "boolean" ||
     !isRecord(input.value.safety) ||
     input.value.safety.writePerformed !== false ||
-    input.value.safety.restrictedFieldsExposed !== false
+    input.value.safety.restrictedFieldsExposed !== false ||
+    (camelUpdatedAtPresent && snakeUpdatedAtPresent) ||
+    (sourceUpdatedAt !== null && !isCanonicalIso(sourceUpdatedAt))
   ) {
     return null;
   }
@@ -699,6 +845,7 @@ function validateEnvelope<TRecord>(input: {
   return {
     source: input.expectedSource,
     generatedAt: input.value.generatedAt,
+    sourceUpdatedAt: sourceUpdatedAt as string | null,
     recordCount: records.length,
     records,
     pagination: {
@@ -708,51 +855,64 @@ function validateEnvelope<TRecord>(input: {
   };
 }
 
+type Day122EnvelopeValidation<TRecord> = {
+  envelope: ValidatedEnvelope<TRecord> | null;
+  diagnostics: HermesOperationalResponseContractDiagnostics;
+};
+
 function validateDay122Envelope<TRecord>(input: {
   value: unknown;
   schemaVersion: "farmos.core.fields.read.v1" | "farmos.core.crop_cycles.read.v1";
   expectedSource: "apparetenkei_fields_readonly" | "apparetenkei_crop_cycles_readonly";
   requestedLimit: number;
-  validateRecord: (value: unknown) => value is TRecord;
+  validateRecordKeys: (value: unknown) => value is JsonRecord;
+  validateRecordReference: (value: JsonRecord) => boolean;
+  validateRecordValues: (value: JsonRecord) => boolean;
   recordReference: (value: TRecord) => string;
-}): ValidatedEnvelope<TRecord> | null {
-  if (!isRecord(input.value) || containsRestrictedKey(input.value) || !hasExactKeys(input.value, DAY122_ENVELOPE_KEYS)) return null;
-  if (
-    input.value.result !== "ok" ||
-    input.value.schema_version !== input.schemaVersion ||
-    input.value.source !== input.expectedSource ||
-    !isCanonicalIso(input.value.generated_at) ||
-    input.value.readOnly !== true ||
-    !Number.isSafeInteger(input.value.record_count) ||
-    Number(input.value.record_count) < 0 ||
-    !Array.isArray(input.value.records) ||
-    !isRecord(input.value.pagination) ||
-    !hasExactKeys(input.value.pagination, DAY122_PAGINATION_KEYS) ||
-    input.value.pagination.limit !== input.requestedLimit ||
-    !Number.isSafeInteger(input.value.pagination.limit) ||
-    Number(input.value.pagination.limit) < 1 ||
-    Number(input.value.pagination.limit) > HERMES_OPERATIONAL_READONLY_MAX_LIMIT ||
-    typeof input.value.pagination.hasMore !== "boolean" ||
-    !isRecord(input.value.safety) ||
-    !hasExactKeys(input.value.safety, DAY122_SAFETY_KEYS) ||
-    input.value.safety.writePerformed !== false ||
-    input.value.safety.restrictedFieldsExposed !== false ||
-    input.value.records.length !== input.value.record_count ||
-    !input.value.records.every(input.validateRecord)
-  ) return null;
+}): Day122EnvelopeValidation<TRecord> {
+  const rejected = (reason: HermesOperationalResponseValidationFailureReason): Day122EnvelopeValidation<TRecord> => ({
+    envelope: null,
+    diagnostics: responseContractDiagnostics(input.value, reason),
+  });
+  if (!isRecord(input.value) || !hasExactKeys(input.value, DAY122_ENVELOPE_KEYS)) return rejected("invalid_top_level_keys");
+  if (input.value.schema_version !== input.schemaVersion) return rejected("invalid_schema_version");
+  if (input.value.result !== "ok") return rejected("invalid_result");
+  if (input.value.available !== true) return rejected("invalid_available");
+  if (input.value.source !== input.expectedSource) return rejected("invalid_response_source");
+  if (!isCanonicalIso(input.value.generated_at)) return rejected("invalid_generated_at");
+  if (input.value.readOnly !== true) return rejected("invalid_read_only");
+  if (!Number.isSafeInteger(input.value.record_count) || Number(input.value.record_count) < 0) return rejected("invalid_record_count");
+  if (!Array.isArray(input.value.records)) return rejected("invalid_records");
+  if (input.value.records.length !== input.value.record_count) return rejected("invalid_record_count");
+  if (!isRecord(input.value.pagination) || !hasExactKeys(input.value.pagination, DAY122_PAGINATION_KEYS) || input.value.pagination.limit !== input.requestedLimit || !Number.isSafeInteger(input.value.pagination.limit) || Number(input.value.pagination.limit) < 1 || Number(input.value.pagination.limit) > HERMES_OPERATIONAL_READONLY_MAX_LIMIT || typeof input.value.pagination.hasMore !== "boolean") return rejected("invalid_pagination");
+  if (!isRecord(input.value.safety) || !hasExactKeys(input.value.safety, DAY122_SAFETY_KEYS)) return rejected("invalid_safety_keys");
+  if (input.value.safety.writePerformed !== false || input.value.safety.restrictedFieldsExposed !== false) return rejected("invalid_safety_value");
+  if (!input.value.records.every(input.validateRecordKeys)) return rejected("invalid_record_keys");
+  const recordsAsJson = input.value.records as JsonRecord[];
+  if (!recordsAsJson.every(input.validateRecordReference)) return rejected("invalid_record_reference");
+  if (!recordsAsJson.every(validateRecordSourceUpdatedAt)) return rejected("invalid_source_updated_at");
+  if (!recordsAsJson.every(input.validateRecordValues)) return rejected("invalid_records");
 
   const records = input.value.records as TRecord[];
-  if (new Set(records.map(input.recordReference)).size !== records.length) return null;
+  if (new Set(records.map(input.recordReference)).size !== records.length) return rejected("invalid_record_reference");
 
   return {
-    source: input.expectedSource,
-    generatedAt: input.value.generated_at,
-    recordCount: input.value.records.length,
-    records,
-    pagination: {
-      limit: input.requestedLimit,
-      hasMore: input.value.pagination.hasMore,
+    envelope: {
+      source: input.expectedSource,
+      generatedAt: input.value.generated_at,
+      sourceUpdatedAt: input.value.records.reduce<string | null>((latest, record) => {
+        const item = record as { source_updated_at?: unknown; updated_at?: unknown };
+        const updatedAt = item.source_updated_at ?? item.updated_at;
+        return typeof updatedAt === "string" && (latest === null || Date.parse(updatedAt) > Date.parse(latest)) ? updatedAt : latest;
+      }, null),
+      recordCount: input.value.records.length,
+      records,
+      pagination: {
+        limit: input.requestedLimit,
+        hasMore: input.value.pagination.hasMore,
+      },
     },
+    diagnostics: responseContractDiagnostics(input.value, null),
   };
 }
 
@@ -855,7 +1015,7 @@ async function readSource<TRecord>(input: {
       requested_limit: input.limit,
       http_status: response.status,
       response_source: envelope.source,
-      generated_at: envelope.generatedAt,
+      generated_at: envelope.sourceUpdatedAt,
       record_count: envelope.recordCount,
       records: envelope.records,
       has_more: envelope.pagination.hasMore,
@@ -893,7 +1053,9 @@ async function readDay122Source<TRecord>(input: {
   endpointPath: typeof FIELD_ENDPOINT_PATH | typeof CROP_CYCLE_ENDPOINT_PATH;
   schemaVersion: "farmos.core.fields.read.v1" | "farmos.core.crop_cycles.read.v1";
   expectedSource: "apparetenkei_fields_readonly" | "apparetenkei_crop_cycles_readonly";
-  validateRecord: (value: unknown) => value is TRecord;
+  validateRecordKeys: (value: unknown) => value is JsonRecord;
+  validateRecordReference: (value: JsonRecord) => boolean;
+  validateRecordValues: (value: JsonRecord) => boolean;
   recordReference: (value: TRecord) => string;
   fetchImpl: typeof fetch;
 }): Promise<HermesOperationalReadonlySourceResult<TRecord>> {
@@ -923,10 +1085,20 @@ async function readDay122Source<TRecord>(input: {
     } catch {
       return createErrorSource({ sourceType: input.sourceType, endpointPath: input.endpointPath, limit: input.limit, errorCode: "invalid_response", fetchPerformed: true, httpStatus: response.status });
     }
-    const envelope = validateDay122Envelope({ value: parsed, schemaVersion: input.schemaVersion, expectedSource: input.expectedSource, requestedLimit: input.limit, validateRecord: input.validateRecord, recordReference: input.recordReference });
-    if (envelope === null) {
-      return createErrorSource({ sourceType: input.sourceType, endpointPath: input.endpointPath, limit: input.limit, errorCode: "invalid_response", fetchPerformed: true, httpStatus: response.status });
+    const validation = validateDay122Envelope({
+      value: parsed,
+      schemaVersion: input.schemaVersion,
+      expectedSource: input.expectedSource,
+      requestedLimit: input.limit,
+      validateRecordKeys: input.validateRecordKeys,
+      validateRecordReference: input.validateRecordReference,
+      validateRecordValues: input.validateRecordValues,
+      recordReference: input.recordReference,
+    });
+    if (validation.envelope === null) {
+      return createErrorSource({ sourceType: input.sourceType, endpointPath: input.endpointPath, limit: input.limit, errorCode: "invalid_response", fetchPerformed: true, httpStatus: response.status, responseContractDiagnostics: validation.diagnostics });
     }
+    const envelope = validation.envelope;
     return {
       result: "ok",
       source_type: input.sourceType,
@@ -938,11 +1110,12 @@ async function readDay122Source<TRecord>(input: {
       requested_limit: input.limit,
       http_status: response.status,
       response_source: envelope.source,
-      generated_at: envelope.generatedAt,
+      generated_at: envelope.sourceUpdatedAt,
       record_count: envelope.recordCount,
       records: envelope.records,
       has_more: envelope.pagination.hasMore,
       error_code: null,
+      response_contract_diagnostics: validation.diagnostics,
       write_performed: false,
       restricted_fields_exposed: false,
       credentials_exposed: false,
@@ -960,13 +1133,21 @@ function validateCropCycleFieldRelations(input: {
   cropCycle: HermesOperationalReadonlySourceResult<HermesOperationalCropCycleRecord>;
 }): HermesOperationalReadonlySourceResult<HermesOperationalCropCycleRecord> {
   if (input.cropCycle.result !== "ok" || input.cropCycle.records.length === 0) return input.cropCycle;
-  if (input.field.result !== "ok") {
-    return createErrorSource({ sourceType: "crop_cycle", endpointPath: CROP_CYCLE_ENDPOINT_PATH, limit: input.cropCycle.requested_limit, errorCode: "invalid_response", fetchPerformed: input.cropCycle.fetch_performed, httpStatus: input.cropCycle.http_status });
-  }
+  if (input.field.result !== "ok") return input.cropCycle;
   const fieldReferences = new Set(input.field.records.map((record) => record.reference));
   const orphanFound = input.cropCycle.records.some((record) => record.field_references.some((reference) => !fieldReferences.has(reference)));
   return orphanFound
-    ? createErrorSource({ sourceType: "crop_cycle", endpointPath: CROP_CYCLE_ENDPOINT_PATH, limit: input.cropCycle.requested_limit, errorCode: "invalid_response", fetchPerformed: input.cropCycle.fetch_performed, httpStatus: input.cropCycle.http_status })
+    ? createErrorSource({
+        sourceType: "crop_cycle",
+        endpointPath: CROP_CYCLE_ENDPOINT_PATH,
+        limit: input.cropCycle.requested_limit,
+        errorCode: "invalid_response",
+        fetchPerformed: input.cropCycle.fetch_performed,
+        httpStatus: input.cropCycle.http_status,
+        responseContractDiagnostics: input.cropCycle.response_contract_diagnostics === undefined
+          ? undefined
+          : { ...input.cropCycle.response_contract_diagnostics, validator_failure_reason: "invalid_record_reference" },
+      })
     : input.cropCycle;
 }
 
@@ -1070,7 +1251,9 @@ export async function readHermesOperationalReadonlySources(input?: {
       endpointPath: FIELD_ENDPOINT_PATH,
       schemaVersion: "farmos.core.fields.read.v1",
       expectedSource: "apparetenkei_fields_readonly",
-      validateRecord: validateFieldRecord,
+      validateRecordKeys: validateFieldRecordKeys,
+      validateRecordReference: validateFieldRecordReference,
+      validateRecordValues: validateFieldRecordValues,
       recordReference: (record) => record.reference,
       fetchImpl,
     }),
@@ -1083,7 +1266,9 @@ export async function readHermesOperationalReadonlySources(input?: {
       endpointPath: CROP_CYCLE_ENDPOINT_PATH,
       schemaVersion: "farmos.core.crop_cycles.read.v1",
       expectedSource: "apparetenkei_crop_cycles_readonly",
-      validateRecord: validateCropCycleRecord,
+      validateRecordKeys: validateCropCycleRecordKeys,
+      validateRecordReference: validateCropCycleRecordReference,
+      validateRecordValues: validateCropCycleRecordValues,
       recordReference: (record) => record.reference,
       fetchImpl,
     }),

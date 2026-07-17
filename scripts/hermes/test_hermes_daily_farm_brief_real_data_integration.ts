@@ -45,12 +45,12 @@ function workLogRecord(index: number) {
   };
 }
 
-function fieldRecord(index: number) {
-  return { reference: `field-${index}`, display_name: `private field body ${index}`, active_state: "unknown" as const, source_updated_at: null };
+function fieldRecord(index: number, sourceUpdatedAt: string | null = null) {
+  return { reference: `field-${index}`, display_name: `private field body ${index}`, active_state: "unknown" as const, source_updated_at: sourceUpdatedAt };
 }
 
-function cropCycleRecord(index: number) {
-  return { reference: `cycle-${index}`, field_references: [`field-${index}`], crop_display_name: `private operational crop body ${index}`, cycle_state: "unknown" as const, operational_start_date: "2026-07-01", source_updated_at: null };
+function cropCycleRecord(index: number, sourceUpdatedAt: string | null = null) {
+  return { reference: `cycle-${index}`, field_references: [`field-${index}`], crop_display_name: `private operational crop body ${index}`, cycle_state: "unknown" as const, operational_start_date: "2026-07-01", source_updated_at: sourceUpdatedAt };
 }
 
 function operationalFixture(input: {
@@ -63,6 +63,8 @@ function operationalFixture(input: {
   fieldMode?: SourceMode;
   cropCycleMode?: SourceMode;
   orphanCropCycle?: boolean;
+  fieldSourceUpdatedAt?: string | null;
+  cropCycleSourceUpdatedAt?: string | null;
   inventoryGeneratedAt?: string | null;
   workLogGeneratedAt?: string | null;
 } = {}): HermesOperationalReadonlyClientResult {
@@ -112,8 +114,8 @@ function operationalFixture(input: {
     { length: input.workLogCount ?? 2 },
     (_, index) => workLogRecord(index),
   );
-  const fields = Array.from({ length: input.fieldCount ?? 2 }, (_, index) => fieldRecord(index));
-  const cropCycles = Array.from({ length: input.cropCycleCount ?? 2 }, (_, index) => ({ ...cropCycleRecord(index), field_references: input.orphanCropCycle && index === 0 ? ["field-orphan"] : [`field-${index}`] }));
+  const fields = Array.from({ length: input.fieldCount ?? 2 }, (_, index) => fieldRecord(index, input.fieldSourceUpdatedAt));
+  const cropCycles = Array.from({ length: input.cropCycleCount ?? 2 }, (_, index) => ({ ...cropCycleRecord(index, input.cropCycleSourceUpdatedAt), field_references: input.orphanCropCycle && index === 0 ? ["field-orphan"] : [`field-${index}`] }));
   const day122Source = <T>(options: { type: "field" | "crop_cycle"; mode: SourceMode; records: T[] }) => ({
     result: options.mode === "ok" ? ("ok" as const) : ("error" as const),
     source_type: options.type,
@@ -460,7 +462,7 @@ async function main(): Promise<void> {
 
   assert.equal(
     day91Fixture.snapshot.sources.crop_cycle.generated_at,
-    "2026-07-14T08:00:00.000Z",
+    null,
   );
   assert.equal(day91Fixture.snapshot.sources.hermes_note.generated_at, null);
   assert.equal(
@@ -600,6 +602,13 @@ async function main(): Promise<void> {
   const failedOperationalSources = await integrate({ operational: async () => operationalFixture({ fieldMode: "unavailable", cropCycleMode: "unavailable" }), snapshotId: "snapshot-day122-source-failure", briefId: "brief-day122-source-failure" });
   assert.equal(failedOperationalSources.snapshot.sources.field.status, "unavailable");
   assert.equal(failedOperationalSources.snapshot.sources.crop_cycle.status, "unavailable");
+  const independentOperationalSources = await integrate({ operational: async () => operationalFixture({ fieldMode: "unavailable" }), snapshotId: "snapshot-day123-independent-source-failure", briefId: "brief-day123-independent-source-failure" });
+  assert.equal(independentOperationalSources.snapshot.sources.field.status, "unavailable");
+  assert.equal(independentOperationalSources.snapshot.sources.crop_cycle.status, "available");
+  assert.equal(independentOperationalSources.snapshot.sources.crop_cycle.limitations.includes("crop_cycle_field_relation_unverified"), true);
+  const updatedOperationalSources = await integrate({ operational: async () => operationalFixture({ fieldSourceUpdatedAt: "2026-07-14T08:30:00.000Z", cropCycleSourceUpdatedAt: "2026-07-14T08:30:00.000Z" }), snapshotId: "snapshot-day123-source-updated-at", briefId: "brief-day123-source-updated-at" });
+  assert.equal(updatedOperationalSources.snapshot.sources.field.freshness, "fresh");
+  assert.equal(updatedOperationalSources.snapshot.sources.crop_cycle.freshness, "fresh");
   const orphan = await integrate({ operational: async () => operationalFixture({ orphanCropCycle: true }), snapshotId: "snapshot-day122-orphan", briefId: "brief-day122-orphan" });
   assert.equal(orphan.snapshot.sources.crop_cycle.status, "invalid");
   assert.equal(orphan.result, "unavailable");
