@@ -37,8 +37,7 @@ const command = prepared === null ? null : buildHermesDailyFarmBriefAuthorizedRe
   expectedCurrentVersion: null,
 });
 const result = await bundle.diagnoseWriteReadiness({ command, targetDate, expectedCurrentVersion: null });
-const candidatesEligible = result.owner_candidate === "eligible" && result.runtime_candidate === "eligible";
-const objectsReady = result.required_relations === "present" && result.persist_function === "ready";
+const candidateResolution = await bundle.resolvePrivilegeCandidates();
 
 console.log(JSON.stringify({
   result: "pass",
@@ -46,14 +45,5 @@ console.log(JSON.stringify({
   ...result,
   actual_persistence_enabled: false,
   persistence_transaction_call_count: 0,
-  manual_apply_preflight: {
-    ready_for_manual_apply: result.connection_available && result.command_valid && objectsReady && candidatesEligible && result.rollback_verified,
-    function_change_required: result.function_security !== "definer" || result.search_path !== "fixed",
-    owner_change_required: result.owner_role !== "safe" || result.owner_candidate !== "eligible",
-    revoke_public_required: result.public_execute === "present",
-    grant_execute_required: result.execute_privilege !== "present",
-    revoke_direct_dml_required: result.runtime_direct_dml === "present",
-    rollback_plan_available: true,
-    production_change_performed: false,
-  },
+  manual_apply_preflight: candidateResolution.preflight,
 }, null, 2));

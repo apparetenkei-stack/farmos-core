@@ -22,6 +22,12 @@ The Day114 function continues to enforce idempotency, source-execution uniquenes
 
 After manual privilege application, the rollback-only readiness diagnostic must report the definer mode, fixed search path, absent PUBLIC EXECUTE, present runtime EXECUTE, absent runtime direct DML, safe owner role and capabilities, compatible canonical state, and verified rollback. Actual Daily Brief persistence is a further, separate approval gate.
 
+## Catalog-owned candidate resolution
+
+The production preflight does not accept owner or runtime role names from environment, CLI, HTTP, or other caller input. In one server-side read-only transaction it resolves the function owner, both relation owners, and `current_user` from PostgreSQL catalogs and then rolls back. Raw role names remain in an in-process opaque token backed by a `WeakMap`; safe output contains only resolved, eligible, principal-match, and ownership-alignment booleans.
+
+The candidate token is bound to the repository-bundle instance and contains the pre-change catalog fingerprint and rollback evidence. A forged token, token from another bundle, caller role override, missing confirmation, or changed catalog fingerprint is rejected before an apply transaction. The reviewed apply runner remains deny-by-default until a separately approved administrator executor is connected. It has one-transaction, zero-retry semantics and does not perform production changes in Day123.
+
 ## Isolated PostgreSQL evidence
 
 The Day123 isolated test uses only `farmos_core_day114_test`. Test-only owner/runtime roles have no credential and no production name. It verifies catalog state, function insert, idempotent replay, conflict rejection, injected rollback, denied direct INSERT and UPDATE, absent DELETE privilege, and authenticated latest read. It runs two independent scenarios without DELETE, TRUNCATE, reset, migration, or production access.
