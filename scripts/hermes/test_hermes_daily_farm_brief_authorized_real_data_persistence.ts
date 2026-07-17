@@ -4,6 +4,8 @@ import type { HermesOperationalReadonlyClientResult } from "../../src/lib/hermes
 import {
   HERMES_DAILY_FARM_BRIEF_REAL_DATA_PERSISTENCE_CONFIRMATION_VALUE,
   HERMES_DAILY_FARM_BRIEF_REAL_DATA_PERSISTENCE_ENV,
+  buildHermesDailyFarmBriefAuthorizedGenerationIdentity,
+  buildHermesDailyFarmBriefAuthorizedRealDataPersistenceCommand,
   prepareHermesDailyFarmBriefRealDataPersistence,
   runHermesDailyFarmBriefAuthorizedRealDataPersistence,
 } from "./brief_runtime/hermes_daily_farm_brief_authorized_real_data_persistence";
@@ -22,6 +24,7 @@ import {
 
 const TARGET_DATE = "2026-07-17" as const;
 const GENERATED_AT = "2026-07-17T01:00:00.000Z";
+const NEXT_GENERATED_AT = "2026-07-17T02:00:00.000Z";
 const STALE_SOURCE_GENERATED_AT = "2026-07-16T01:00:00.000Z";
 
 function source<T>(type: "inventory" | "work_log" | "field" | "crop_cycle", records: T[], generatedAt = GENERATED_AT) {
@@ -52,8 +55,9 @@ function environment(confirmed = true): Record<string, string> {
   return confirmed ? { [HERMES_DAILY_FARM_BRIEF_REAL_DATA_PERSISTENCE_ENV.enabled]: "true", [HERMES_DAILY_FARM_BRIEF_REAL_DATA_PERSISTENCE_ENV.confirmation]: HERMES_DAILY_FARM_BRIEF_REAL_DATA_PERSISTENCE_CONFIRMATION_VALUE } : {};
 }
 
-function prepared(changed = false) {
-  return prepareHermesDailyFarmBriefRealDataPersistence({ targetDate: TARGET_DATE, generatedAt: GENERATED_AT, readOperationalSources: async () => operational({ changed }), readMemoryContext: async () => ({ result: "error" }) });
+function prepared(options: { changed?: boolean; generatedAt?: string } = {}) {
+  const generatedAt = options.generatedAt ?? GENERATED_AT;
+  return prepareHermesDailyFarmBriefRealDataPersistence({ targetDate: TARGET_DATE, generatedAt, readOperationalSources: async () => operational({ changed: options.changed }), readMemoryContext: async () => ({ result: "error" }) });
 }
 
 function stalePrepared() {
@@ -142,9 +146,26 @@ assert.equal(inserted.database_write_performed, false);
 assert.equal(inserted.safety.application_database_write_performed, false);
 assert.equal(inserted.safety.proposal_saved, false);
 assert.ok(repository.lastCommand);
-const exactPayloadReplay = await persistHermesDailyFarmBrief({ command: structuredClone(repository.lastCommand), repository, clock: () => GENERATED_AT });
+const firstCommand = structuredClone(repository.lastCommand);
+const exactPayloadReplay = await persistHermesDailyFarmBrief({ command: structuredClone(firstCommand), repository, clock: () => GENERATED_AT });
 assert.equal(exactPayloadReplay.status, "reused");
 assert.equal(exactPayloadReplay.retry_count, 0);
+const sameIdentityDifferentPayloadPrepared = await prepared({ changed: true });
+assert.ok(sameIdentityDifferentPayloadPrepared);
+const sameIdentityDifferentPayloadCommand = buildHermesDailyFarmBriefAuthorizedRealDataPersistenceCommand({
+  prepared: sameIdentityDifferentPayloadPrepared,
+  targetDate: TARGET_DATE,
+  generatedAt: GENERATED_AT,
+  expectedCurrentVersion: 1,
+});
+assert.ok(sameIdentityDifferentPayloadCommand);
+const recordsBeforeIdentityConflict = repository.inspectRecords();
+const sameIdentityDifferentPayload = await persistHermesDailyFarmBrief({ command: sameIdentityDifferentPayloadCommand, repository, clock: () => GENERATED_AT });
+assert.equal(sameIdentityDifferentPayload.status, "rejected");
+assert.equal(sameIdentityDifferentPayload.error_code, "idempotency_conflict");
+assert.equal(sameIdentityDifferentPayload.safety.fixture_repository_write_performed, false);
+assert.equal(sameIdentityDifferentPayload.retry_count, 0);
+assert.deepEqual(repository.inspectRecords(), recordsBeforeIdentityConflict);
 
 const staleRepository = new HermesDailyFarmBriefFixturePersistenceRepository();
 const stale = await runHermesDailyFarmBriefAuthorizedRealDataPersistence(input(staleRepository, { prepare: () => stalePrepared() }));
@@ -156,24 +177,36 @@ assert.equal(stale.latest_display_projection, "pass");
 assert.equal(stale.administrator_display_state, "stale");
 assert.equal(stale.general_staff_counts_redacted, true);
 
-const nextPrepared = async () => {
-  const value = await prepared(true);
-  if (value === null) return null;
-  return { ...value, execution_result: { ...value.execution_result, execution_id: `${value.execution_result.execution_id}-v2` } };
-};
-const updated = await runHermesDailyFarmBriefAuthorizedRealDataPersistence(input(repository, { prepare: nextPrepared }));
+const firstGenerationIdentity = buildHermesDailyFarmBriefAuthorizedGenerationIdentity({ targetDate: TARGET_DATE, generatedAt: GENERATED_AT });
+const repeatedGenerationIdentity = buildHermesDailyFarmBriefAuthorizedGenerationIdentity({ targetDate: TARGET_DATE, generatedAt: GENERATED_AT });
+const nextGenerationIdentity = buildHermesDailyFarmBriefAuthorizedGenerationIdentity({ targetDate: TARGET_DATE, generatedAt: NEXT_GENERATED_AT });
+assert.ok(firstGenerationIdentity);
+assert.equal(repeatedGenerationIdentity, firstGenerationIdentity);
+assert.ok(nextGenerationIdentity);
+assert.notEqual(nextGenerationIdentity, firstGenerationIdentity);
+const updated = await runHermesDailyFarmBriefAuthorizedRealDataPersistence(input(repository, {
+  generatedAt: NEXT_GENERATED_AT,
+  prepare: () => prepared({ changed: true, generatedAt: NEXT_GENERATED_AT }),
+}));
 assert.equal(updated.result, "inserted");
 assert.equal(updated.expected_current_version, 1);
 assert.deepEqual((repository.inspectRecords() as Array<{ version: number; record_status: string }>).map(({ version, record_status }) => ({ version, record_status })), [{ version: 1, record_status: "superseded" }, { version: 2, record_status: "canonical" }]);
+assert.ok(repository.lastCommand);
+assert.equal(repository.lastCommand.record.record_id, firstCommand.record.record_id);
+assert.notEqual(repository.lastCommand.command_id, firstCommand.command_id);
+assert.notEqual(repository.lastCommand.source_execution_reference, firstCommand.source_execution_reference);
+assert.notEqual(repository.lastCommand.idempotency_key, firstCommand.idempotency_key);
 
 const callsBeforeConflict = repository.transactionCallCount;
 const recordsBeforeConflict = repository.inspectRecords();
-const conflict = await runHermesDailyFarmBriefAuthorizedRealDataPersistence(input(repository, { prepare: () => prepared(true) }));
+const conflict = await runHermesDailyFarmBriefAuthorizedRealDataPersistence(input(repository, { prepare: () => prepared({ changed: true }) }));
 assert.equal(conflict.result, "rejected");
 assert.equal(conflict.stage, "persistence");
+assert.equal(conflict.persistence_failure_code, "existing_record_conflict");
 assert.equal(repository.transactionCallCount - callsBeforeConflict, 1);
 assert.deepEqual(repository.inspectRecords(), recordsBeforeConflict);
 assert.equal(conflict.database_write_performed, false);
+assert.equal(conflict.safety.retry_performed, false);
 
 const rollbackRepository = new HermesDailyFarmBriefFixturePersistenceRepository();
 rollbackRepository.failNextTransaction();
@@ -198,4 +231,4 @@ const serialized = JSON.stringify(inserted);
 for (const forbidden of ["record_id", "source_record_id", "scope_index", "principal_ref", "allowed_scope_keys", "credential", "field-0", "cycle-0"]) assert.equal(serialized.includes(forbidden), false);
 assert.equal(inserted.safety.secret_exposed, false);
 
-console.log(JSON.stringify({ result: "pass", boundary: "hermes_daily_farm_brief_authorized_real_data_persistence", default_disabled: true, dry_run_write_count: 0, repository_identity_mismatch_write_count: 0, insert: "pass", exact_payload_reuse: "reused", existing_v1_to_v2: "pass", version_conflict_retry_count: 0, conflicting_reuse: "rejected", rollback: "pass", read_after_write: "pass", latest_selector: "pass", latest_display: "pass", operational_read_maximum: 1, memory_read_maximum: 1, app_database_write_performed: false, proposal_saved: false, secret_exposed: false }));
+console.log(JSON.stringify({ result: "pass", boundary: "hermes_daily_farm_brief_authorized_real_data_persistence", default_disabled: true, dry_run_write_count: 0, repository_identity_mismatch_write_count: 0, insert: "pass", deterministic_generation_identity: true, new_generated_at_new_identity: true, stable_record_identity: true, exact_payload_reuse: "reused", same_identity_different_payload: "idempotency_conflict", existing_v1_to_v2: "pass", version_conflict_retry_count: 0, conflicting_reuse: "rejected", rollback: "pass", read_after_write: "pass", latest_selector: "pass", latest_display: "pass", operational_read_maximum: 1, memory_read_maximum: 1, app_database_write_performed: false, proposal_saved: false, secret_exposed: false }));

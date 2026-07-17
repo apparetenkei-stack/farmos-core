@@ -1,6 +1,7 @@
 import {
   buildHermesDailyFarmBriefProjectablePersistenceCommand,
 } from "./hermes_daily_farm_brief_persistence_command_contract";
+import { fingerprintHermesDailyFarmBriefPersistenceCommandPayload } from "./hermes_daily_farm_brief_persistence_fingerprint";
 import {
   buildHermesDailyFarmBriefExecutionRoleProjection,
   buildHermesDailyFarmBriefExecutionScopeIndex,
@@ -111,13 +112,30 @@ type PrepareInput = {
   readMemoryContext: () => Promise<unknown>;
 };
 
+export function buildHermesDailyFarmBriefAuthorizedGenerationIdentity(input: {
+  targetDate: string;
+  generatedAt: string;
+}): string | null {
+  if (!isHermesDailyFarmBusinessDate(input.targetDate) || !isCanonicalIso(input.generatedAt)) return null;
+  return fingerprintHermesDailyFarmBriefPersistenceCommandPayload({
+    schema_version: "hermes.daily_farm_brief.authorized_generation_identity.v1",
+    business_date: input.targetDate,
+    generated_at: input.generatedAt,
+    trigger_type: "manual",
+    actor_role: "administrator",
+    role_projection_target: "administrator",
+  }).slice(0, 32);
+}
+
 export async function prepareHermesDailyFarmBriefRealDataPersistence(input: PrepareInput): Promise<HermesDailyFarmBriefPreparedRealDataPersistence | null> {
   if (!isHermesDailyFarmBusinessDate(input.targetDate) || !isCanonicalIso(input.generatedAt)) return null;
   const requestedDate = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Tokyo", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(input.generatedAt));
   if (requestedDate !== input.targetDate) return null;
-  const decision = orchestrateHermesDailyFarmBriefGeneration({ requestCreation: { triggerType: "manual", requestedAt: input.generatedAt, actorRole: "administrator", authorizationVerified: true, serverForceRegenerationAllowed: true, requestIdFactory: () => `day123-real-request-${input.targetDate}` }, existingState: null });
+  const generationIdentity = buildHermesDailyFarmBriefAuthorizedGenerationIdentity(input);
+  if (generationIdentity === null) return null;
+  const decision = orchestrateHermesDailyFarmBriefGeneration({ requestCreation: { triggerType: "manual", requestedAt: input.generatedAt, actorRole: "administrator", authorizationVerified: true, serverForceRegenerationAllowed: true, requestIdFactory: () => `day123-real-request-${generationIdentity}` }, existingState: null });
   if (decision === null || decision.decision !== "generate" || decision.request.business_date !== input.targetDate) return null;
-  const request = createHermesDailyFarmBriefExecutionRequest({ generationDecision: decision, roleProjectionTarget: "administrator", allowedScopeKeys: [], clock: () => input.generatedAt, executionIdFactory: () => `day123-real-execution-${input.targetDate}` });
+  const request = createHermesDailyFarmBriefExecutionRequest({ generationDecision: decision, roleProjectionTarget: "administrator", allowedScopeKeys: [], clock: () => input.generatedAt, executionIdFactory: () => `day123-real-execution-${generationIdentity}` });
   if (request === null) return null;
   let operationalRead = 0;
   let memoryRead = 0;
@@ -132,9 +150,9 @@ export async function prepareHermesDailyFarmBriefRealDataPersistence(input: Prep
         readMemoryContext: async () => { memoryRead += 1; return input.readMemoryContext(); },
         now: () => input.generatedAt,
         timezone: "Asia/Tokyo",
-        snapshotIdFactory: () => `day123-real-snapshot-${input.targetDate}`,
-        briefIdFactory: () => `day123-real-brief-${input.targetDate}`,
-        factIdFactory: (index) => `day123-real-fact-${input.targetDate}-${index}`,
+        snapshotIdFactory: () => `day123-real-snapshot-${generationIdentity}`,
+        briefIdFactory: () => `day123-real-brief-${generationIdentity}`,
+        factIdFactory: (index) => `day123-real-fact-${generationIdentity}-${index}`,
       }));
       return bundle;
     },
@@ -204,12 +222,14 @@ export function buildHermesDailyFarmBriefAuthorizedRealDataPersistenceCommand(in
   generatedAt: string;
   expectedCurrentVersion: number | null;
 }) {
+  const generationIdentity = buildHermesDailyFarmBriefAuthorizedGenerationIdentity(input);
+  if (generationIdentity === null) return null;
   return buildHermesDailyFarmBriefProjectablePersistenceCommand({
     executionResult: input.prepared.execution_result,
     latestSource: input.prepared.latest_source,
     expectedCurrentVersion: input.expectedCurrentVersion,
     requestedAt: input.generatedAt,
-    commandIdFactory: () => `day123-real-command-${input.targetDate}`,
+    commandIdFactory: () => `day123-real-command-${generationIdentity}`,
     recordIdFactory: (date) => `daily-farm-brief-${date}-projectable`,
   });
 }
