@@ -22,7 +22,7 @@ import {
   parseHermesDailyFarmBriefLatestReadSource,
   type HermesDailyFarmBriefAuthenticatedActorContext,
 } from "./hermes_daily_farm_brief_latest_api_contract";
-import { parseHermesDailyFarmBriefLatestDisplayApiResponse } from "./hermes_daily_farm_brief_latest_display_api_contract";
+import { parseHermesDailyFarmBriefLatestDisplayApiResponseV2 } from "./hermes_daily_farm_brief_latest_display_api_contract";
 import { serveHermesDailyFarmBriefLatestDisplay } from "./hermes_daily_farm_brief_latest_display_service";
 import {
   readHermesDailyFarmBriefPersistedLatestSource,
@@ -286,8 +286,8 @@ export async function runHermesDailyFarmBriefAuthorizedRealDataPersistence(input
   const responseFor = (actor: HermesDailyFarmBriefAuthenticatedActorContext) => serveHermesDailyFarmBriefLatestDisplay({ request: new Request("http://localhost/api/hermes/daily-farm-brief/latest-display"), dependencies: { authenticate: async () => ({ ...authentication, principal_ref: actor.principal_ref }), resolveActorContext: async () => actor, readLatestSource: async () => selected.source, clock: () => input.generatedAt } });
   const administratorResponse = await responseFor(input.administratorActor);
   const generalStaffResponse = await responseFor(input.generalStaffActor);
-  const administratorBody = parseHermesDailyFarmBriefLatestDisplayApiResponse(await administratorResponse.json());
-  const generalStaffBody = parseHermesDailyFarmBriefLatestDisplayApiResponse(await generalStaffResponse.json());
+  const administratorBody = parseHermesDailyFarmBriefLatestDisplayApiResponseV2(await administratorResponse.json());
+  const generalStaffBody = parseHermesDailyFarmBriefLatestDisplayApiResponseV2(await generalStaffResponse.json());
   const administratorDisplay = administratorBody?.result === "ok" ? administratorBody.display : null;
   const generalStaffDisplay = generalStaffBody?.result === "ok" ? generalStaffBody.display : null;
   const staffRedacted = generalStaffDisplay !== null && generalStaffDisplay.source_disclosure.every((source) => source.source_record_count === null && source.input_record_count === null && source.selected_fact_count === null && source.attention_count === null && source.available_but_no_selected_facts === null && source.available_but_no_attention === null);

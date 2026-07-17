@@ -1,5 +1,5 @@
-import { createHermesDailyFarmBriefDisplayProjection } from "./hermes_daily_farm_brief_display_projection_boundary";
-import type { HermesDailyFarmBriefDisplayProjection } from "./hermes_daily_farm_brief_display_projection_contract";
+import { createHermesDailyFarmBriefDisplayProjectionV2 } from "./hermes_daily_farm_brief_display_projection_boundary";
+import type { HermesDailyFarmBriefDisplayProjectionV2 } from "./hermes_daily_farm_brief_display_projection_contract";
 import { deriveHermesDailyFarmBusinessDate } from "./hermes_daily_farm_brief_generation_contract";
 import {
   parseHermesDailyFarmBriefAuthenticatedActorContext,
@@ -8,7 +8,7 @@ import {
   type HermesDailyFarmBriefAuthenticationResult,
 } from "./hermes_daily_farm_brief_latest_api_contract";
 import {
-  createHermesDailyFarmBriefLatestDisplayApiResponse,
+  createHermesDailyFarmBriefLatestDisplayApiResponseV2,
   createHermesDailyFarmBriefLatestDisplayReadRequest,
   type HermesDailyFarmBriefLatestDisplayApiError,
   type HermesDailyFarmBriefLatestDisplayState,
@@ -25,13 +25,13 @@ export type HermesDailyFarmBriefLatestDisplayDependencies = {
 const RESPONSE_HEADERS = { "Cache-Control": "no-store", "Content-Type": "application/json; charset=utf-8", "X-Content-Type-Options": "nosniff" } as const;
 function response(error: HermesDailyFarmBriefLatestDisplayApiError, status: 400 | 401 | 403 | 405 | 500): Response {
   const headers = new Headers(RESPONSE_HEADERS); if (status === 405) headers.set("Allow", "GET");
-  const body = createHermesDailyFarmBriefLatestDisplayApiResponse({ result: "error", error });
+  const body = createHermesDailyFarmBriefLatestDisplayApiResponseV2({ result: "error", error });
   return new Response(JSON.stringify(body), { status, headers });
 }
-function success(displayState: HermesDailyFarmBriefLatestDisplayState, display: HermesDailyFarmBriefDisplayProjection | null): Response {
+function success(displayState: HermesDailyFarmBriefLatestDisplayState, display: HermesDailyFarmBriefDisplayProjectionV2 | null): Response {
   const body = displayState === "current" || displayState === "stale"
-    ? display === null ? null : createHermesDailyFarmBriefLatestDisplayApiResponse({ result: "ok", displayState, display })
-    : createHermesDailyFarmBriefLatestDisplayApiResponse({ result: "ok", displayState, display: null });
+    ? display === null ? null : createHermesDailyFarmBriefLatestDisplayApiResponseV2({ result: "ok", displayState, display })
+    : createHermesDailyFarmBriefLatestDisplayApiResponseV2({ result: "ok", displayState, display: null });
   if (body === null) return response("latest_display_read_failed", 500);
   return new Response(JSON.stringify(body), { status: 200, headers: RESPONSE_HEADERS });
 }
@@ -57,7 +57,7 @@ export async function serveHermesDailyFarmBriefLatestDisplay(input: { request: R
   }
   const artifacts = createHermesDailyFarmBriefRoleAwareLatestArtifacts({ businessDate: source.business_date, requestedBusinessDate, scopeIndex: source.scope_index, snapshot: source.snapshot, role: actor.role, allowedScopeKeys: actor.allowed_scope_keys });
   if (artifacts === null) return response("latest_display_read_failed", 500);
-  const display = createHermesDailyFarmBriefDisplayProjection({ latestCandidate: artifacts.latest_candidate, roleProjection: artifacts.role_projection });
+  const display = createHermesDailyFarmBriefDisplayProjectionV2({ latestCandidate: artifacts.latest_candidate, roleProjection: artifacts.role_projection, snapshot: source.snapshot });
   if (display === null) return response("latest_display_read_failed", 500);
   return success(display.display_state, display);
 }

@@ -7,6 +7,10 @@ import {
   type HermesDailyFarmFreshness,
   type HermesDailyFarmSourceType,
 } from "./hermes_daily_farm_brief_policy";
+import {
+  parseHermesDailyFarmBriefAttentionDetails,
+  type HermesDailyFarmBriefAttentionDetail,
+} from "./hermes_daily_farm_brief_attention_detail_contract";
 
 export const HERMES_DAILY_FARM_BRIEF_DISPLAY_PROJECTION_LIMITS = {
   title_chars: 120,
@@ -37,6 +41,11 @@ export const HERMES_DAILY_FARM_BRIEF_DISPLAY_PROJECTION_SAFETY = {
   fail_closed: true,
 } as const;
 
+export const HERMES_DAILY_FARM_BRIEF_DISPLAY_PROJECTION_V2_SAFETY = {
+  ...HERMES_DAILY_FARM_BRIEF_DISPLAY_PROJECTION_SAFETY,
+  retry_performed: false,
+} as const;
+
 export type HermesDailyFarmBriefDisplaySeverity = "info" | "attention";
 export type HermesDailyFarmBriefDisplaySourceAvailability = "available" | "empty" | "limited" | "unavailable" | "unknown";
 export type HermesDailyFarmBriefDisplayPriority = { label: string; detail: string; severity: HermesDailyFarmBriefDisplaySeverity };
@@ -64,6 +73,17 @@ export type HermesDailyFarmBriefDisplayProjection = {
   source_disclosure: HermesDailyFarmBriefDisplaySourceDisclosure[];
   limitations: string[];
   safety: typeof HERMES_DAILY_FARM_BRIEF_DISPLAY_PROJECTION_SAFETY;
+};
+export type HermesDailyFarmBriefDisplayPriorityV2 = HermesDailyFarmBriefDisplayPriority & {
+  attention_details: HermesDailyFarmBriefAttentionDetail[];
+};
+export type HermesDailyFarmBriefDisplayProjectionV2 = Omit<
+  HermesDailyFarmBriefDisplayProjection,
+  "schema_version" | "priorities" | "safety"
+> & {
+  schema_version: "hermes.daily_farm_brief.display_projection.v2";
+  priorities: HermesDailyFarmBriefDisplayPriorityV2[];
+  safety: typeof HERMES_DAILY_FARM_BRIEF_DISPLAY_PROJECTION_V2_SAFETY;
 };
 
 type JsonRecord = Record<string, unknown>;
@@ -148,4 +168,40 @@ export function parseHermesDailyFarmBriefDisplayProjection(value: unknown): Herm
     if (!isRecord(projection.safety) || !exact(projection.safety, Object.keys(HERMES_DAILY_FARM_BRIEF_DISPLAY_PROJECTION_SAFETY)) || !Object.entries(HERMES_DAILY_FARM_BRIEF_DISPLAY_PROJECTION_SAFETY).every(([key, expected]) => projection.safety[key] === expected)) return null;
     return { ...(projection as HermesDailyFarmBriefDisplayProjection), priorities, attention_items: attentionItems, source_disclosure: disclosure, limitations: [...projection.limitations] };
   } catch { return null; }
+}
+
+export function parseHermesDailyFarmBriefDisplayProjectionV2(value: unknown): HermesDailyFarmBriefDisplayProjectionV2 | null {
+  try {
+    const projection = typeof value === "string" ? JSON.parse(value) : value;
+    if (!isRecord(projection) || projection.schema_version !== "hermes.daily_farm_brief.display_projection.v2") return null;
+    if (!Array.isArray(projection.priorities)) return null;
+    const priorities: HermesDailyFarmBriefDisplayPriorityV2[] = [];
+    for (const raw of projection.priorities) {
+      if (!isRecord(raw) || !exact(raw, ["label", "detail", "severity", "attention_details"])) return null;
+      const attentionDetails = parseHermesDailyFarmBriefAttentionDetails(raw.attention_details);
+      if (attentionDetails === null || (raw.severity === "info" && attentionDetails.length !== 0)) return null;
+      priorities.push({
+        label: raw.label as string,
+        detail: raw.detail as string,
+        severity: raw.severity as HermesDailyFarmBriefDisplaySeverity,
+        attention_details: attentionDetails,
+      });
+    }
+    if (!isRecord(projection.safety) || !exact(projection.safety, Object.keys(HERMES_DAILY_FARM_BRIEF_DISPLAY_PROJECTION_V2_SAFETY)) || !Object.entries(HERMES_DAILY_FARM_BRIEF_DISPLAY_PROJECTION_V2_SAFETY).every(([key, expected]) => projection.safety[key] === expected)) return null;
+    const v1 = parseHermesDailyFarmBriefDisplayProjection({
+      ...projection,
+      schema_version: "hermes.daily_farm_brief.display_projection.v1",
+      priorities: priorities.map(({ label, detail, severity }) => ({ label, detail, severity })),
+      safety: HERMES_DAILY_FARM_BRIEF_DISPLAY_PROJECTION_SAFETY,
+    });
+    if (v1 === null) return null;
+    return {
+      ...v1,
+      schema_version: "hermes.daily_farm_brief.display_projection.v2",
+      priorities,
+      safety: HERMES_DAILY_FARM_BRIEF_DISPLAY_PROJECTION_V2_SAFETY,
+    };
+  } catch {
+    return null;
+  }
 }

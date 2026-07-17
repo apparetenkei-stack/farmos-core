@@ -59,7 +59,7 @@ export function normalizeHermesDailyFarmBriefScopeCrop(value: unknown): string |
   return normalized.length > 0 && normalized.length <= HERMES_DAILY_FARM_BRIEF_SCOPE_LIMITS.text_chars && !/[\u0000-\u001f\u007f]/u.test(normalized) ? normalized : null;
 }
 
-function scopeKey(type: HermesDailyFarmBriefScopeType, explicitValue: string): string {
+export function createHermesDailyFarmBriefScopeKey(type: HermesDailyFarmBriefScopeType, explicitValue: string): string {
   return `${type}:${createHash("sha256").update(`${type}\0${explicitValue}`, "utf8").digest("hex").slice(0, 24)}`;
 }
 
@@ -76,7 +76,7 @@ function validateCropCycle(value: unknown): value is HermesDailyFarmBriefScopeCr
 }
 
 function addScope(map: Map<string, MutableScope>, input: { type: HermesDailyFarmBriefScopeType; explicitValue: string; source: "work_log" | "crop_cycle"; recordId: string | null }): MutableScope {
-  const key = scopeKey(input.type, input.explicitValue);
+  const key = createHermesDailyFarmBriefScopeKey(input.type, input.explicitValue);
   let scope = map.get(key);
   if (!scope) {
     scope = {

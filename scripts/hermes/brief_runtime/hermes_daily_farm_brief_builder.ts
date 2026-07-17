@@ -12,7 +12,10 @@ import type {
   HermesDailyFarmBriefSafeSummary,
   HermesDailyFarmBriefSourceSummary,
 } from "./hermes_daily_farm_brief_contract";
-import type { HermesDailyFarmSnapshot } from "./hermes_daily_farm_snapshot_contract";
+import type {
+  HermesDailyFarmSnapshot,
+  HermesDailyFarmWorkLogRecord,
+} from "./hermes_daily_farm_snapshot_contract";
 import { parseHermesDailyFarmSnapshot } from "./hermes_daily_farm_snapshot_adapter";
 import {
   createHermesDailyFarmBriefSourceSelectionCoverage,
@@ -104,6 +107,15 @@ function isCanonicalIso(value: unknown): value is string {
     Number.isFinite(timestamp) &&
     new Date(timestamp).toISOString() === value
   );
+}
+
+export function classifyHermesDailyFarmBriefWorkLogAttention(
+  record: Pick<HermesDailyFarmWorkLogRecord, "started_at">,
+): "work_log_started_at_missing" | "work_log_started_at_invalid" | null {
+  if (record.started_at === null) return "work_log_started_at_missing";
+  return isCanonicalIso(record.started_at)
+    ? null
+    : "work_log_started_at_invalid";
 }
 
 function compareFacts(
@@ -221,24 +233,18 @@ function createFactCandidates(snapshot: HermesDailyFarmSnapshot): FactCandidate[
   }
 
   for (const record of snapshot.sources.work_log.records) {
-    if (record.started_at === null) {
+    const attentionCode = classifyHermesDailyFarmBriefWorkLogAttention(record);
+    if (attentionCode !== null) {
       facts.push({
         severity: "warning",
         category: "work_log_observation",
-        fact_code: "work_log_started_at_missing",
+        fact_code: attentionCode,
         source_type: "work_log",
         source_record_id: record.id,
-        summary: "Work log start timestamp is unavailable",
-        observed_at: null,
-      });
-    } else if (!isCanonicalIso(record.started_at)) {
-      facts.push({
-        severity: "warning",
-        category: "work_log_observation",
-        fact_code: "work_log_started_at_invalid",
-        source_type: "work_log",
-        source_record_id: record.id,
-        summary: "Work log start timestamp is invalid",
+        summary:
+          attentionCode === "work_log_started_at_missing"
+            ? "Work log start timestamp is unavailable"
+            : "Work log start timestamp is invalid",
         observed_at: null,
       });
     }

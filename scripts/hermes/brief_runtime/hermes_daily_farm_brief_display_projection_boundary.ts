@@ -15,7 +15,15 @@ import {
   type HermesDailyFarmBriefDisplayPriority,
   type HermesDailyFarmBriefDisplayProjection,
   type HermesDailyFarmBriefDisplaySourceAvailability,
+  HERMES_DAILY_FARM_BRIEF_DISPLAY_PROJECTION_V2_SAFETY,
+  parseHermesDailyFarmBriefDisplayProjectionV2,
+  type HermesDailyFarmBriefDisplayProjectionV2,
 } from "./hermes_daily_farm_brief_display_projection_contract";
+import { projectHermesDailyFarmBriefAttentionDetails } from "./hermes_daily_farm_brief_attention_detail_projection";
+import {
+  compareHermesDailyFarmBriefAttentionDetails,
+  hermesDailyFarmBriefAttentionDetailSignature,
+} from "./hermes_daily_farm_brief_attention_detail_contract";
 
 const LIMITATION_MAP = {
   independent_field_source_unavailable: "圃場情報の一部を独立した情報源から確認できません。",
@@ -110,4 +118,41 @@ export function createHermesDailyFarmBriefDisplayProjection(input: { latestCandi
     safety: HERMES_DAILY_FARM_BRIEF_DISPLAY_PROJECTION_SAFETY,
   };
   return parseHermesDailyFarmBriefDisplayProjection(value);
+}
+
+export function createHermesDailyFarmBriefDisplayProjectionV2(input: {
+  latestCandidate: unknown;
+  roleProjection: unknown;
+  snapshot: unknown;
+}): HermesDailyFarmBriefDisplayProjectionV2 | null {
+  const v1 = createHermesDailyFarmBriefDisplayProjection(input);
+  const roleProjection = parseHermesDailyFarmBriefRoleProjection(input.roleProjection);
+  const attentionProjection = projectHermesDailyFarmBriefAttentionDetails({
+    snapshot: input.snapshot,
+    roleProjection: input.roleProjection,
+  });
+  if (v1 === null || roleProjection === null || attentionProjection === null) return null;
+
+  const prioritiesV2 = v1.priorities.map((priority) => {
+    const matchingScopes = roleProjection.scopes.filter((scope) => {
+      const severity = scope.warning_count > 0 ? "attention" : scope.info_count > 0 ? "info" : null;
+      const detail = scope.warning_count > 0
+        ? `確認事項が${scope.warning_count}件あります。`
+        : scope.info_count > 0
+          ? `参考情報が${scope.info_count}件あります。`
+          : null;
+      return scope.display_label === priority.label && severity === priority.severity && detail === priority.detail;
+    });
+    const details = matchingScopes
+      .flatMap((scope) => attentionProjection.details_by_scope.get(scope.scope_key) ?? [])
+      .sort(compareHermesDailyFarmBriefAttentionDetails);
+    const unique = [...new Map(details.map((detail) => [hermesDailyFarmBriefAttentionDetailSignature(detail), detail])).values()];
+    return { ...priority, attention_details: unique };
+  });
+  return parseHermesDailyFarmBriefDisplayProjectionV2({
+    ...v1,
+    schema_version: "hermes.daily_farm_brief.display_projection.v2",
+    priorities: prioritiesV2,
+    safety: HERMES_DAILY_FARM_BRIEF_DISPLAY_PROJECTION_V2_SAFETY,
+  });
 }
