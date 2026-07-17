@@ -30,6 +30,8 @@ import {
 export const HERMES_DAILY_FARM_BRIEF_RECORDS_RELATION = "ai.daily_farm_brief_records" as const;
 export const HERMES_DAILY_FARM_BRIEF_COMMANDS_RELATION = "ai.daily_farm_brief_persistence_commands" as const;
 export const HERMES_DAILY_FARM_BRIEF_PRODUCTION_WRITE_ENABLED_ENV = "HERMES_DAILY_FARM_BRIEF_DATABASE_WRITE_ENABLED" as const;
+export const HERMES_DAILY_FARM_BRIEF_PERSISTENCE_OWNER_ROLE_ENV = "HERMES_DAILY_FARM_BRIEF_PERSISTENCE_OWNER_ROLE" as const;
+export const HERMES_DAILY_FARM_BRIEF_PERSISTENCE_RUNTIME_ROLE_ENV = "HERMES_DAILY_FARM_BRIEF_PERSISTENCE_RUNTIME_ROLE" as const;
 export const HERMES_DAILY_FARM_BRIEF_RELATION_OVERRIDE_ENV = {
   records: "HERMES_DAILY_FARM_BRIEF_DATABASE_RECORDS_RELATION",
   commands: "HERMES_DAILY_FARM_BRIEF_DATABASE_COMMANDS_RELATION",
@@ -51,7 +53,7 @@ export type HermesDailyFarmBriefRepositoryIdentityEvidence = {
 
 export type HermesDailyFarmBriefProductionWriteExecutor = {
   executeCanonicalTransition(command: HermesDailyFarmBriefPersistenceCommand): Promise<unknown>;
-  diagnoseWriteReadiness?: (input: { targetDate: string; expectedCurrentVersion: number | null }) => Promise<HermesDailyFarmBriefWriteReadinessEvidence>;
+  diagnoseWriteReadiness?: (input: { targetDate: string; expectedCurrentVersion: number | null; ownerRole?: string; runtimeRole?: string }) => Promise<HermesDailyFarmBriefWriteReadinessEvidence>;
 };
 
 export type HermesDailyFarmBriefProductionRepositoryExecutor =
@@ -150,7 +152,7 @@ class SharedPostgresExecutor implements HermesDailyFarmBriefProductionRepository
     } finally { client?.release(); }
   }
 
-  async diagnoseWriteReadiness(input: { targetDate: string; expectedCurrentVersion: number | null }): Promise<HermesDailyFarmBriefWriteReadinessEvidence> {
+  async diagnoseWriteReadiness(input: { targetDate: string; expectedCurrentVersion: number | null; ownerRole?: string; runtimeRole?: string }): Promise<HermesDailyFarmBriefWriteReadinessEvidence> {
     let client: PoolClient | null = null;
     let rollbackVerified = false;
     try {
@@ -164,9 +166,24 @@ class SharedPostgresExecutor implements HermesDailyFarmBriefProductionRepository
         commands_exists: boolean;
         function_exists: boolean;
         function_signature_matches: boolean;
-        execute_privilege: boolean;
-        relation_privileges: boolean;
+        function_security_definer: boolean;
+        function_search_path_safe: boolean;
+        schema_public_create: boolean;
+        schema_owner_safe: boolean;
+        public_execute: boolean;
+        runtime_execute_privilege: boolean;
+        runtime_direct_dml: boolean;
+        owner_relation_privileges: boolean;
+        owner_role_safe: boolean;
+        relation_owners_match_function_owner: boolean;
+        owner_candidate_eligible: boolean;
+        runtime_candidate_eligible: boolean;
       }>(`
+        with target_function as (
+          select p.oid, p.proowner, p.prosecdef, p.proconfig
+          from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+          where n.nspname = 'ai' and p.oid = to_regprocedure('ai.persist_daily_farm_brief_command(jsonb,text,text,boolean)')
+        )
         select
           to_regclass('ai.daily_farm_brief_records') is not null as records_exists,
           to_regclass('ai.daily_farm_brief_persistence_commands') is not null as commands_exists,
@@ -176,10 +193,29 @@ class SharedPostgresExecutor implements HermesDailyFarmBriefProductionRepository
           ) as function_exists,
           coalesce(to_regprocedure('ai.persist_daily_farm_brief_command(jsonb,text,text,boolean)') is not null
             and pg_get_function_result(to_regprocedure('ai.persist_daily_farm_brief_command(jsonb,text,text,boolean)')) = 'jsonb', false) as function_signature_matches,
-          coalesce(has_function_privilege(current_user, to_regprocedure('ai.persist_daily_farm_brief_command(jsonb,text,text,boolean)'), 'EXECUTE'), false) as execute_privilege,
-          coalesce(has_table_privilege(current_user, to_regclass('ai.daily_farm_brief_records'), 'SELECT,INSERT,UPDATE'), false)
-            and coalesce(has_table_privilege(current_user, to_regclass('ai.daily_farm_brief_persistence_commands'), 'SELECT,INSERT'), false) as relation_privileges
-      `);
+          coalesce((select prosecdef from target_function), false) as function_security_definer,
+          coalesce((select proconfig = array['search_path=pg_catalog, ai']::text[] from target_function), false) as function_search_path_safe,
+          coalesce(has_schema_privilege('public', 'ai', 'CREATE'), false) as schema_public_create,
+          coalesce((select not r.rolsuper and not r.rolcanlogin and not r.rolbypassrls from pg_namespace n join pg_roles r on r.oid=n.nspowner where n.nspname='ai'), false) as schema_owner_safe,
+          coalesce(has_function_privilege('public', to_regprocedure('ai.persist_daily_farm_brief_command(jsonb,text,text,boolean)'), 'EXECUTE'), false) as public_execute,
+          coalesce(has_function_privilege(current_user, to_regprocedure('ai.persist_daily_farm_brief_command(jsonb,text,text,boolean)'), 'EXECUTE'), false) as runtime_execute_privilege,
+          coalesce(has_table_privilege(current_user, to_regclass('ai.daily_farm_brief_records'), 'INSERT'), false)
+            or coalesce(has_table_privilege(current_user, to_regclass('ai.daily_farm_brief_records'), 'UPDATE'), false)
+            or coalesce(has_table_privilege(current_user, to_regclass('ai.daily_farm_brief_records'), 'DELETE'), false)
+            or coalesce(has_table_privilege(current_user, to_regclass('ai.daily_farm_brief_persistence_commands'), 'INSERT'), false)
+            or coalesce(has_table_privilege(current_user, to_regclass('ai.daily_farm_brief_persistence_commands'), 'UPDATE'), false)
+            or coalesce(has_table_privilege(current_user, to_regclass('ai.daily_farm_brief_persistence_commands'), 'DELETE'), false) as runtime_direct_dml,
+          coalesce((select has_table_privilege(proowner, to_regclass('ai.daily_farm_brief_records'), 'SELECT,INSERT,UPDATE')
+            and has_table_privilege(proowner, to_regclass('ai.daily_farm_brief_persistence_commands'), 'SELECT,INSERT') from target_function), false) as owner_relation_privileges,
+          coalesce((select not r.rolsuper and not r.rolcanlogin and not r.rolbypassrls from target_function f join pg_roles r on r.oid = f.proowner), false) as owner_role_safe,
+          coalesce((select c1.relowner = f.proowner and c2.relowner = f.proowner
+            from target_function f
+            join pg_class c1 on c1.oid = to_regclass('ai.daily_farm_brief_records')
+            join pg_class c2 on c2.oid = to_regclass('ai.daily_farm_brief_persistence_commands')), false) as relation_owners_match_function_owner,
+          coalesce((select not rolsuper and not rolcanlogin and not rolbypassrls from pg_roles where rolname = $1::text), false) as owner_candidate_eligible,
+          coalesce((select not rolsuper and not rolbypassrls from pg_roles where rolname = $2::text), false)
+            and current_user = $2::text as runtime_candidate_eligible
+      `, [input.ownerRole ?? null, input.runtimeRole ?? null]);
       const row = objects.rows[0];
       let canonicalRecordCount = 0;
       let expectedVersionMatches = input.expectedCurrentVersion === null;
@@ -203,8 +239,18 @@ class SharedPostgresExecutor implements HermesDailyFarmBriefProductionRepository
         commands_relation_exists: row?.commands_exists === true,
         function_exists: row?.function_exists === true,
         function_signature_matches: row?.function_signature_matches === true,
-        execute_privilege: row?.execute_privilege === true,
-        relation_privileges: row?.relation_privileges === true,
+        function_security_definer: row?.function_security_definer === true,
+        function_search_path_safe: row?.function_search_path_safe === true,
+        schema_public_create: row?.schema_public_create === true,
+        schema_owner_safe: row?.schema_owner_safe === true,
+        public_execute: row?.public_execute === true,
+        runtime_execute_privilege: row?.runtime_execute_privilege === true,
+        runtime_direct_dml: row?.runtime_direct_dml === true,
+        owner_relation_privileges: row?.owner_relation_privileges === true,
+        owner_role_safe: row?.owner_role_safe === true,
+        relation_owners_match_function_owner: row?.relation_owners_match_function_owner === true,
+        owner_candidate_eligible: row?.owner_candidate_eligible === true,
+        runtime_candidate_eligible: row?.runtime_candidate_eligible === true,
         canonical_record_count: Number.isSafeInteger(canonicalRecordCount) ? canonicalRecordCount : 0,
         expected_version_matches: expectedVersionMatches,
         rollback_verified: true,
@@ -227,7 +273,7 @@ function registerBundle(input: HermesDailyFarmBriefRepositoryBundle, token: symb
 }
 
 export function createHermesDailyFarmBriefFixtureRepositoryBundle(repository: HermesDailyFarmBriefPersistedReadRepository & HermesDailyFarmBriefPersistenceWriteRepository & { readCount?: number }): HermesDailyFarmBriefRepositoryBundle {
-  return registerBundle({ state: "ready", write_state: "enabled", readRepository: repository, writeRepository: repository, diagnoseWriteReadiness: async (input) => classifyHermesDailyFarmBriefProductionWriteReadiness({ ...input, evidence: { connection_available: true, transaction_read_only: false, records_relation_exists: true, commands_relation_exists: true, function_exists: true, function_signature_matches: true, execute_privilege: true, relation_privileges: true, canonical_record_count: 0, expected_version_matches: input.expectedCurrentVersion === null, rollback_verified: true } }) }, Symbol("daily-brief-fixture-bundle"), "fixture");
+  return registerBundle({ state: "ready", write_state: "enabled", readRepository: repository, writeRepository: repository, diagnoseWriteReadiness: async (input) => classifyHermesDailyFarmBriefProductionWriteReadiness({ ...input, evidence: { connection_available: true, transaction_read_only: false, records_relation_exists: true, commands_relation_exists: true, function_exists: true, function_signature_matches: true, function_security_definer: true, function_search_path_safe: true, schema_public_create: false, schema_owner_safe: true, public_execute: false, runtime_execute_privilege: true, runtime_direct_dml: false, owner_relation_privileges: true, owner_role_safe: true, relation_owners_match_function_owner: true, owner_candidate_eligible: true, runtime_candidate_eligible: true, canonical_record_count: 0, expected_version_matches: input.expectedCurrentVersion === null, rollback_verified: true } }) }, Symbol("daily-brief-fixture-bundle"), "fixture");
 }
 
 export function createHermesDailyFarmBriefProductionRepositoryBundle(environment: Readonly<Record<string, string | undefined>>, injectedExecutor?: HermesDailyFarmBriefProductionRepositoryExecutor): HermesDailyFarmBriefRepositoryBundle {
@@ -248,7 +294,7 @@ export function createHermesDailyFarmBriefProductionRepositoryBundle(environment
   const diagnoseWriteReadiness = async (input: { command: unknown; targetDate: string; expectedCurrentVersion: number | null }) => {
     if (executor.diagnoseWriteReadiness === undefined) return classifyHermesDailyFarmBriefProductionWriteReadiness({ ...input, connectionFailure: true });
     try {
-      const evidence = await executor.diagnoseWriteReadiness({ targetDate: input.targetDate, expectedCurrentVersion: input.expectedCurrentVersion });
+      const evidence = await executor.diagnoseWriteReadiness({ targetDate: input.targetDate, expectedCurrentVersion: input.expectedCurrentVersion, ownerRole: environment[HERMES_DAILY_FARM_BRIEF_PERSISTENCE_OWNER_ROLE_ENV], runtimeRole: environment[HERMES_DAILY_FARM_BRIEF_PERSISTENCE_RUNTIME_ROLE_ENV] });
       return classifyHermesDailyFarmBriefProductionWriteReadiness({ ...input, evidence });
     } catch {
       return classifyHermesDailyFarmBriefProductionWriteReadiness({ ...input, connectionFailure: true });

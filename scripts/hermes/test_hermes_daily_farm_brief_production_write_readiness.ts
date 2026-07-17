@@ -31,7 +31,7 @@ assert.ok(prepared);
 const command = buildHermesDailyFarmBriefAuthorizedRealDataPersistenceCommand({ prepared, targetDate: TARGET_DATE, generatedAt: GENERATED_AT, expectedCurrentVersion: null });
 assert.ok(command);
 
-const readyEvidence: HermesDailyFarmBriefWriteReadinessEvidence = { connection_available: true, transaction_read_only: false, records_relation_exists: true, commands_relation_exists: true, function_exists: true, function_signature_matches: true, execute_privilege: true, relation_privileges: true, canonical_record_count: 0, expected_version_matches: true, rollback_verified: true };
+const readyEvidence: HermesDailyFarmBriefWriteReadinessEvidence = { connection_available: true, transaction_read_only: false, records_relation_exists: true, commands_relation_exists: true, function_exists: true, function_signature_matches: true, function_security_definer: true, function_search_path_safe: true, schema_public_create: false, schema_owner_safe: true, public_execute: false, runtime_execute_privilege: true, runtime_direct_dml: false, owner_relation_privileges: true, owner_role_safe: true, relation_owners_match_function_owner: true, owner_candidate_eligible: true, runtime_candidate_eligible: true, canonical_record_count: 0, expected_version_matches: true, rollback_verified: true };
 const classify = (evidence: HermesDailyFarmBriefWriteReadinessEvidence, value: unknown = command) => classifyHermesDailyFarmBriefProductionWriteReadiness({ command: value, targetDate: TARGET_DATE, expectedCurrentVersion: null, evidence });
 
 assert.equal(classify(readyEvidence).classification, "ready");
@@ -39,8 +39,13 @@ assert.equal(classify({ ...readyEvidence, transaction_read_only: true }).classif
 assert.equal(classify({ ...readyEvidence, records_relation_exists: false }).classification, "relation_missing");
 assert.equal(classify({ ...readyEvidence, function_exists: false, function_signature_matches: false }).classification, "function_missing");
 assert.equal(classify({ ...readyEvidence, function_signature_matches: false }).classification, "function_signature_mismatch");
-assert.equal(classify({ ...readyEvidence, execute_privilege: false }).classification, "execute_privilege_missing");
-assert.equal(classify({ ...readyEvidence, relation_privileges: false }).classification, "relation_privilege_missing");
+assert.equal(classify({ ...readyEvidence, function_security_definer: false }).classification, "function_not_security_definer");
+assert.equal(classify({ ...readyEvidence, function_search_path_safe: false }).classification, "unsafe_search_path");
+assert.equal(classify({ ...readyEvidence, public_execute: true }).classification, "public_execute_present");
+assert.equal(classify({ ...readyEvidence, runtime_execute_privilege: false }).classification, "execute_privilege_missing");
+assert.equal(classify({ ...readyEvidence, runtime_direct_dml: true }).classification, "runtime_direct_dml_present");
+assert.equal(classify({ ...readyEvidence, owner_role_safe: false }).classification, "owner_role_unsafe");
+assert.equal(classify({ ...readyEvidence, owner_relation_privileges: false }).classification, "owner_privilege_missing");
 assert.equal(classify({ ...readyEvidence, canonical_record_count: 1, expected_version_matches: false }).classification, "existing_record_conflict");
 assert.equal(classify(readyEvidence, { invalid: true }).classification, "command_invalid");
 const rollbackFailure = classify({ ...readyEvidence, rollback_verified: false });

@@ -1,5 +1,7 @@
 # Authorized real-data Daily Brief persistence
 
+> Day123 privilege hardening is specified separately in [Hermes Daily Farm Brief security-definer hardening](./hermes-daily-farm-brief-security-definer-hardening.md). Production privilege application and actual persistence remain separate manual approval gates.
+
 ## Purpose
 
 Day123後半は、4-source read-only実データからDaily Briefを明示的に生成し、既存のserver-owned persistence command、atomic repository transaction、persisted latest selector、authenticated latest-displayへ接続するone-shot境界を定義する。通常のreal-data smoke runnerは引き続きread-onlyであり、保存処理を持たない。
