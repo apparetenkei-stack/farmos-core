@@ -345,7 +345,8 @@
     "test-hermes-daily-farm-brief-proposal-review-decision-service": "tsx scripts/hermes/test_hermes_daily_farm_brief_proposal_review_decision_service.ts",
     "test-hermes-daily-farm-brief-proposal-review-decision-route-boundary": "tsx scripts/hermes/test_hermes_daily_farm_brief_proposal_review_decision_route_boundary.ts",
     "test-hermes-daily-farm-brief-proposal-review-decision-ui": "tsx scripts/hermes/test_hermes_daily_farm_brief_proposal_review_decision_ui.ts",
-    "check-hermes-daily-farm-brief-proposal-review-decision-api-ui": "pnpm run test-hermes-daily-farm-brief-proposal-review-decision-api-contract && pnpm run test-hermes-daily-farm-brief-proposal-review-decision-service && pnpm run test-hermes-daily-farm-brief-proposal-review-decision-route-boundary && pnpm run test-hermes-daily-farm-brief-proposal-review-decision-ui && pnpm run test-hermes-daily-farm-brief-proposal-review-decision-boundary && pnpm run test-hermes-daily-farm-brief-proposal-review-decision-postgres-repository-contract && pnpm run test-hermes-daily-farm-brief-proposal-review-decision-postgres-readiness"
+    "check-hermes-daily-farm-brief-proposal-review-decision-api-ui": "pnpm run test-hermes-daily-farm-brief-proposal-review-decision-api-contract && pnpm run test-hermes-daily-farm-brief-proposal-review-decision-service && pnpm run test-hermes-daily-farm-brief-proposal-review-decision-route-boundary && pnpm run test-hermes-daily-farm-brief-proposal-review-decision-ui && pnpm run test-hermes-daily-farm-brief-proposal-review-decision-boundary && pnpm run test-hermes-daily-farm-brief-proposal-review-decision-postgres-repository-contract && pnpm run test-hermes-daily-farm-brief-proposal-review-decision-postgres-readiness",
+    "test-hermes-daily-farm-brief-proposal-review-integrated-flow": "tsx scripts/hermes/test_hermes_daily_farm_brief_proposal_review_integrated_flow.ts"
   },
   "keywords": [],
   "author": "",
