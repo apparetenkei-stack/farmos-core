@@ -52,7 +52,7 @@ export type HermesDay128ReviewPostgresTransactionExecution<T> = {
  */
 export type HermesDay128ReviewPostgresTransactionExecutor = {
   executeSingleConnectionTransaction: <T>(input: {
-    databaseTarget: typeof HERMES_DAILY_FARM_BRIEF_DAY114_DATABASE;
+    databaseTarget: string;
     beginSql: string;
     operation: (
       transaction: HermesDay128ReviewPostgresTransaction,
@@ -183,6 +183,13 @@ export class PostgresDailyFarmBriefProposalReviewDecisionRepository
 {
   constructor(
     private readonly executor: HermesDay128ReviewPostgresTransactionExecutor,
+    private readonly transactionContract: {
+      databaseTarget: string;
+      beginSql: string;
+    } = {
+      databaseTarget: HERMES_DAILY_FARM_BRIEF_DAY114_DATABASE,
+      beginSql: HERMES_DAY128_REVIEW_POSTGRES_SQL.begin,
+    },
   ) {}
 
   async recordProposalReviewDecision(
@@ -193,8 +200,8 @@ export class PostgresDailyFarmBriefProposalReviewDecisionRepository
     let execution: HermesDay128ReviewPostgresTransactionExecution<TransactionValue>;
     try {
       execution = await this.executor.executeSingleConnectionTransaction<TransactionValue>({
-        databaseTarget: HERMES_DAILY_FARM_BRIEF_DAY114_DATABASE,
-        beginSql: HERMES_DAY128_REVIEW_POSTGRES_SQL.begin,
+        databaseTarget: this.transactionContract.databaseTarget,
+        beginSql: this.transactionContract.beginSql,
         operation: async (transaction) => {
           const candidatesResult = await transaction.query(
             HERMES_DAY128_REVIEW_POSTGRES_SQL.candidates,

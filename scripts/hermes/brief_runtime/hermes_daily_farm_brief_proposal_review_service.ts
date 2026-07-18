@@ -29,11 +29,17 @@ import { HERMES_DAY128_PROTECTED_PROPOSAL_ID } from "../../../src/lib/hermes/her
 export type HermesDailyFarmBriefProposalReviewServiceDependencies = {
   authenticate: (request: Request) => Promise<unknown>;
   resolveActorContext: (authentication: Extract<HermesDailyFarmBriefAuthenticationResult,{status:"authenticated"}>) => Promise<unknown>;
-  readRepository: () => Promise<HermesDailyFarmBriefProposalReviewReadRepository | null>;
+  readRepository: (authorization: {
+    authentication: Extract<HermesDailyFarmBriefAuthenticationResult,{status:"authenticated"}>;
+    actor: NonNullable<ReturnType<typeof parseHermesDailyFarmBriefAuthenticatedActorContext>>;
+  }) => Promise<HermesDailyFarmBriefProposalReviewReadRepository | null>;
   clock: () => string;
 };
 export type HermesDailyFarmBriefProposalReviewDecisionServiceDependencies = HermesDailyFarmBriefProposalReviewServiceDependencies & {
-  reviewRepository: () => Promise<DailyFarmBriefProposalReviewDecisionRepository | null>;
+  reviewRepository: (authorization: {
+    authentication: Extract<HermesDailyFarmBriefAuthenticationResult,{status:"authenticated"}>;
+    actor: NonNullable<ReturnType<typeof parseHermesDailyFarmBriefAuthenticatedActorContext>>;
+  }) => Promise<DailyFarmBriefProposalReviewDecisionRepository | null>;
 };
 
 const HEADERS={"Cache-Control":"no-store","Content-Type":"application/json; charset=utf-8","X-Content-Type-Options":"nosniff"} as const;
@@ -55,7 +61,7 @@ export async function serveHermesDailyFarmBriefProposalReviewList(input:{request
   const request=createHermesDailyFarmBriefProposalReviewListRequest({request:input.request,clock:input.dependencies.clock});
   if(request===null)return listError("invalid_request");
   const authorization=await authorize(input.request,input.dependencies);if(authorization.error!==null)return listError(authorization.error);
-  let repository:HermesDailyFarmBriefProposalReviewReadRepository|null;try{repository=await input.dependencies.readRepository();}catch{repository=null;}if(repository===null)return listError("proposal_read_unavailable");
+  let repository:HermesDailyFarmBriefProposalReviewReadRepository|null;try{repository=await input.dependencies.readRepository({authentication:authorization.authentication!,actor:authorization.actor!});}catch{repository=null;}if(repository===null)return listError("proposal_read_unavailable");
   try{const rows=await repository.listDailyBriefProposalRows(100);const proposals=rows.map((row)=>createHermesDailyFarmBriefProposalListItem({row,requestedAt:request.requested_at}));if(proposals.some((item)=>item===null))return listError("proposal_read_unavailable");return new Response(JSON.stringify(createHermesDailyFarmBriefProposalReviewListApiResponse({result:"ok",proposals:proposals as NonNullable<(typeof proposals)[number]>[]})),{status:200,headers:HEADERS});}catch{return listError("proposal_read_unavailable");}
 }
 
@@ -65,7 +71,7 @@ export async function serveHermesDailyFarmBriefProposalReviewDetail(input:{reque
   if(request===null)return detailError("invalid_request");
   if(parseHermesDailyFarmBriefProposalSafeReference(request.proposal_ref)===null)return detailError("invalid_proposal_reference");
   const authorization=await authorize(input.request,input.dependencies);if(authorization.error!==null)return detailError(authorization.error);
-  let repository:HermesDailyFarmBriefProposalReviewReadRepository|null;try{repository=await input.dependencies.readRepository();}catch{repository=null;}if(repository===null)return detailError("proposal_read_unavailable");
+  let repository:HermesDailyFarmBriefProposalReviewReadRepository|null;try{repository=await input.dependencies.readRepository({authentication:authorization.authentication!,actor:authorization.actor!});}catch{repository=null;}if(repository===null)return detailError("proposal_read_unavailable");
   try{const row=await repository.findDailyBriefProposalRowBySafeReference(request.proposal_ref);if(row===null)return detailError("proposal_not_found");const proposal=createHermesDailyFarmBriefProposalDetail({row,requestedAt:request.requested_at});if(proposal===null||proposal.proposal_ref!==request.proposal_ref)return detailError("proposal_read_unavailable");return new Response(JSON.stringify(createHermesDailyFarmBriefProposalReviewDetailApiResponse({result:"ok",proposal})),{status:200,headers:HEADERS});}catch{return detailError("proposal_read_unavailable");}
 }
 
@@ -96,7 +102,7 @@ export async function serveHermesDailyFarmBriefProposalReviewDecision(input:{req
   if(body===null)return decisionError("invalid_request");
 
   let readRepository:HermesDailyFarmBriefProposalReviewReadRepository|null;
-  try{readRepository=await input.dependencies.readRepository();}catch{readRepository=null;}
+  try{readRepository=await input.dependencies.readRepository({authentication:authorization.authentication,actor:authorization.actor});}catch{readRepository=null;}
   if(readRepository===null)return decisionError("unavailable");
   let rawRow:Awaited<ReturnType<HermesDailyFarmBriefProposalReviewReadRepository["findDailyBriefProposalRowBySafeReference"]>>;
   try{rawRow=await readRepository.findDailyBriefProposalRowBySafeReference(proposalRef);}catch{return decisionError("unavailable");}
@@ -117,7 +123,7 @@ export async function serveHermesDailyFarmBriefProposalReviewDecision(input:{req
     return decisionError(mapped[preparation.error]??"unavailable");
   }
 
-  let repository:DailyFarmBriefProposalReviewDecisionRepository|null;try{repository=await input.dependencies.reviewRepository();}catch{repository=null;}
+  let repository:DailyFarmBriefProposalReviewDecisionRepository|null;try{repository=await input.dependencies.reviewRepository({authentication:authorization.authentication,actor:authorization.actor});}catch{repository=null;}
   if(repository===null)return decisionError("unavailable");
   let result:Awaited<ReturnType<DailyFarmBriefProposalReviewDecisionRepository["recordProposalReviewDecision"]>>;
   try{result=await repository.recordProposalReviewDecision(preparation.command);}catch{return decisionError("atomic_write_failed");}

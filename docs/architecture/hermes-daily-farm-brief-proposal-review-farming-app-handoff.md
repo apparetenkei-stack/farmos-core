@@ -4,8 +4,9 @@
 
 This document is the consumer contract for a farming-application server that
 uses the existing FarmOS Core Daily Brief Proposal administrator APIs. It
-describes only the contracts implemented and verified through Day129. It does
-not approve a production database connection or add a production adapter.
+describes the consumer contract verified through Day129 and the fail-closed
+production review adapter added during Day130. It does not approve deployment
+or a production review write.
 
 The supported administrator flow is:
 
@@ -296,7 +297,83 @@ It must not automatically retry or resubmit the note.
 - automatic retry is zero;
 - Proposal Apply is zero;
 - farming-application database writes are zero;
-- production database connections are not established by this handoff.
+- production review connections require the explicit production adapter gate,
+  administrator authorization, valid server-only database configuration, and
+  successful readiness.
+
+## Production review adapter
+
+Local and production review are separate adapters. The local adapter requires
+the existing local runtime flag, the exact isolated test database, a local
+socket, and the isolated Docker transaction executor. The production adapter
+never reads the local flag, rejects the isolated fixture target through the
+existing production target classifier, and uses the existing server-only
+PostgreSQL connection contract.
+
+The production adapter is deny-by-default. It requires exact enablement by:
+
+```text
+HERMES_DAILY_FARM_BRIEF_PRODUCTION_REVIEW_ENABLED=true
+```
+
+It also requires the existing `HERMES_DAILY_BRIEF_DATABASE_*` production
+connection settings and the existing pilot authentication/actor settings. The
+enable flag alone does not create an executor or connect to a database. Host,
+database, role, and credential values are never included in public readiness or
+HTTP responses.
+
+The farming-app browser does not receive these settings. Its server route sends
+the existing server credential to the Core endpoint, where Core resolves the
+principal and administrator role before it resolves a production repository:
+
+```text
+browser -> farming-app server -> authenticated Core route
+        -> production readiness -> atomic review transaction
+```
+
+The production connection principal must have SELECT on the Proposal table,
+UPDATE on exactly these five columns, and INSERT on the audit table:
+
+```text
+status
+reviewed_by
+reviewed_at
+review_note
+updated_at
+```
+
+Readiness rejects Proposal INSERT, DELETE, TRUNCATE, table-level UPDATE,
+non-review column UPDATE, audit mutation other than INSERT, app-table writes,
+schema CREATE, any other table write, superuser, or RLS bypass capability.
+
+## Production transaction and readiness
+
+The production adapter reuses the Day128 safe-reference resolution, strict
+Day126 row parser, pending-only transition, expiry/protected checks, and
+`expected_status + expected_updated_at` compare-and-swap. One `pg` connection
+per decision performs the target-row lock, five-column UPDATE, and append-only
+audit INSERT. Commit occurs only after both affected-row counts equal one. Any
+exception, count mismatch, or denied state rolls back and performs no retry.
+
+Production readiness uses a read-only transaction and catalog privilege checks.
+It verifies connection identity, Proposal read, the five update columns, audit
+INSERT, forbidden-privilege absence, and rollback. It performs no Proposal or
+audit write and returns only a fixed state such as `disabled`,
+`environment_missing`, `proposal_update_denied`, `audit_insert_denied`, or
+`ready`.
+
+## Deployment gate and rollback
+
+Implementation does not approve deployment. Before production review is
+enabled, operators must prepare server-only Core and farming-app environments,
+confirm administrator authentication, obtain a `ready` diagnostic, and receive
+separate approval for one real review POST plus detail/audit verification.
+
+Operational rollback disables the production review flag and redeploys Core.
+The adapter does not apply migrations, grants, revokes, or schema changes, so it
+has no automatic database rollback step. A failed decision transaction rolls
+back its Proposal update and audit insert atomically. Existing audit events are
+never deleted.
 
 ## Non-goals
 
@@ -305,9 +382,9 @@ It must not automatically retry or resubmit the note.
 - browser-to-Core direct access;
 - exposing Core credentials to client code;
 - automatic review retry;
-- a new repository, readiness boundary, fixture, executor, endpoint, or response
-  shape;
-- a production PostgreSQL adapter or production deployment approval.
+- a new endpoint, response shape, fixture, migration, role, or permission
+  mutation;
+- production deployment approval or an automatic production review attempt.
 
 ## Integration acceptance criteria
 

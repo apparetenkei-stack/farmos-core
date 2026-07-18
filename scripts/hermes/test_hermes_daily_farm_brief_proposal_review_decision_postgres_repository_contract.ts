@@ -23,7 +23,7 @@ const RECORD_ID = "7b48f13a-e76b-4b19-a822-f66147566074";
 const SECOND_ID = "c44bbcfd-7ec1-4c68-86f7-e67f52f86da2";
 const PRINCIPAL = "day128-internal-administrator";
 
-function fixture() {
+function fixture(decision: "approve" | "reject" | "request_revision" = "approve") {
   const candidate = createHermesDailyFarmBriefProposalCandidate({
     value: {
       schema_version: "hermes.proposal_candidate.work_log_follow_up_input.v1",
@@ -56,7 +56,7 @@ function fixture() {
   };
   const proposalRef = createHermesDailyFarmBriefProposalSafeReference(row.source_refs_json.idempotency_key);
   const preparation = prepareHermesDailyFarmBriefProposalReviewDecision({
-    request: { proposal_ref: proposalRef, decision: "approve", review_note: "内容を確認しました。", expected_status: "pending", expected_updated_at: row.updated_at },
+    request: { proposal_ref: proposalRef, decision, review_note: "内容を確認しました。", expected_status: "pending", expected_updated_at: row.updated_at },
     authentication: { schema_version: "hermes.daily_farm_brief.authentication_result.v1", status: "authenticated", principal_ref: PRINCIPAL },
     actor: { schema_version: "hermes.daily_farm_brief.authenticated_actor_context.v1", principal_ref: PRINCIPAL, role: "administrator", allowed_scope_keys: [], authorization_verified: true },
     currentState: { proposal_ref: proposalRef, current_status: "pending", current_updated_at: row.updated_at, expires_at: row.payload_json.expires_at, applied_at: null, applied_by: null, protected_fixture: false },
@@ -77,7 +77,7 @@ class FakeTransactionExecutor implements HermesDay128ReviewPostgresTransactionEx
   releases = 0;
   constructor(private readonly steps: QueryStep[]) {}
   async executeSingleConnectionTransaction<T>(input: {
-    databaseTarget: typeof HERMES_DAILY_FARM_BRIEF_DAY114_DATABASE;
+    databaseTarget: string;
     beginSql: string;
     operation: (transaction: HermesDay128ReviewPostgresTransaction) => Promise<HermesDay128ReviewPostgresTransactionDecision<T>>;
   }): Promise<HermesDay128ReviewPostgresTransactionExecution<T>> {
@@ -151,6 +151,20 @@ assert.equal(success.executor.queries[2].sql, HERMES_DAY128_REVIEW_POSTGRES_SQL.
 assert.equal(success.executor.queries[3].sql, HERMES_DAY128_REVIEW_POSTGRES_SQL.auditInsert);
 assert.match(success.executor.queries[3].sql, /returning 1 as inserted/u);
 assert.doesNotMatch(success.executor.queries[3].sql, /returning id/u);
+
+for (const [decision, nextStatus, auditType] of [
+  ["approve", "approved", "approve_review"],
+  ["reject", "rejected", "reject_review"],
+  ["request_revision", "needs_revision", "request_revision"],
+] as const) {
+  const mapped = fixture(decision);
+  const executed = await executeWith(mapped.row, mapped.command);
+  assert.equal(executed.result.result, "recorded");
+  if (executed.result.result === "recorded") assert.equal(executed.result.nextStatus, nextStatus);
+  assert.equal(executed.executor.queries[2].parameters[1], nextStatus);
+  assert.equal(executed.executor.queries[3].parameters[1], auditType);
+  assert.equal(executed.executor.commits, 1);
+}
 
 const zero = await executeWith(base.row, base.command, [{ rowCount: 0, rows: [] }]);
 assert.equal(zero.result.result, "not_found"); assert.equal(zero.executor.rollbacks, 1);

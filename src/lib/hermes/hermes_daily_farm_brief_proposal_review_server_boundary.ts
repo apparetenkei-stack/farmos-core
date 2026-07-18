@@ -13,6 +13,10 @@ import { createHermesDay128DockerReviewTransactionExecutor } from "./hermes_dail
 import { HERMES_DAILY_FARM_BRIEF_DAY114_DATABASE } from "../../../scripts/hermes/brief_runtime/hermes_daily_farm_brief_postgres_persistence_boundary";
 import type { DailyFarmBriefProposalReviewDecisionRepository } from "./hermes_daily_farm_brief_proposal_review_decision_boundary";
 import type { HermesDay128ReviewPostgresTransactionExecutor } from "./hermes_daily_farm_brief_proposal_review_decision_postgres_repository";
+import {
+  createHermesDailyFarmBriefProposalProductionReviewAdapter,
+  type HermesDailyFarmBriefProductionReviewAdapterResult,
+} from "./hermes_daily_farm_brief_proposal_review_production_adapter";
 
 export const HERMES_DAY128_LOCAL_REVIEW_RUNTIME_ENABLED_ENV = "HERMES_DAY128_LOCAL_REVIEW_RUNTIME_ENABLED" as const;
 
@@ -38,12 +42,37 @@ export function createHermesDailyFarmBriefProposalReviewServerDependencies(input
   authenticationProvider:HermesDailyFarmBriefServerAuthenticationProvider;
   actorDirectory:HermesDailyFarmBriefActorDirectory;
   clock:()=>string;
+  productionAdapterFactory?:typeof createHermesDailyFarmBriefProposalProductionReviewAdapter;
+  localReviewRepositoryResolver?:typeof resolveHermesDay128LocalReviewRepository;
 }):HermesDailyFarmBriefProposalReviewDecisionServiceDependencies{
+  let productionAdapter:Promise<HermesDailyFarmBriefProductionReviewAdapterResult>|null=null;
+  const resolveProduction=(authorization:Parameters<HermesDailyFarmBriefProposalReviewDecisionServiceDependencies["reviewRepository"]>[0])=>{
+    productionAdapter??=(input.productionAdapterFactory??createHermesDailyFarmBriefProposalProductionReviewAdapter)({
+      environment:input.environment,
+      authentication:authorization.authentication,
+      actor:authorization.actor,
+    });
+    return productionAdapter;
+  };
   return {
     authenticate:(request)=>authenticateHermesDailyFarmBriefServerRequest(input.authenticationProvider,request),
     resolveActorContext:(authentication)=>resolveHermesDailyFarmBriefActorContext(input.actorDirectory,authentication),
-    readRepository:async()=>{const readiness=await diagnoseHermesDay127ProposalReviewPostgresReadiness({databaseTarget:input.environment[HERMES_DAY126_ISOLATED_TEST_DATABASE_ENV]});return readiness.state==="ready"?readiness.repository:null;},
-    reviewRepository:()=>resolveHermesDay128LocalReviewRepository({environment:input.environment}),
+    readRepository:async(authorization)=>{
+      if(input.environment[HERMES_DAY126_ISOLATED_TEST_DATABASE_ENV]===HERMES_DAILY_FARM_BRIEF_DAY114_DATABASE){
+        const readiness=await diagnoseHermesDay127ProposalReviewPostgresReadiness({databaseTarget:input.environment[HERMES_DAY126_ISOLATED_TEST_DATABASE_ENV]});
+        return readiness.state==="ready"?readiness.repository:null;
+      }
+      return (await resolveProduction(authorization)).readRepository;
+    },
+    reviewRepository:async(authorization)=>{
+      if(input.environment[HERMES_DAY128_LOCAL_REVIEW_RUNTIME_ENABLED_ENV]==="true"){
+        return (input.localReviewRepositoryResolver??resolveHermesDay128LocalReviewRepository)({environment:input.environment});
+      }
+      if(input.environment[HERMES_DAY126_ISOLATED_TEST_DATABASE_ENV]===HERMES_DAILY_FARM_BRIEF_DAY114_DATABASE){
+        return null;
+      }
+      return (await resolveProduction(authorization)).reviewRepository;
+    },
     clock:input.clock,
   };
 }
