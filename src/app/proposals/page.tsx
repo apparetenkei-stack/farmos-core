@@ -122,6 +122,11 @@ export default async function ProposalsPage() {
           View committed apply history
         </Link>
       </p>
+      <p>
+        <Link href="/proposals/daily-brief">
+          Daily Brief 確認事項を安全な管理者画面で確認する
+        </Link>
+      </p>
 
       <section>
         <h2>Summary</h2>
