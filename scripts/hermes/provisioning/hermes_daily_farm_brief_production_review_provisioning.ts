@@ -132,13 +132,29 @@ admin_role as (select * from pg_catalog.pg_roles where rolname=current_user),
 runtime_role as (select * from pg_catalog.pg_roles where rolname=$2::text),
 owner_role as (select * from pg_catalog.pg_roles where rolname='${DAY130_PRODUCTION_REVIEW_AUDIT_OWNER}'),
 proposal as (select * from pg_catalog.pg_class where oid=to_regclass('ai.proposal_inbox')),
-audit_schema as (select * from pg_catalog.pg_namespace where oid=to_regnamespace('audit')),
-audit_table as (select * from pg_catalog.pg_class where oid=to_regclass('audit.proposal_review_decision_events')),
+audit_schema as (
+  select n.* from pg_catalog.pg_namespace n where n.nspname='audit'
+),
+audit_table as (
+  select c.* from pg_catalog.pg_class c join audit_schema n on n.oid=c.relnamespace
+  where c.relname='proposal_review_decision_events' and c.relkind in ('r','p')
+),
+audit_indexes as (
+  select c.oid,c.relname
+  from pg_catalog.pg_class c
+  join audit_schema n on n.oid=c.relnamespace
+  join pg_catalog.pg_index i on i.indexrelid=c.oid
+  where c.relkind='i' and i.indrelid=(select oid from audit_table) and c.relname in (
+    'idx_proposal_review_decision_events_proposal_id',
+    'idx_proposal_review_decision_events_decision_type',
+    'idx_proposal_review_decision_events_decided_at'
+  )
+),
 audit_columns as (
   select a.*,d.oid default_oid,pg_catalog.pg_get_expr(d.adbin,d.adrelid) default_expr
   from pg_catalog.pg_attribute a
   left join pg_catalog.pg_attrdef d on d.adrelid=a.attrelid and d.adnum=a.attnum
-  where a.attrelid=to_regclass('audit.proposal_review_decision_events') and a.attnum>0 and not a.attisdropped
+  where a.attrelid=(select oid from audit_table) and a.attnum>0 and not a.attisdropped
 ),
 owner_membership as (
   select m.* from pg_catalog.pg_auth_members m join owner_role o on o.oid=m.roleid
@@ -178,7 +194,7 @@ select
     and not has_table_privilege(o.oid,'ai.proposal_inbox','DELETE')
     and not exists(select 1 from pg_catalog.pg_class c join pg_catalog.pg_namespace n on n.oid=c.relnamespace
       where n.nspname not in ('pg_catalog','information_schema') and n.nspname not like 'pg_toast%'
-      and c.relkind in ('r','p') and c.oid is distinct from to_regclass('audit.proposal_review_decision_events')
+      and c.relkind in ('r','p') and c.oid is distinct from (select oid from audit_table)
       and (has_table_privilege(o.oid,c.oid,'INSERT') or has_table_privilege(o.oid,c.oid,'UPDATE')
         or has_table_privilege(o.oid,c.oid,'DELETE') or has_table_privilege(o.oid,c.oid,'TRUNCATE')))
     from owner_role o),false) as owner_contract_valid,
@@ -208,19 +224,18 @@ select
       when 'decided_at' then atttypid='timestamptz'::regtype and attnotnull and default_expr='now()'
       when 'created_at' then atttypid='timestamptz'::regtype and attnotnull and default_expr='now()'
       else false end) and bool_and(attidentity='' and attgenerated='') from audit_columns)
-    and (select count(*)=3 from pg_catalog.pg_constraint where conrelid=to_regclass('audit.proposal_review_decision_events') and contype in ('p','f','c'))
-    and exists(select 1 from pg_catalog.pg_constraint where conrelid=to_regclass('audit.proposal_review_decision_events') and contype='p' and conname='proposal_review_decision_events_pkey' and conkey=array[(select attnum from audit_columns where attname='id')]::smallint[])
-    and exists(select 1 from pg_catalog.pg_constraint where conrelid=to_regclass('audit.proposal_review_decision_events') and contype='f' and conname='proposal_review_decision_events_proposal_id_fkey' and confrelid=to_regclass('ai.proposal_inbox') and confupdtype='c' and confdeltype='r' and conkey=array[(select attnum from audit_columns where attname='proposal_id')]::smallint[] and confkey=array[(select attnum from pg_catalog.pg_attribute where attrelid=to_regclass('ai.proposal_inbox') and attname='id')]::smallint[])
-    and exists(select 1 from pg_catalog.pg_constraint where conrelid=to_regclass('audit.proposal_review_decision_events') and contype='c' and conname='proposal_review_decision_events_decision_type_check'
+    and (select count(*)=3 from pg_catalog.pg_constraint where conrelid=(select oid from audit_table) and contype in ('p','f','c'))
+    and exists(select 1 from pg_catalog.pg_constraint where conrelid=(select oid from audit_table) and contype='p' and conname='proposal_review_decision_events_pkey' and conkey=array[(select attnum from audit_columns where attname='id')]::smallint[])
+    and exists(select 1 from pg_catalog.pg_constraint where conrelid=(select oid from audit_table) and contype='f' and conname='proposal_review_decision_events_proposal_id_fkey' and confrelid=to_regclass('ai.proposal_inbox') and confupdtype='c' and confdeltype='r' and conkey=array[(select attnum from audit_columns where attname='proposal_id')]::smallint[] and confkey=array[(select attnum from pg_catalog.pg_attribute where attrelid=to_regclass('ai.proposal_inbox') and attname='id')]::smallint[])
+    and exists(select 1 from pg_catalog.pg_constraint where conrelid=(select oid from audit_table) and contype='c' and conname='proposal_review_decision_events_decision_type_check'
       and pg_catalog.regexp_replace(pg_catalog.pg_get_constraintdef(oid),'[[:space:]]+','','g')='CHECK((decision_type=ANY(ARRAY[''approve_review''::text,''reject_review''::text,''request_revision''::text,''defer_review''::text])))')
     and not exists(select 1 from audit_table t cross join lateral pg_catalog.aclexplode(coalesce(t.relacl,pg_catalog.acldefault('r',t.relowner))) acl where acl.grantee=0)
     as audit_table_contract_valid,
-  (select count(*)::int from pg_catalog.pg_class c join pg_catalog.pg_namespace n on n.oid=c.relnamespace
-    where n.nspname='audit' and c.relname in ('idx_proposal_review_decision_events_proposal_id','idx_proposal_review_decision_events_decision_type','idx_proposal_review_decision_events_decided_at')) as audit_indexes_present,
-  coalesce(pg_catalog.pg_get_indexdef(to_regclass('audit.idx_proposal_review_decision_events_proposal_id')) like '%USING btree (proposal_id)',false)
-    and coalesce(pg_catalog.pg_get_indexdef(to_regclass('audit.idx_proposal_review_decision_events_decision_type')) like '%USING btree (decision_type)',false)
-    and coalesce(pg_catalog.pg_get_indexdef(to_regclass('audit.idx_proposal_review_decision_events_decided_at')) like '%USING btree (decided_at DESC)',false)
-    and (select count(*)=4 from pg_catalog.pg_index where indrelid=to_regclass('audit.proposal_review_decision_events'))
+  (select count(*)::int from audit_indexes) as audit_indexes_present,
+  coalesce(pg_catalog.pg_get_indexdef((select oid from audit_indexes where relname='idx_proposal_review_decision_events_proposal_id')) like '%USING btree (proposal_id)',false)
+    and coalesce(pg_catalog.pg_get_indexdef((select oid from audit_indexes where relname='idx_proposal_review_decision_events_decision_type')) like '%USING btree (decision_type)',false)
+    and coalesce(pg_catalog.pg_get_indexdef((select oid from audit_indexes where relname='idx_proposal_review_decision_events_decided_at')) like '%USING btree (decided_at DESC)',false)
+    and (select count(*)=4 from pg_catalog.pg_index where indrelid=(select oid from audit_table))
     as audit_indexes_contract_valid,
   coalesce((select rolcanlogin and not rolsuper and not rolbypassrls and not rolcreaterole and not rolcreatedb and not rolreplication
     and not exists(select 1 from pg_catalog.pg_auth_members where member=r.oid)
@@ -234,30 +249,30 @@ select
     and not has_table_privilege(r.oid,'ai.proposal_inbox','UPDATE')
     and not exists(select 1 from pg_catalog.pg_attribute a where a.attrelid=to_regclass('ai.proposal_inbox') and a.attnum>0 and not a.attisdropped
       and a.attname not in ('status','reviewed_by','reviewed_at','review_note','updated_at') and has_column_privilege(r.oid,a.attrelid,a.attname,'UPDATE'))
-    and not coalesce(has_table_privilege(r.oid,to_regclass('audit.proposal_review_decision_events'),'SELECT'),false)
-    and not coalesce(has_table_privilege(r.oid,to_regclass('audit.proposal_review_decision_events'),'UPDATE'),false)
-    and not coalesce(has_table_privilege(r.oid,to_regclass('audit.proposal_review_decision_events'),'DELETE'),false)
-    and not coalesce(has_table_privilege(r.oid,to_regclass('audit.proposal_review_decision_events'),'TRUNCATE'),false)
-    and not coalesce(has_table_privilege(r.oid,to_regclass('audit.proposal_review_decision_events'),'REFERENCES'),false)
-    and not coalesce(has_table_privilege(r.oid,to_regclass('audit.proposal_review_decision_events'),'TRIGGER'),false)
+    and not coalesce(has_table_privilege(r.oid,(select oid from audit_table),'SELECT'),false)
+    and not coalesce(has_table_privilege(r.oid,(select oid from audit_table),'UPDATE'),false)
+    and not coalesce(has_table_privilege(r.oid,(select oid from audit_table),'DELETE'),false)
+    and not coalesce(has_table_privilege(r.oid,(select oid from audit_table),'TRUNCATE'),false)
+    and not coalesce(has_table_privilege(r.oid,(select oid from audit_table),'REFERENCES'),false)
+    and not coalesce(has_table_privilege(r.oid,(select oid from audit_table),'TRIGGER'),false)
     and not exists(select 1 from pg_catalog.pg_namespace n where n.nspname in ('ai','audit','app','public') and has_schema_privilege(r.oid,n.oid,'CREATE'))
     and not exists(select 1 from pg_catalog.pg_class c join pg_catalog.pg_namespace n on n.oid=c.relnamespace
       where n.nspname not in ('pg_catalog','information_schema') and n.nspname not like 'pg_toast%' and c.relkind in ('r','p')
-      and c.oid not in (to_regclass('ai.proposal_inbox'),to_regclass('audit.proposal_review_decision_events'))
+      and c.oid is distinct from to_regclass('ai.proposal_inbox') and c.oid is distinct from (select oid from audit_table)
       and (has_table_privilege(r.oid,c.oid,'INSERT') or has_table_privilege(r.oid,c.oid,'UPDATE') or has_table_privilege(r.oid,c.oid,'DELETE') or has_table_privilege(r.oid,c.oid,'TRUNCATE')))
     from runtime_role r),false)
     and coalesce((select not exists(select 1 from pg_catalog.pg_class c join pg_catalog.pg_namespace n on n.oid=c.relnamespace
       where n.nspname='app' and c.relkind in ('r','p') and (has_table_privilege(o.oid,c.oid,'INSERT') or has_table_privilege(o.oid,c.oid,'UPDATE') or has_table_privilege(o.oid,c.oid,'DELETE') or has_table_privilege(o.oid,c.oid,'TRUNCATE'))) from owner_role o),true)
     as forbidden_privileges_absent,
   coalesce((select
-    coalesce(has_schema_privilege(r.oid,to_regnamespace('audit'),'USAGE'),false)
+    coalesce(has_schema_privilege(r.oid,(select oid from audit_schema),'USAGE'),false)
     and has_table_privilege(r.oid,'ai.proposal_inbox','SELECT')
     and has_column_privilege(r.oid,'ai.proposal_inbox','status','UPDATE')
     and has_column_privilege(r.oid,'ai.proposal_inbox','reviewed_by','UPDATE')
     and has_column_privilege(r.oid,'ai.proposal_inbox','reviewed_at','UPDATE')
     and has_column_privilege(r.oid,'ai.proposal_inbox','review_note','UPDATE')
     and has_column_privilege(r.oid,'ai.proposal_inbox','updated_at','UPDATE')
-    and has_table_privilege(r.oid,'audit.proposal_review_decision_events','INSERT')
+    and coalesce(has_table_privilege(r.oid,(select oid from audit_table),'INSERT'),false)
     from runtime_role r),false) as runtime_privileges_exact
 )
 select jsonb_build_object(

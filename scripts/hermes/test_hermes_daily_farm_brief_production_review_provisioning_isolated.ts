@@ -21,6 +21,7 @@ const container = `farmos-day130-provisioning-${randomBytes(5).toString("hex")}`
 const credential = `day130-${randomBytes(12).toString("hex")}`;
 const dailyBriefDatabase = "farmos_core_day130_daily_brief_test";
 const proposalReviewDatabase = "farmos_core_day130_proposal_review_test";
+const partialAuditDatabase = "farmos_core_day130_partial_audit_test";
 const bootstrapRole = "day130_bootstrap";
 const adminRole = "day130_provisioning_admin";
 const runtimeRole = "day130_production_review_runtime";
@@ -57,7 +58,7 @@ async function connectEventually(port: number, database: string): Promise<Pool> 
   throw new Error("isolated_postgres_unavailable");
 }
 
-function environment(port: number) {
+function environment(port: number, reviewDatabase = proposalReviewDatabase) {
   const shared = {
     HERMES_DAILY_FARM_BRIEF_PRODUCTION_REVIEW_PROVISIONING_ENABLED: "true",
     HERMES_DAILY_FARM_BRIEF_PRODUCTION_REVIEW_PROVISIONING_CONFIRMATION:
@@ -75,7 +76,7 @@ function environment(port: number) {
     HERMES_DAILY_FARM_BRIEF_PROPOSAL_REVIEW_DATABASE_ENABLED: "true",
     HERMES_DAILY_FARM_BRIEF_PROPOSAL_REVIEW_DATABASE_HOST: "127.0.0.1",
     HERMES_DAILY_FARM_BRIEF_PROPOSAL_REVIEW_DATABASE_PORT: String(port),
-    HERMES_DAILY_FARM_BRIEF_PROPOSAL_REVIEW_DATABASE_NAME: proposalReviewDatabase,
+    HERMES_DAILY_FARM_BRIEF_PROPOSAL_REVIEW_DATABASE_NAME: reviewDatabase,
     HERMES_DAILY_FARM_BRIEF_PROPOSAL_REVIEW_DATABASE_USER: runtimeRole,
     HERMES_DAILY_FARM_BRIEF_PROPOSAL_REVIEW_DATABASE_PASSWORD: credential,
     HERMES_DAILY_FARM_BRIEF_PROPOSAL_REVIEW_DATABASE_SSL_MODE: "disable",
@@ -85,7 +86,7 @@ function environment(port: number) {
     HERMES_DAILY_FARM_BRIEF_PRIVILEGE_ADMIN_DATABASE_ENABLED: "true",
     HERMES_DAILY_FARM_BRIEF_PRIVILEGE_ADMIN_DATABASE_HOST: "127.0.0.1",
     HERMES_DAILY_FARM_BRIEF_PRIVILEGE_ADMIN_DATABASE_PORT: String(port),
-    HERMES_DAILY_FARM_BRIEF_PRIVILEGE_ADMIN_DATABASE_NAME: proposalReviewDatabase,
+    HERMES_DAILY_FARM_BRIEF_PRIVILEGE_ADMIN_DATABASE_NAME: reviewDatabase,
     HERMES_DAILY_FARM_BRIEF_PRIVILEGE_ADMIN_DATABASE_USER: adminRole,
     HERMES_DAILY_FARM_BRIEF_PRIVILEGE_ADMIN_DATABASE_PASSWORD: credential,
     HERMES_DAILY_FARM_BRIEF_PRIVILEGE_ADMIN_DATABASE_SSL_MODE: "disable",
@@ -114,7 +115,9 @@ class FailAfterAuditTablePool implements Day130ProductionReviewProvisioningPool 
 
 let bootstrap: Pool | null = null;
 let dailyBriefBootstrap: Pool | null = null;
+let partialBootstrap: Pool | null = null;
 let adminPool: Pool | null = null;
+let partialAdminPool: Pool | null = null;
 let started = false;
 try {
   docker([
@@ -166,6 +169,51 @@ try {
     grant references (id) on table ai.proposal_inbox to ${adminRole} with grant option;
     grant select on table ai.proposal_inbox to ${adminRole} with grant option;
     grant update (status,reviewed_by,reviewed_at,review_note,updated_at) on table ai.proposal_inbox to ${adminRole} with grant option;
+    create schema audit_shadow;
+    revoke all on schema audit_shadow from public;
+    create table audit_shadow.proposal_review_decision_events (
+      proposal_id uuid,
+      decision_type text,
+      decided_at timestamptz
+    );
+    create index idx_proposal_review_decision_events_proposal_id on audit_shadow.proposal_review_decision_events(proposal_id);
+    create index idx_proposal_review_decision_events_decision_type on audit_shadow.proposal_review_decision_events(decision_type);
+    create index idx_proposal_review_decision_events_decided_at on audit_shadow.proposal_review_decision_events(decided_at desc);
+  `);
+  await bootstrap.query(`create database ${partialAuditDatabase}`);
+  await bootstrap.query(`grant create on database ${partialAuditDatabase} to ${adminRole} with grant option`);
+  partialBootstrap = new Pool({ host: "127.0.0.1", port, database: partialAuditDatabase, user: bootstrapRole, password: credential, ssl: false, max: 1 });
+  await partialBootstrap.query(`
+    create schema ai;
+    revoke all on schema ai from public;
+    create table ai.proposal_inbox (
+      id uuid primary key default gen_random_uuid(),
+      proposal_type text not null,
+      title text not null,
+      body text not null,
+      payload_json jsonb not null default '{}'::jsonb,
+      source_refs_json jsonb not null default '[]'::jsonb,
+      model_name text,
+      agent_name text,
+      confidence numeric(4,3),
+      reason text,
+      risk_level text not null default 'low',
+      status text not null default 'pending',
+      reviewed_by text,
+      reviewed_at timestamptz,
+      review_note text,
+      applied_at timestamptz,
+      applied_by text,
+      created_at timestamptz not null default now(),
+      updated_at timestamptz not null default now()
+    );
+    grant usage on schema ai to ${runtimeRole};
+    grant usage on schema ai to ${adminRole} with grant option;
+    grant references (id) on table ai.proposal_inbox to ${adminRole} with grant option;
+    grant select on table ai.proposal_inbox to ${adminRole} with grant option;
+    grant update (status,reviewed_by,reviewed_at,review_note,updated_at) on table ai.proposal_inbox to ${adminRole} with grant option;
+    create schema audit;
+    revoke all on schema audit from public;
   `);
   await dailyBriefBootstrap.query(`
     create schema ai;
@@ -178,8 +226,28 @@ try {
   const splitFactsB = await bootstrap.query("select to_regclass('ai.daily_farm_brief_records') is not null as daily_present,to_regclass('ai.proposal_inbox') is not null as proposal_present");
   assert.deepEqual(splitFactsA.rows[0], { daily_present: true, proposal_present: false });
   assert.deepEqual(splitFactsB.rows[0], { daily_present: false, proposal_present: true });
+  const shadowFacts = await bootstrap.query(`select jsonb_build_object(
+    'audit_schema_absent',not exists(select 1 from pg_catalog.pg_namespace where nspname='audit'),
+    'shadow_index_count',(select count(*)::int from pg_catalog.pg_class c join pg_catalog.pg_namespace n on n.oid=c.relnamespace
+      where n.nspname='audit_shadow' and c.relkind='i' and c.relname in (
+        'idx_proposal_review_decision_events_proposal_id',
+        'idx_proposal_review_decision_events_decision_type',
+        'idx_proposal_review_decision_events_decided_at'))
+  ) evidence`);
+  assert.deepEqual(shadowFacts.rows[0]?.evidence, { audit_schema_absent: true, shadow_index_count: 3 });
   const env = environment(port);
   adminPool = new Pool({ host: "127.0.0.1", port, database: proposalReviewDatabase, user: adminRole, password: credential, ssl: false, max: 1 });
+
+  const partialEnv = environment(port, partialAuditDatabase);
+  partialAdminPool = new Pool({ host: "127.0.0.1", port, database: partialAuditDatabase, user: adminRole, password: credential, ssl: false, max: 1 });
+  const partialAuditUsage = await partialBootstrap.query(`select coalesce(has_schema_privilege($1::text,n.oid,'USAGE'),false) as admin_audit_usage
+    from pg_catalog.pg_namespace n where n.nspname='audit'`, [adminRole]);
+  assert.equal(partialAuditUsage.rows[0]?.admin_audit_usage, false);
+  const partial = await diagnoseDay130ProductionReviewProvisioning(partialEnv, { pool: partialAdminPool as unknown as Day130ProductionReviewProvisioningPool });
+  assert.equal(partial.state, "audit_contract_mismatch");
+  assert.equal(partial.database_mutation_performed, false);
+  assert.equal(partial.transaction_committed, false);
+  assert.equal(partial.rollback_performed, true);
 
   const readiness = await diagnoseDay130ProductionReviewProvisioning(env, { pool: adminPool as unknown as Day130ProductionReviewProvisioningPool });
   assert.equal(readiness.state, "ready_to_apply");
@@ -244,6 +312,10 @@ try {
     second_run_idempotent: "PASS",
     rollback_test: "PASS",
     split_database_test: "PASS",
+    audit_schema_absent_diagnose: "PASS",
+    partial_audit_contract_fail_closed: "PASS",
+    audit_schema_usage_not_required: "PASS",
+    other_schema_same_names_ignored: "PASS",
     review_repository_isolated: "PASS",
     retry_count: 0,
     production_connection_performed: false,
@@ -254,6 +326,8 @@ try {
   }));
 } finally {
   await adminPool?.end().catch(() => undefined);
+  await partialAdminPool?.end().catch(() => undefined);
+  await partialBootstrap?.end().catch(() => undefined);
   await dailyBriefBootstrap?.end().catch(() => undefined);
   await bootstrap?.end().catch(() => undefined);
   if (started) {

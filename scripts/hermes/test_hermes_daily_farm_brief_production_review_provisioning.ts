@@ -171,6 +171,8 @@ for (const [change, expected] of [
   [{ proposal_contract_valid: false }, "proposal_contract_mismatch"],
   [{ audit_schema_present: true, audit_schema_contract_valid: false }, "audit_contract_mismatch"],
   [{ audit_table_present: true, audit_table_contract_valid: false }, "audit_contract_mismatch"],
+  [{ audit_schema_present: true, audit_schema_contract_valid: true, audit_table_present: true, audit_table_contract_valid: true, audit_indexes_present: 0, audit_indexes_contract_valid: false }, "audit_contract_mismatch"],
+  [{ audit_schema_present: true, audit_schema_contract_valid: true, audit_table_present: true, audit_table_contract_valid: true, audit_indexes_present: 3, audit_indexes_contract_valid: false }, "audit_contract_mismatch"],
   [{ runtime_safe: false }, "runtime_principal_unsafe"],
   [{ forbidden_privileges_absent: false }, "forbidden_privilege_present"],
 ] as const) {
@@ -266,6 +268,14 @@ assert.match(moduleSource, /grant references \(id\)/u);
 assert.match(moduleSource, /grant update \(status,reviewed_by,reviewed_at,review_note,updated_at\)/u);
 assert.doesNotMatch(moduleSource, /grant update on table ai\.proposal_inbox/iu);
 assert.doesNotMatch(moduleSource, /delete from|truncate table|drop table|drop schema|drop role/iu);
+assert.doesNotMatch(moduleSource, /to_reg(?:class|namespace)\('audit/u);
+assert.match(moduleSource, /audit_schema as \([\s\S]*pg_catalog\.pg_namespace[\s\S]*n\.nspname='audit'/u);
+assert.match(moduleSource, /audit_table as \([\s\S]*join audit_schema[\s\S]*c\.relname='proposal_review_decision_events'/u);
+assert.match(moduleSource, /audit_indexes as \([\s\S]*join audit_schema[\s\S]*c\.relkind='i'/u);
+assert.match(moduleSource, /pg_get_indexdef\(\(select oid from audit_indexes where relname=/u);
+const inspectionKeys = /const INSPECTION_KEYS = \[([\s\S]*?)\] as const;/u.exec(moduleSource)?.[1].match(/"[a-z_]+"/gu) ?? [];
+assert.equal(inspectionKeys.length, 15);
+assert.equal(new Set(inspectionKeys).size, 15);
 assert.match(runnerSource, /process\.argv\.length === 3/u);
 assert.match(runnerSource, /process\.argv\[2\] === "--apply"/u);
 
@@ -304,6 +314,9 @@ console.log(JSON.stringify({
   http_apply_exposed: false,
   split_database_contract: true,
   admin_aligned_to_proposal_review: true,
+  audit_oid_resolution_only: true,
+  evidence_key_count: inspectionKeys.length,
+  parser_relaxed: false,
   second_run_idempotent: true,
   rollback_verified: true,
   retry_count: 0,
