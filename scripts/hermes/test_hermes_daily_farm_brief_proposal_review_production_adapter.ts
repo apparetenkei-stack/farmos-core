@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 
 import {
   HERMES_DAILY_FARM_BRIEF_PRODUCTION_REVIEW_ENABLED_ENV,
@@ -9,7 +10,11 @@ import {
   type HermesDailyFarmBriefProductionReviewExecutor,
 } from "../../src/lib/hermes/hermes_daily_farm_brief_proposal_review_production_adapter";
 import { createHermesDailyFarmBriefProposalSafeReference } from "../../src/lib/hermes/hermes_daily_farm_brief_proposal_review_read_boundary";
-import { HERMES_DAILY_BRIEF_DATABASE_ENV_KEYS,parseHermesDailyFarmBriefProductionEnvironment } from "./brief_runtime/hermes_daily_farm_brief_production_readiness_contract";
+import { HERMES_DAILY_BRIEF_DATABASE_ENV_KEYS } from "./brief_runtime/hermes_daily_farm_brief_production_readiness_contract";
+import {
+  HERMES_DAILY_FARM_BRIEF_PROPOSAL_REVIEW_DATABASE_ENV_KEYS,
+  parseHermesDailyFarmBriefProposalReviewDatabaseEnvironment,
+} from "../../src/lib/hermes/hermes_daily_farm_brief_proposal_review_database_contract";
 import type { Pool } from "pg";
 import { createDay127ApiTestRow } from "./test_hermes_daily_farm_brief_proposal_review_service";
 
@@ -29,15 +34,25 @@ const STAFF = { ...ADMIN, role: "general_staff", allowed_scope_keys: ["scope"] }
 const ENV = {
   [HERMES_DAILY_FARM_BRIEF_PRODUCTION_REVIEW_ENABLED_ENV]: "true",
   [HERMES_DAILY_BRIEF_DATABASE_ENV_KEYS.enabled]: "true",
-  [HERMES_DAILY_BRIEF_DATABASE_ENV_KEYS.host]: "database.internal.example",
+  [HERMES_DAILY_BRIEF_DATABASE_ENV_KEYS.host]: "daily-brief.internal.example",
   [HERMES_DAILY_BRIEF_DATABASE_ENV_KEYS.port]: "5432",
-  [HERMES_DAILY_BRIEF_DATABASE_ENV_KEYS.database]: "farmos_core_production_candidate",
-  [HERMES_DAILY_BRIEF_DATABASE_ENV_KEYS.user]: "proposal_review_runtime",
-  [HERMES_DAILY_BRIEF_DATABASE_ENV_KEYS.credential]: "fixture-value",
+  [HERMES_DAILY_BRIEF_DATABASE_ENV_KEYS.database]: "farmos_core_pilot",
+  [HERMES_DAILY_BRIEF_DATABASE_ENV_KEYS.user]: "daily_brief_runtime",
+  [HERMES_DAILY_BRIEF_DATABASE_ENV_KEYS.credential]: "daily-brief-fixture-value",
   [HERMES_DAILY_BRIEF_DATABASE_ENV_KEYS.ssl]: "verify-full",
   [HERMES_DAILY_BRIEF_DATABASE_ENV_KEYS.connect]: "1000",
   [HERMES_DAILY_BRIEF_DATABASE_ENV_KEYS.statement]: "3000",
   [HERMES_DAILY_BRIEF_DATABASE_ENV_KEYS.lock]: "1000",
+  [HERMES_DAILY_FARM_BRIEF_PROPOSAL_REVIEW_DATABASE_ENV_KEYS.enabled]: "true",
+  [HERMES_DAILY_FARM_BRIEF_PROPOSAL_REVIEW_DATABASE_ENV_KEYS.host]: "proposal-review.internal.example",
+  [HERMES_DAILY_FARM_BRIEF_PROPOSAL_REVIEW_DATABASE_ENV_KEYS.port]: "5433",
+  [HERMES_DAILY_FARM_BRIEF_PROPOSAL_REVIEW_DATABASE_ENV_KEYS.database]: "farmos_core_local",
+  [HERMES_DAILY_FARM_BRIEF_PROPOSAL_REVIEW_DATABASE_ENV_KEYS.user]: "proposal_review_runtime",
+  [HERMES_DAILY_FARM_BRIEF_PROPOSAL_REVIEW_DATABASE_ENV_KEYS.credential]: "proposal-review-fixture-value",
+  [HERMES_DAILY_FARM_BRIEF_PROPOSAL_REVIEW_DATABASE_ENV_KEYS.ssl]: "verify-full",
+  [HERMES_DAILY_FARM_BRIEF_PROPOSAL_REVIEW_DATABASE_ENV_KEYS.connect]: "1000",
+  [HERMES_DAILY_FARM_BRIEF_PROPOSAL_REVIEW_DATABASE_ENV_KEYS.statement]: "3000",
+  [HERMES_DAILY_FARM_BRIEF_PROPOSAL_REVIEW_DATABASE_ENV_KEYS.lock]: "1000",
 } as const;
 
 const READY = {
@@ -127,7 +142,21 @@ const productionFlagOnly = await create({ environment: { [HERMES_DAILY_FARM_BRIE
 assert.equal(productionFlagOnly.result.readiness.state, "environment_missing");
 assert.equal(factoryCalls, 0);
 
-const isolated = await create({ environment: { ...ENV, [HERMES_DAILY_BRIEF_DATABASE_ENV_KEYS.database]: "farmos_core_day114_test" } });
+const dailyBriefOnly = await create({ environment: Object.fromEntries(
+  [
+    ...Object.entries(ENV).filter(([key]) => !key.startsWith("HERMES_DAILY_FARM_BRIEF_PROPOSAL_REVIEW_DATABASE_")),
+    ["PGHOST", "legacy-postgres.invalid"],
+    ["POSTGRES_HOST", "legacy-postgres.invalid"],
+  ],
+) });
+assert.equal(dailyBriefOnly.result.readiness.state, "environment_missing");
+assert.equal(factoryCalls, 0, "Daily Brief credentials must not be a Proposal Review fallback");
+assert.equal(Object.values(HERMES_DAILY_FARM_BRIEF_PROPOSAL_REVIEW_DATABASE_ENV_KEYS).length, 10);
+assert(Object.values(HERMES_DAILY_FARM_BRIEF_PROPOSAL_REVIEW_DATABASE_ENV_KEYS).every(
+  (key) => key.startsWith("HERMES_DAILY_FARM_BRIEF_PROPOSAL_REVIEW_DATABASE_") && !key.startsWith("NEXT_PUBLIC_"),
+));
+
+const isolated = await create({ environment: { ...ENV, [HERMES_DAILY_FARM_BRIEF_PROPOSAL_REVIEW_DATABASE_ENV_KEYS.database]: "farmos_core_day114_test" } });
 assert.equal(isolated.result.readiness.state, "environment_missing");
 assert.equal(factoryCalls, 0, "production adapter must reject isolated fixture target");
 
@@ -187,14 +216,22 @@ assert.doesNotMatch(HERMES_DAILY_FARM_BRIEF_PRODUCTION_REVIEW_READINESS_SQL, /in
 assert.doesNotMatch(HERMES_DAILY_FARM_BRIEF_PRODUCTION_REVIEW_READINESS_SQL, /farmos_core_day114_test|farmos_ai_proposal_review_local/u);
 assert.match(HERMES_DAILY_FARM_BRIEF_PRODUCTION_REVIEW_READINESS_SQL, /has_column_privilege/u);
 assert.match(HERMES_DAILY_FARM_BRIEF_PRODUCTION_REVIEW_READINESS_SQL, /proposal_review_decision_events/u);
-assert(!JSON.stringify(ready.result.readiness).includes(ENV[HERMES_DAILY_BRIEF_DATABASE_ENV_KEYS.credential]));
+assert(!JSON.stringify(ready.result.readiness).includes(ENV[HERMES_DAILY_FARM_BRIEF_PROPOSAL_REVIEW_DATABASE_ENV_KEYS.credential]));
+for (const relative of [
+  "../../src/app/api/hermes/daily-farm-brief/proposals/route.ts",
+  "../../src/app/api/hermes/daily-farm-brief/proposals/[proposalRef]/route.ts",
+  "../../src/app/api/hermes/daily-farm-brief/proposals/[proposalRef]/review/route.ts",
+]) {
+  const routeSource = readFileSync(new URL(relative, import.meta.url), "utf8");
+  assert.doesNotMatch(routeSource, /PROPOSAL_REVIEW_DATABASE|DATABASE_PASSWORD|NEXT_PUBLIC_/u);
+}
 
 class FakeClient {
   queries: string[] = [];
   releases = 0;
   async query(sql: string) {
     this.queries.push(sql);
-    if (sql.includes("select current_database()")) return { rowCount: 1, rows: [{ current_database: ENV[HERMES_DAILY_BRIEF_DATABASE_ENV_KEYS.database], current_user: ENV[HERMES_DAILY_BRIEF_DATABASE_ENV_KEYS.user], transaction_read_only: this.queries.some((item) => item === "begin transaction read only") && !this.queries.some((item) => item === HERMES_DAILY_FARM_BRIEF_PRODUCTION_REVIEW_BEGIN_SQL) ? "on" : "off" }] };
+    if (sql.includes("select current_database()")) return { rowCount: 1, rows: [{ current_database: ENV[HERMES_DAILY_FARM_BRIEF_PROPOSAL_REVIEW_DATABASE_ENV_KEYS.database], current_user: ENV[HERMES_DAILY_FARM_BRIEF_PROPOSAL_REVIEW_DATABASE_ENV_KEYS.user], transaction_read_only: this.queries.some((item) => item === "begin transaction read only") && !this.queries.some((item) => item === HERMES_DAILY_FARM_BRIEF_PRODUCTION_REVIEW_BEGIN_SQL) ? "on" : "off" }] };
     if (sql === HERMES_DAILY_FARM_BRIEF_PRODUCTION_REVIEW_READINESS_SQL) return { rowCount: 1, rows: [{ evidence: DATABASE_READY }] };
     if (sql.includes("from ai.proposal_inbox")) return { rowCount: 1, rows: [row] };
     return { rowCount: 1, rows: [{ value: 1 }] };
@@ -207,13 +244,13 @@ class FakePool {
   async connect() { const client = new FakeClient(); this.clients.push(client); return client; }
   async end() { this.endCalls += 1; }
 }
-const productionConfig = parseHermesDailyFarmBriefProductionEnvironment(ENV);
+const productionConfig = parseHermesDailyFarmBriefProposalReviewDatabaseEnvironment(ENV);
 assert(productionConfig);
 const fakePool = new FakePool();
 const pgExecutor = new PgProductionReviewExecutor(productionConfig, {
-  host: ENV[HERMES_DAILY_BRIEF_DATABASE_ENV_KEYS.host],
-  user: ENV[HERMES_DAILY_BRIEF_DATABASE_ENV_KEYS.user],
-  credential: ENV[HERMES_DAILY_BRIEF_DATABASE_ENV_KEYS.credential],
+  host: ENV[HERMES_DAILY_FARM_BRIEF_PROPOSAL_REVIEW_DATABASE_ENV_KEYS.host],
+  user: ENV[HERMES_DAILY_FARM_BRIEF_PROPOSAL_REVIEW_DATABASE_ENV_KEYS.user],
+  credential: ENV[HERMES_DAILY_FARM_BRIEF_PROPOSAL_REVIEW_DATABASE_ENV_KEYS.credential],
 }, fakePool as unknown as Pool);
 assert.equal((await pgExecutor.diagnoseReadiness()).result, "ok");
 assert.equal((await pgExecutor.readCandidates(100)).length, 1);
@@ -252,6 +289,10 @@ console.log(JSON.stringify({
   administrator_required: true,
   isolated_target_rejected: true,
   local_production_isolation: true,
+  split_database_contract: true,
+  daily_brief_fallback_forbidden: true,
+  pg_fallback_forbidden: true,
+  http_credential_exposure: false,
   five_column_update_required: true,
   audit_insert_required: true,
   app_write_forbidden: true,

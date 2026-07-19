@@ -1,17 +1,17 @@
 import { Pool, type PoolClient, type PoolConfig } from "pg";
 
 import {
-  HERMES_DAILY_BRIEF_DATABASE_ENV_KEYS,
-  parseHermesDailyFarmBriefProductionEnvironment,
-  type HermesDailyFarmBriefProductionReadRepositoryConfig,
-} from "../../../scripts/hermes/brief_runtime/hermes_daily_farm_brief_production_readiness_contract";
-import {
   parseHermesDailyFarmBriefAuthenticatedActorContext,
   parseHermesDailyFarmBriefAuthenticationResult,
 } from "../../../scripts/hermes/brief_runtime/hermes_daily_farm_brief_latest_api_contract";
 import {
   createHermesDailyFarmBriefProductionPoolSslConfig,
 } from "./hermes_daily_farm_brief_production_read_repository";
+import {
+  HERMES_DAILY_FARM_BRIEF_PROPOSAL_REVIEW_DATABASE_ENV_KEYS,
+  parseHermesDailyFarmBriefProposalReviewDatabaseEnvironment,
+  type HermesDailyFarmBriefProposalReviewDatabaseConfig,
+} from "./hermes_daily_farm_brief_proposal_review_database_contract";
 import {
   createHermesDailyFarmBriefProposalSafeReference,
   parseHermesDailyFarmBriefProposalReviewRawRow,
@@ -273,7 +273,7 @@ export class PgProductionReviewExecutor implements HermesDailyFarmBriefProductio
   private readonly expectedUser: string;
 
   constructor(
-    private readonly config: HermesDailyFarmBriefProductionReadRepositoryConfig,
+    private readonly config: HermesDailyFarmBriefProposalReviewDatabaseConfig,
     settings: { host: string; user: string; credential: string },
     pool?: Pool,
   ) {
@@ -448,7 +448,7 @@ export async function createHermesDailyFarmBriefProposalProductionReviewAdapter(
   authentication: unknown;
   actor: unknown;
   executorFactory?: (
-    config: HermesDailyFarmBriefProductionReadRepositoryConfig,
+    config: HermesDailyFarmBriefProposalReviewDatabaseConfig,
     settings: { host: string; user: string; credential: string },
   ) => HermesDailyFarmBriefProductionReviewExecutor | null;
 }): Promise<HermesDailyFarmBriefProductionReviewAdapterResult> {
@@ -465,10 +465,10 @@ export async function createHermesDailyFarmBriefProposalProductionReviewAdapter(
   if (authorization === null) return empty(denied("authentication_unavailable", { production_adapter_selected: true }));
   if (authorization !== "administrator") return empty(denied("administrator_required", { production_adapter_selected: true, authentication_available: true }));
 
-  const config = parseHermesDailyFarmBriefProductionEnvironment(input.environment);
-  const host = input.environment[HERMES_DAILY_BRIEF_DATABASE_ENV_KEYS.host];
-  const user = input.environment[HERMES_DAILY_BRIEF_DATABASE_ENV_KEYS.user];
-  const credential = input.environment[HERMES_DAILY_BRIEF_DATABASE_ENV_KEYS.credential];
+  const config = parseHermesDailyFarmBriefProposalReviewDatabaseEnvironment(input.environment);
+  const host = input.environment[HERMES_DAILY_FARM_BRIEF_PROPOSAL_REVIEW_DATABASE_ENV_KEYS.host];
+  const user = input.environment[HERMES_DAILY_FARM_BRIEF_PROPOSAL_REVIEW_DATABASE_ENV_KEYS.user];
+  const credential = input.environment[HERMES_DAILY_FARM_BRIEF_PROPOSAL_REVIEW_DATABASE_ENV_KEYS.credential];
   if (config === null || !host || !user || !credential) {
     return empty(denied("environment_missing", { production_adapter_selected: true, authentication_available: true, administrator_authorized: true }));
   }

@@ -1,15 +1,16 @@
 import { Pool, type PoolClient, type PoolConfig } from "pg";
 
 import {
-  HERMES_DAILY_BRIEF_DATABASE_ENV_KEYS,
-  parseHermesDailyFarmBriefProductionEnvironment,
-} from "../brief_runtime/hermes_daily_farm_brief_production_readiness_contract";
-import {
   HERMES_DAILY_FARM_BRIEF_PRIVILEGE_ADMIN_ENV,
-  parseHermesDailyFarmBriefPrivilegeAdminEnvironment,
+  parseHermesDailyFarmBriefPrivilegeAdminEnvironmentForTarget,
   type HermesDailyFarmBriefPrivilegeAdminConfig,
 } from "../../../src/lib/hermes/hermes_daily_farm_brief_privilege_administrator_executor";
 import { createHermesDailyFarmBriefProductionPoolSslConfig } from "../../../src/lib/hermes/hermes_daily_farm_brief_production_read_repository";
+import {
+  HERMES_DAILY_FARM_BRIEF_PROPOSAL_REVIEW_DATABASE_ENV_KEYS,
+  parseHermesDailyFarmBriefProposalReviewDatabaseEnvironment,
+  proposalReviewDatabaseTarget,
+} from "../../../src/lib/hermes/hermes_daily_farm_brief_proposal_review_database_contract";
 
 export const DAY130_PRODUCTION_REVIEW_AUDIT_OWNER =
   "farmos_ai_proposal_review_audit_owner" as const;
@@ -301,14 +302,17 @@ function configuration(environment: Readonly<Record<string, string | undefined>>
     environment[DAY130_PRODUCTION_REVIEW_PROVISIONING_ENV.enabled] !== "true" ||
     environment[DAY130_PRODUCTION_REVIEW_PROVISIONING_ENV.confirmation] !== DAY130_PRODUCTION_REVIEW_PROVISIONING_CONFIRMATION
   ) return { result: base("disabled") };
-  const runtime = parseHermesDailyFarmBriefProductionEnvironment(environment);
-  const runtimeRole = environment[HERMES_DAILY_BRIEF_DATABASE_ENV_KEYS.user];
+  const runtime = parseHermesDailyFarmBriefProposalReviewDatabaseEnvironment(environment);
+  const runtimeRole = environment[HERMES_DAILY_FARM_BRIEF_PROPOSAL_REVIEW_DATABASE_ENV_KEYS.user];
   if (runtime === null || !runtimeRole || !IDENTIFIER.test(runtimeRole)) return { result: base("environment_missing") };
   const adminKeys = Object.values(HERMES_DAILY_FARM_BRIEF_PRIVILEGE_ADMIN_ENV);
   if (!adminKeys.every((key) => typeof environment[key] === "string" && environment[key]!.length > 0)) {
     return { result: base("environment_missing") };
   }
-  const parsed = parseHermesDailyFarmBriefPrivilegeAdminEnvironment(environment, runtime.database_name);
+  const parsed = parseHermesDailyFarmBriefPrivilegeAdminEnvironmentForTarget(
+    environment,
+    proposalReviewDatabaseTarget(environment, runtime),
+  );
   if (!parsed.targetMatches) return { result: base("target_mismatch") };
   if (parsed.admin === null) return { result: base("environment_missing") };
   return { admin: parsed.admin, runtimeDatabase: runtime.database_name, runtimeRole };

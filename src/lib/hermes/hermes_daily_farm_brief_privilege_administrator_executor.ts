@@ -7,6 +7,10 @@ import {
   type HermesDailyFarmBriefProductionReadRepositoryConfig,
 } from "../../../scripts/hermes/brief_runtime/hermes_daily_farm_brief_production_readiness_contract";
 import { createHermesDailyFarmBriefProductionPoolSslConfig } from "./hermes_daily_farm_brief_production_read_repository";
+import {
+  HERMES_DAILY_FARM_BRIEF_PROPOSAL_REVIEW_DATABASE_ENV_KEYS,
+  parseHermesDailyFarmBriefProposalReviewDatabaseEnvironment,
+} from "./hermes_daily_farm_brief_proposal_review_database_contract";
 import type { HermesDailyFarmBriefPrivilegeApplyExecutor } from "./hermes_daily_farm_brief_production_repository_bundle";
 
 export const HERMES_DAILY_FARM_BRIEF_PRIVILEGE_ADMIN_ENV = {
@@ -23,10 +27,19 @@ export const HERMES_DAILY_FARM_BRIEF_PRIVILEGE_ADMIN_ENV = {
 } as const;
 
 export type HermesDailyFarmBriefPrivilegeAdminConfig = {
-  config: HermesDailyFarmBriefProductionReadRepositoryConfig;
+  config: Pick<
+    HermesDailyFarmBriefProductionReadRepositoryConfig,
+    "port" | "database_name" | "ssl_mode" | "connect_timeout_ms" | "statement_timeout_ms" | "lock_timeout_ms"
+  >;
   host: string;
   user: string;
   credential: string;
+};
+
+export type HermesDailyFarmBriefPrivilegeAdminTarget = {
+  host: string;
+  port: number;
+  databaseName: string;
 };
 
 export type HermesDailyFarmBriefPrivilegeAdminSafePreflight = {
@@ -62,6 +75,37 @@ export function parseHermesDailyFarmBriefPrivilegeAdminEnvironment(environment: 
   const credential = mapped[HERMES_DAILY_BRIEF_DATABASE_ENV_KEYS.credential];
   const targetMatches = config !== null && runtimeDatabaseName !== null && config.database_name === runtimeDatabaseName;
   return { admin: config !== null && host && user && credential && targetMatches ? { config, host, user, credential } : null, targetMatches };
+}
+
+export function parseHermesDailyFarmBriefPrivilegeAdminEnvironmentForTarget(
+  environment: Readonly<Record<string, string | undefined>>,
+  target: HermesDailyFarmBriefPrivilegeAdminTarget | null,
+): { admin: HermesDailyFarmBriefPrivilegeAdminConfig | null; targetMatches: boolean } {
+  const keys = HERMES_DAILY_FARM_BRIEF_PROPOSAL_REVIEW_DATABASE_ENV_KEYS;
+  const mapped = {
+    [keys.enabled]: environment[HERMES_DAILY_FARM_BRIEF_PRIVILEGE_ADMIN_ENV.enabled],
+    [keys.host]: environment[HERMES_DAILY_FARM_BRIEF_PRIVILEGE_ADMIN_ENV.host],
+    [keys.port]: environment[HERMES_DAILY_FARM_BRIEF_PRIVILEGE_ADMIN_ENV.port],
+    [keys.database]: environment[HERMES_DAILY_FARM_BRIEF_PRIVILEGE_ADMIN_ENV.database],
+    [keys.user]: environment[HERMES_DAILY_FARM_BRIEF_PRIVILEGE_ADMIN_ENV.user],
+    [keys.credential]: environment[HERMES_DAILY_FARM_BRIEF_PRIVILEGE_ADMIN_ENV.credential],
+    [keys.ssl]: environment[HERMES_DAILY_FARM_BRIEF_PRIVILEGE_ADMIN_ENV.sslMode],
+    [keys.connect]: environment[HERMES_DAILY_FARM_BRIEF_PRIVILEGE_ADMIN_ENV.connectTimeout],
+    [keys.statement]: environment[HERMES_DAILY_FARM_BRIEF_PRIVILEGE_ADMIN_ENV.statementTimeout],
+    [keys.lock]: environment[HERMES_DAILY_FARM_BRIEF_PRIVILEGE_ADMIN_ENV.lockTimeout],
+  };
+  const config = parseHermesDailyFarmBriefProposalReviewDatabaseEnvironment(mapped);
+  const host = mapped[keys.host];
+  const user = mapped[keys.user];
+  const credential = mapped[keys.credential];
+  const targetMatches = config !== null && target !== null && host === target.host &&
+    config.port === target.port && config.database_name === target.databaseName;
+  return {
+    admin: config !== null && host && user && credential && targetMatches
+      ? { config, host, user, credential }
+      : null,
+    targetMatches,
+  };
 }
 
 function quoteIdentifier(value: string): string | null {
