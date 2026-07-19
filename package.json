@@ -348,7 +348,10 @@
     "check-hermes-daily-farm-brief-proposal-review-decision-api-ui": "pnpm run test-hermes-daily-farm-brief-proposal-review-decision-api-contract && pnpm run test-hermes-daily-farm-brief-proposal-review-decision-service && pnpm run test-hermes-daily-farm-brief-proposal-review-decision-route-boundary && pnpm run test-hermes-daily-farm-brief-proposal-review-decision-ui && pnpm run test-hermes-daily-farm-brief-proposal-review-decision-boundary && pnpm run test-hermes-daily-farm-brief-proposal-review-decision-postgres-repository-contract && pnpm run test-hermes-daily-farm-brief-proposal-review-decision-postgres-readiness && pnpm run test-hermes-daily-farm-brief-proposal-review-production-adapter",
     "test-hermes-daily-farm-brief-proposal-review-integrated-flow": "tsx scripts/hermes/test_hermes_daily_farm_brief_proposal_review_integrated_flow.ts",
     "test-hermes-daily-farm-brief-proposal-review-production-adapter": "tsx scripts/hermes/test_hermes_daily_farm_brief_proposal_review_production_adapter.ts",
-    "run-hermes-daily-farm-brief-proposal-review-production-readiness": "node --env-file=.env.local --import tsx scripts/hermes/run_hermes_daily_farm_brief_proposal_review_production_readiness.ts"
+    "run-hermes-daily-farm-brief-proposal-review-production-readiness": "node --env-file=.env.local --import tsx scripts/hermes/run_hermes_daily_farm_brief_proposal_review_production_readiness.ts",
+    "test-hermes-daily-farm-brief-production-review-provisioning": "tsx scripts/hermes/test_hermes_daily_farm_brief_production_review_provisioning.ts",
+    "test-hermes-daily-farm-brief-production-review-provisioning-isolated": "tsx scripts/hermes/test_hermes_daily_farm_brief_production_review_provisioning_isolated.ts",
+    "run-hermes-daily-farm-brief-production-review-provisioning": "node --env-file=.env.local --import tsx scripts/hermes/run_hermes_daily_farm_brief_production_review_provisioning.ts"
   },
   "keywords": [],
   "author": "",
