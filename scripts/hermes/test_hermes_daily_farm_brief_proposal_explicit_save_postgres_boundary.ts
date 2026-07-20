@@ -106,7 +106,12 @@ export async function runDay126PostgresBoundaryScenario() {
   assert.equal(afterFirst.target_count, 1);
   assert.equal(afterFirst.proposal_count, before.proposal_count + (before.target_count === 0 ? 1 : 0));
   assert.deepEqual([afterFirst.protected_status, afterFirst.protected_applied_at, afterFirst.protected_applied_by], [before.protected_status, before.protected_applied_at, before.protected_applied_by]);
-  assert.deepEqual([afterFirst.target_status, afterFirst.target_applied_at, afterFirst.target_applied_by], ["pending", null, null]);
+  assert.deepEqual(
+    [afterFirst.target_status, afterFirst.target_applied_at, afterFirst.target_applied_by],
+    before.target_count === 0
+      ? ["pending", null, null]
+      : [before.target_status, before.target_applied_at, before.target_applied_by],
+  );
   const second = await execution(main, UUIDS.mainA, readiness.repository);
   assert.equal(second.status, "already_saved");
   const afterSecond = await snapshot(pg, preparedKey);

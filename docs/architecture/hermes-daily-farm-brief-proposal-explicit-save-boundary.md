@@ -34,6 +34,29 @@ atomic INSERT結果の`inserted=true`では返却summary IDと要求record IDの
 
 repositoryは`findExistingByIdempotencyKey`と`insertProposal`だけを実装し、UPDATE/DELETE、app/audit write、Proposal Apply、review decision、model、retryを提供しない。E2E fixtureは削除せず、deterministic keyを再利用してrerunnable/idempotentにする。Day127 handoffは保存済みProposalのlist/detail readである。
 
+## Day130: Production explicit save
+
+Productionの正式保存入口はserver-only package runnerとProduction adapterである。browserやAPI requestからDB接続情報、role、target、任意のProposal payloadを受け取らない。runnerはPilot identity provider、request authentication helper、authenticated actor parserを順に通し、administratorだけを許可する。candidateは既存candidate boundaryで生成し、保存時には既存explicit-save boundaryが再検証する。
+
+```text
+candidate generation
+  -> explicit save (administrator + two gates + one candidate)
+  -> Proposal Review
+  -> Proposal Apply (separate human-approved boundary)
+```
+
+これらはそれぞれ別の状態遷移である。
+
+- Proposal生成 ≠ Proposal保存
+- Proposal保存 ≠ Review
+- Review ≠ Apply
+
+runnerは既定でdiagnoseとなり、enablementとsource-fixed confirmationの2条件が不足する場合はDBへ接続せずdeniedとなる。2条件が揃っても`--apply`が唯一の追加引数でなければINSERTしない。入力はexact schemaのcandidate 1件だけで、配列や未知key、expired candidate、Apply済みcandidate、review列が設定されたcandidateを拒否する。confirmation値、credential、actor ID、Proposal IDはsafe JSONへ含めない。
+
+Production adapterはProposal Reviewの正式database target parserを再利用する一方、Review runtimeとは別のINSERT専用runtime materialを要求する。接続後はtarget、runtime role、relation contractと最小権限をread-only transactionで確認する。保存mutationは固定parameterized INSERTを含む単一transactionで、semantic idempotency keyのadvisory lock、既存確認、exact response parse、postconditionがすべて成立した場合だけcommitする。失敗はrollbackし、retryは行わない。
+
+Production経路はProposal tableへのINSERT以外を提供せず、UPDATE、DELETE、Review POST、Proposal Apply、app/Sales業務row write、audit write、role/permission変更を行わない。fixture apply runnerやfixture identifierをProduction runnerへ流用しない。
+
 ### 隔離DB fixture bootstrap
 
 Day114の隔離DBにはDaily Brief persistence relationは存在するが、Day126が必要とするProposal fixtureは元々含まれていない。専用bootstrapはproduction migrationではなく、明示targetが`farmos_core_day114_test`である場合だけ利用できるtest fixtureである。既存roleだけを使用し、roleやcredentialを新設・変更しない。
