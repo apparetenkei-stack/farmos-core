@@ -7,6 +7,7 @@ import {
   runHermesDailyFarmBriefProposalExplicitSaveProduction,
   type HermesDailyFarmBriefProposalExplicitSaveProductionExecutor,
 } from "../../src/lib/hermes/hermes_daily_farm_brief_proposal_explicit_save_production_adapter";
+import { HERMES_DAILY_FARM_BRIEF_PROPOSAL_EXPLICIT_SAVE_WRITER_ROLE } from "../../src/lib/hermes/hermes_daily_farm_brief_proposal_explicit_save_writer_provisioning";
 import { hermesDailyFarmBriefProposalExplicitSaveProductionApplyRequested } from "./run_hermes_daily_farm_brief_proposal_explicit_save_production";
 
 const NOW = "2026-07-18T04:00:00.000Z";
@@ -34,7 +35,7 @@ function environment(overrides: Record<string, string | undefined> = {}) {
   return {
     [HERMES_DAILY_FARM_BRIEF_PROPOSAL_EXPLICIT_SAVE_PRODUCTION_ENV.enabled]: "true",
     [HERMES_DAILY_FARM_BRIEF_PROPOSAL_EXPLICIT_SAVE_PRODUCTION_ENV.confirmation]: HERMES_DAILY_FARM_BRIEF_PROPOSAL_EXPLICIT_SAVE_PRODUCTION_CONFIRMATION,
-    [HERMES_DAILY_FARM_BRIEF_PROPOSAL_EXPLICIT_SAVE_PRODUCTION_ENV.user]: "proposal_writer",
+    [HERMES_DAILY_FARM_BRIEF_PROPOSAL_EXPLICIT_SAVE_PRODUCTION_ENV.user]: HERMES_DAILY_FARM_BRIEF_PROPOSAL_EXPLICIT_SAVE_WRITER_ROLE,
     [HERMES_DAILY_FARM_BRIEF_PROPOSAL_EXPLICIT_SAVE_PRODUCTION_ENV.credential]: "fixture-credential",
     HERMES_DAILY_FARM_BRIEF_PROPOSAL_REVIEW_DATABASE_ENABLED: "true",
     HERMES_DAILY_FARM_BRIEF_PROPOSAL_REVIEW_DATABASE_HOST: "localhost",

@@ -19,6 +19,7 @@ import {
 } from "./hermes_daily_farm_brief_proposal_review_database_contract";
 import { createHermesDailyFarmBriefProductionPoolSslConfig } from "./hermes_daily_farm_brief_production_read_repository";
 import { parseHermesDay126PersistedProposalSummary } from "./hermes_daily_farm_brief_proposal_explicit_save_postgres_repository";
+import { HERMES_DAILY_FARM_BRIEF_PROPOSAL_EXPLICIT_SAVE_WRITER_ROLE } from "./hermes_daily_farm_brief_proposal_explicit_save_writer_provisioning";
 
 export const HERMES_DAILY_FARM_BRIEF_PROPOSAL_EXPLICIT_SAVE_PRODUCTION_ENV = {
   enabled: "HERMES_DAILY_FARM_BRIEF_PROPOSAL_EXPLICIT_SAVE_PRODUCTION_ENABLED",
@@ -260,7 +261,7 @@ export async function runHermesDailyFarmBriefProposalExplicitSaveProduction(inpu
   const target = config === null ? null : proposalReviewDatabaseTarget(input.environment, config);
   const user = input.environment[HERMES_DAILY_FARM_BRIEF_PROPOSAL_EXPLICIT_SAVE_PRODUCTION_ENV.user];
   const credential = input.environment[HERMES_DAILY_FARM_BRIEF_PROPOSAL_EXPLICIT_SAVE_PRODUCTION_ENV.credential];
-  if (config === null || target === null || !user || !credential || user === input.environment[HERMES_DAILY_FARM_BRIEF_PROPOSAL_REVIEW_DATABASE_ENV_KEYS.user]) return output("denied", "invalid_environment", { candidate_valid: true, administrator_authorized: true, explicit_save_gate_valid: true, proposal_count: 1 });
+  if (config === null || target === null || user !== HERMES_DAILY_FARM_BRIEF_PROPOSAL_EXPLICIT_SAVE_WRITER_ROLE || !credential || user === input.environment[HERMES_DAILY_FARM_BRIEF_PROPOSAL_REVIEW_DATABASE_ENV_KEYS.user]) return output("denied", "invalid_environment", { candidate_valid: true, administrator_authorized: true, explicit_save_gate_valid: true, proposal_count: 1 });
   const executor = (input.executorFactory ?? ((c, settings) => new PgProductionProposalExplicitSaveExecutor(c, settings)))(config, { host: target.host, user, credential });
   if (executor === null) return output("error", "internal_error", { candidate_valid: true, administrator_authorized: true, explicit_save_gate_valid: true, proposal_count: 1 });
   try {

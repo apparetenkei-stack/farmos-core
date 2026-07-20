@@ -57,6 +57,16 @@ Production adapterはProposal Reviewの正式database target parserを再利用�
 
 Production経路はProposal tableへのINSERT以外を提供せず、UPDATE、DELETE、Review POST、Proposal Apply、app/Sales業務row write、audit write、role/permission変更を行わない。fixture apply runnerやfixture identifierをProduction runnerへ流用しない。
 
+### Dedicated Production writer provisioning
+
+Production explicit-save writerはReview runtimeと分離したsource-fixed LOGIN roleである。Provisioningはserver-onlyのdiagnose runnerとapply runnerだけを入口とし、browser route、Review POST、Proposal Apply、Proposal保存runnerからroleや権限を変更できない。
+
+diagnoseはadministrator認証とProduction Review database targetを再利用し、`BEGIN READ ONLY`でcatalog contractを検査して必ずrollbackする。applyは別のenablementとsource-fixed confirmation、exact `--apply`引数、process environmentで渡すcredentialがすべて揃う場合だけ実行できる。credentialはparameter bindでtransaction-local settingへ渡し、SQL source、標準出力、result evidenceへ含めない。
+
+apply transactionは固定writer roleを`LOGIN NOINHERIT NOSUPERUSER NOBYPASSRLS NOCREATEROLE NOCREATEDB NOREPLICATION`で作成し、対象DB CONNECT、ai schema USAGE、`ai.proposal_inbox` SELECT/INSERTだけを付与する。同一transaction内のpostconditionが、UPDATE/DELETE/TRUNCATE/REFERENCES/TRIGGER、schema CREATE、他relation、audit、app/Sales write、ownership、membershipの不存在を確認した場合だけcommitする。PostgreSQL 17では非superuserの`CREATEROLE` principalがroleを作成すると、bootstrap grantorによるcreator membershipが自動作成され、そのprincipal自身では除去できない。このためrole作成を伴うapply executorは明示的なbootstrap administrator connectionだけを受理し、writer runtime自身にはsuperuser属性もmembershipも残さない。既存roleがexact contractならread-only相当のrollbackで`already_applied`、不一致なら変更せずfail-closedとする。
+
+ProvisioningはProposal rowをINSERTせず、Review decisionやProposal Applyも実行しない。isolated PostgreSQL testだけがfixture role/privilegeを作成し、Production targetやProduction credentialを使用しない。
+
 ### 隔離DB fixture bootstrap
 
 Day114の隔離DBにはDaily Brief persistence relationは存在するが、Day126が必要とするProposal fixtureは元々含まれていない。専用bootstrapはproduction migrationではなく、明示targetが`farmos_core_day114_test`である場合だけ利用できるtest fixtureである。既存roleだけを使用し、roleやcredentialを新設・変更しない。
