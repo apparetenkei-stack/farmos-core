@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 
 import { serveHermesDailyFarmBriefProposalReviewDecision,type HermesDailyFarmBriefProposalReviewDecisionServiceDependencies } from "./brief_runtime/hermes_daily_farm_brief_proposal_review_service";
+import { parseHermesDailyFarmBriefProposalReviewDecisionHttpResponse } from "./brief_runtime/hermes_daily_farm_brief_proposal_review_api_contract";
 import { createDay127ApiTestRow } from "./test_hermes_daily_farm_brief_proposal_review_service";
 import { createHermesDailyFarmBriefProposalSafeReference } from "../../src/lib/hermes/hermes_daily_farm_brief_proposal_review_read_boundary";
 import { HERMES_DAY128_PROTECTED_PROPOSAL_ID } from "../../src/lib/hermes/hermes_daily_farm_brief_proposal_review_decision_postgres_repository";
@@ -19,7 +20,7 @@ function request(value:unknown=body,urlRef=ref){return new Request(`http://local
 async function call(d=deps(),value:unknown=body,urlRef=ref){return serveHermesDailyFarmBriefProposalReviewDecision({request:request(value,urlRef),dependencies:d});}
 async function json(response:Response){return JSON.parse(await response.text()) as Record<string,unknown>;}
 
-const success=await call();assert.equal(success.status,200);assert.deepEqual(await json(success),{ok:true,proposal_ref:ref,previous_status:"pending",status:"approved",updated_at:"2026-07-18T04:00:00.000Z"});
+const success=await call();assert.equal(success.status,200);assert.deepEqual(parseHermesDailyFarmBriefProposalReviewDecisionHttpResponse(await success.text()),{ok:true,proposal_ref:ref,previous_status:"pending",status:"approved",updated_at:"2026-07-18T04:00:00.000Z"});
 assert.equal((await call(deps(),{...body,unknown:true})).status,400);
 assert.equal((await call(deps({auth:{schema_version:"hermes.daily_farm_brief.authentication_result.v1",status:"unauthenticated",principal_ref:null}}))).status,401);
 assert.equal((await call(deps({actor:STAFF}))).status,403);

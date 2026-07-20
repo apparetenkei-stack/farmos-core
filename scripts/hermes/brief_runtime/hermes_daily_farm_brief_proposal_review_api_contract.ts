@@ -66,9 +66,11 @@ export function parseHermesDailyFarmBriefProposalReviewDecisionHttpRequest(value
 }
 const DECISION_HTTP_ERRORS=["invalid_request","unauthenticated","forbidden","not_found","stale","invalid_transition","expired","protected","unavailable","atomic_write_failed"] as const;
 export function parseHermesDailyFarmBriefProposalReviewDecisionHttpResponse(value:unknown):HermesDailyFarmBriefProposalReviewDecisionHttpResponse|null {
-  if(!record(value))return null;
-  if(value.ok===false)return exact(value,["ok","error"])&&(DECISION_HTTP_ERRORS as readonly unknown[]).includes(value.error)?value as HermesDailyFarmBriefProposalReviewDecisionHttpResponse:null;
-  return value.ok===true&&exact(value,["ok","proposal_ref","previous_status","status","updated_at"])&&parseHermesDailyFarmBriefProposalSafeReference(value.proposal_ref)!==null&&value.previous_status==="pending"&&["approved","rejected","needs_revision"].includes(String(value.status))&&isCanonicalIso(value.updated_at)?value as HermesDailyFarmBriefProposalReviewDecisionHttpResponse:null;
+  let decoded:unknown=value;
+  if(typeof value==="string"){try{decoded=JSON.parse(value);}catch{return null;}}
+  if(!record(decoded))return null;
+  if(decoded.ok===false)return exact(decoded,["ok","error"])&&(DECISION_HTTP_ERRORS as readonly unknown[]).includes(decoded.error)?decoded as HermesDailyFarmBriefProposalReviewDecisionHttpResponse:null;
+  return decoded.ok===true&&exact(decoded,["ok","proposal_ref","previous_status","status","updated_at"])&&parseHermesDailyFarmBriefProposalSafeReference(decoded.proposal_ref)!==null&&decoded.previous_status==="pending"&&["approved","rejected","needs_revision"].includes(String(decoded.status))&&isCanonicalIso(decoded.updated_at)?decoded as HermesDailyFarmBriefProposalReviewDecisionHttpResponse:null;
 }
 
 export function createHermesDailyFarmBriefProposalReviewListRequest(input:{request:Request;clock:()=>string}): HermesDailyFarmBriefProposalReviewListRequest|null { let url:URL;let now:string;try{url=new URL(input.request.url);now=input.clock();}catch{return null;}return parseHermesDailyFarmBriefProposalReviewListRequest({schema_version:"hermes.daily_farm_brief.proposal_review_list_request.v1",method:input.request.method,pathname:url.pathname,requested_at:now,query_parameter_count:[...url.searchParams].length,body_present:input.request.body!==null}); }

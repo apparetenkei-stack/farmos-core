@@ -44,6 +44,8 @@ The candidate uses source `daily_brief_proposal_review_decision` and carries str
 
 A successful safe result contains only the safe Proposal reference, public decision, resulting status, reviewed timestamp, and fixed no-Apply/no-app-write values. It excludes reviewer principal, DB role and target, audit identity, candidate/idempotency/duplicate identifiers, raw payload/source references, SQL, credentials, and raw errors.
 
+The HTTP response parser accepts either the serialized JSON response body or an already decoded JSON value. Both forms pass through the same strict exact-key and value validation; malformed JSON, missing keys, and unknown extra keys fail closed.
+
 ## Phase 3 blocker
 
 Pure/static boundary implemented.
