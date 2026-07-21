@@ -1,6 +1,10 @@
 import type { FarmOsApprovedCommand } from "./farm_os_approved_command_contract";
-export const FARM_OS_EXECUTION_GATEWAY_REQUEST_SCHEMA_VERSION="farmos.execution.gateway.request.v1" as const;
-export const FARM_OS_EXECUTION_GATEWAY_RESULT_SCHEMA_VERSION="farmos.execution.gateway.result.v1" as const;
-export type FarmOsExecutionGatewayRequest={schema_version:typeof FARM_OS_EXECUTION_GATEWAY_REQUEST_SCHEMA_VERSION;request_id:string;approved_command:FarmOsApprovedCommand;requested_at:string;request_actor:"execution_gateway";correlation_id:string};
-export type FarmOsExecutionGatewayResult={schema_version:typeof FARM_OS_EXECUTION_GATEWAY_RESULT_SCHEMA_VERSION;request_id:string;command_id:string;result:"blocked"|"unavailable";error:string;gateway_version:"not_implemented_day132";audit:{recorded_at:string};trace:{correlation_id:string}};
-// Contract only: Day132 intentionally exports no gateway implementation, adapter, dispatcher, or state machine.
+import type { FarmOsCommandStateRecord } from "./farm_os_execution_gateway_state_machine";
+import type { FarmOsFakeAdapterResult } from "./farm_os_fake_execution_adapter";
+export const FARM_OS_EXECUTION_GATEWAY_REQUEST_SCHEMA_VERSION="farmos.execution.gateway.request.v2" as const;
+export const FARM_OS_EXECUTION_GATEWAY_RESULT_SCHEMA_VERSION="farmos.execution.gateway.result.v2" as const;
+export const FARM_OS_EXECUTION_GATEWAY_VERSION="farmos-execution-gateway-day133.v1" as const;
+export type FarmOsExecutionGatewayRequest={schema_version:typeof FARM_OS_EXECUTION_GATEWAY_REQUEST_SCHEMA_VERSION;gateway_request_id:string;approved_command:FarmOsApprovedCommand;requested_at:string;request_actor:"execution_gateway";correlation_id:string;expected_command_hash:string;expected_proposal_hash:string;expected_command_state:"requested";gateway_version:typeof FARM_OS_EXECUTION_GATEWAY_VERSION};
+export type FarmOsExecutionGatewayResult={schema_version:typeof FARM_OS_EXECUTION_GATEWAY_RESULT_SCHEMA_VERSION;gateway_request_id:string;command_id:string;result:"succeeded"|"failed"|"compensation_required"|"blocked";error:string|null;gateway_version:typeof FARM_OS_EXECUTION_GATEWAY_VERSION;state_records:readonly FarmOsCommandStateRecord[];adapter_result:FarmOsFakeAdapterResult|null;audit:{recorded_at:string;execution_is_business_fact:false};trace:{proposal_id:string;approval_id:string;command_id:string;gateway_request_id:string;adapter_request_id:string|null;adapter_result_id:string|null;request_id:string;correlation_id:string;source_event_hash:string;proposal_hash:string;command_hash:string}};
+export type FarmOsAgentResultBoundary={result_kind:"agent_result";execution_result:false};
+export type FarmOsExecutionResultBoundary={result_kind:"execution_result";business_fact_created:false};
