@@ -1,36 +1,40 @@
 # Approved Proposal to Approved Command Contract
 
-Day132 defines a fail-closed, non-executing boundary from a reviewed Proposal to
-an Approved Command reservation. FarmOS Core remains the source of truth. The
-builder accepts only the exact `farmos.approved.proposal.v1` envelope, an active
-Proposal Registry type, an approved human review, canonical timestamps, exact
-approval evidence, a known Command Class, and trace and audit references.
+Day132 defines the non-executing boundary `Proposal → Human Review → Approved
+Proposal → Approved Command`. The existing `approved` Proposal status and
+`approve` review decision are the only accepted success states. Pending,
+rejected, needs-revision, expired, applied, superseded, and unknown states fail
+closed. Approval evidence binds the reviewer, timestamp, Proposal version and
+integrity hash, approved capabilities, and approved output classes.
 
-The Proposal Registry continues to own the Proposal's base classification. An
-Approved Proposal may name exactly one L2 or L3 Command Class after review. Its
-declared risk, approval requirement, capabilities, and reauthentication evidence
-must exactly match that Command Registry entry. This explicit reviewed envelope
-is the only Day132 boundary that may raise a Proposal candidate into a command
-classification; callers cannot choose or lower risk independently.
+The static Command Registry derives its L2/L3 risk, capability,
+reauthorization, rollback, and external-execution classifications from the
+Day131 Risk Policy. It restricts Proposal types, command versions, output
+classes, target-system identifiers, and an exact typed payload per Command
+Class. Arbitrary URLs, table names, service names, natural-language commands,
+unknown payload fields, and caller-selected risk are not accepted.
 
-The Command Registry contains `approved_internal_command` and
-`approved_external_command`. Both are non-executable in Day132. The builder
-creates a deterministic command ID, proposal hash, command hash, and builder
-version reservation in memory only. The target reference is derived from and
-must equal the approved Proposal reference; arbitrary targets are rejected. It
-rejects unknown or extra fields, missing
-approval or capability, risk mismatch, invalid version, invalid trace, duplicate
-JSON keys, duplicate command hashes, URL/Secret/command-text payloads, and
-unknown Command Classes. It does not persist a reservation or call a gateway.
+`ApprovedCommandBuilder` is a pure boundary. It validates the Approved Proposal,
+the exact Build Request, Proposal and Command registries, and the Day131
+`approved_command_builder` Policy Matrix entry before deterministically deriving
+the command identity and hashes. Idempotency data is a non-persisted reservation;
+known hashes may classify a duplicate fixture, but Day132 creates no DB lock,
+reservation store, or replay-protection persistence.
 
-`ExecutionGatewayRequest` and `ExecutionGatewayResult` are reservation-only
-contracts. Requests fix `execution_requested=false` and `dry_run_only=true`;
-results can only be blocked or unavailable and record zero execution. There is
-no Gateway implementation, state machine, route, database repository, Apply,
-business adapter, external API, or business write in Day132.
+`ExecutionGatewayRequest` and `ExecutionGatewayResult` are types only. Approved
+Command does not mean Executed Command. Command Builder is not an Execution
+Gateway. The existence of an ExecutionGatewayRequest type does not authorize a
+gateway call. Day132 contains no gateway implementation, adapter, dispatcher,
+state machine, route, DB mutation, business write, Proposal Apply, external API,
+or runtime tool.
 
-Fixtures A–J cover Approved Proposal, Approved Command, unknown Proposal,
-missing approval, missing capability, wrong risk, duplicate command, invalid
-schema, invalid trace, and unknown command. Fixture counters are labelled as
-test-observed. Production command building, gateway calls, and internal and
-external execution remain zero.
+Fixtures A–J cover Approved Proposal, deterministic Approved Command, unknown
+Proposal, missing approval, missing capability, risk mismatch, duplicate
+identity, schema error, trace discontinuity, and unknown Command. Duplicate JSON
+keys are detected only at the raw duplicate-aware parser boundary. Reports use
+assertion and test-observed counters; gateway, internal/external execution,
+business write, and Proposal Apply remain zero.
+
+Day133 may introduce an Execution Gateway skeleton, fake adapter, command state
+machine, Agent-result responsibility boundary, and correlation handling. None of
+those implementations are part of Day132.

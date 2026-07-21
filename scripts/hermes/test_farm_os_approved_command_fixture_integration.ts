@@ -1,60 +1,21 @@
 import assert from "node:assert/strict";
-import {
-  buildFarmOsApprovedCommand,
-  parseFarmOsApprovedCommand,
-} from "../../src/lib/hermes/farm_os_approved_command_contract";
-import {
-  parseFarmOsApprovedProposal,
-  type FarmOsApprovedProposal,
-} from "../../src/lib/hermes/farm_os_approved_proposal_contract";
-
-const base: FarmOsApprovedProposal = {
-  schema_version: "farmos.approved.proposal.v1", proposal_id: "proposal_fixture_day132",
-  proposal_type: "work_log_follow_up", proposal_version: 1,
-  risk_level: "l2_internal_apply", review_result: "approved",
-  review_timestamp: "2026-07-21T08:00:00.000Z", review_actor: "human_reviewer",
-  approval_requirement: "privileged_approval",
-  approval_evidence: { evidence_id: "approval_fixture_day132", approval_requirement: "privileged_approval", capabilities: ["approve_internal_execution"], approved_at: "2026-07-21T08:00:00.000Z", approved_by: "fixture-human-reviewer", reauthenticated_at: "2026-07-21T07:59:00.000Z" },
-  approved_outputs: ["approved_internal_command"], source_runtime: "farmos-native-runtime",
-  trace: { request_id: "request_fixture_day132", correlation_id: "correlation_fixture_day132", source_event_hash: `sha256:${"a".repeat(64)}` },
-  audit: { review_audit_reference: "audit_fixture_day132", recorded_at: "2026-07-21T08:00:01.000Z" },
-};
-const buildInput = { approved_proposal: base, command_class: "approved_internal_command", capabilities: ["approve_internal_execution"], execution_target_reference: base.proposal_id, parameters: { fixture: true }, built_at: "2026-07-21T08:01:00.000Z" } as const;
-type CaseResult = { test_case_id: string; classification: string; allowed: boolean; blocked_reason: string | null; assertion_count: number };
-const cases: CaseResult[] = [];
-const record = (test_case_id: string, classification: string, allowed: boolean, blocked_reason: string | null, checks: readonly [string, boolean][]) => {
-  let assertion_count = 0;
-  for (const [name, condition] of checks) { assertion_count += 1; assert.equal(condition, true, `${test_case_id}:${name}`); }
-  cases.push({ test_case_id, classification, allowed, blocked_reason, assertion_count });
-};
-const counters = { command_build_count: 0, command_rejected_count: 0, command_validation_count: 0, gateway_call_count: 0, internal_execution_count: 0, external_execution_count: 0 };
-const validateProposal = (value: unknown) => { counters.command_validation_count += 1; return parseFarmOsApprovedProposal(value); };
-const runBuild = (input: Parameters<typeof buildFarmOsApprovedCommand>[0]) => { counters.command_validation_count += 1; const result = buildFarmOsApprovedCommand(input); if (result.result === "built") counters.command_build_count += 1; else counters.command_rejected_count += 1; counters.gateway_call_count += result.gateway_call_count; counters.internal_execution_count += result.internal_execution_count; counters.external_execution_count += result.external_execution_count; return result; };
-
-const a = validateProposal(base);
-record("A", "approved_proposal", a.valid, a.blocked_reason, [["approved", a.valid], ["review", base.review_result === "approved"]]);
-const b = runBuild(buildInput);
-record("B", "approved_command", b.result === "built", b.blocked_reason, [["built", b.result === "built"], ["gateway_zero", b.gateway_call_count === 0]]);
-const c = validateProposal({ ...base, proposal_type: "unknown" });
-record("C", "unknown_proposal", c.valid, c.blocked_reason, [["blocked", !c.valid], ["reason", c.blocked_reason === "unknown_proposal_type"]]);
-const d = validateProposal({ ...base, approval_evidence: { ...base.approval_evidence, capabilities: [] } });
-record("D", "missing_approval", d.valid, d.blocked_reason, [["blocked", !d.valid], ["reason", d.blocked_reason === "approval_evidence_invalid"]]);
-const e = runBuild({ ...buildInput, capabilities: [] });
-record("E", "missing_capability", e.result === "built", e.blocked_reason, [["blocked", e.result === "rejected"], ["reason", e.blocked_reason === "missing_required_capability"]]);
-const f = validateProposal({ ...base, risk_level: "l3_external_execution" });
-record("F", "wrong_risk", f.valid, f.blocked_reason, [["blocked", !f.valid], ["reason", f.blocked_reason === "risk_mismatch"]]);
-assert.equal(b.result, "built");
-const g = runBuild({ ...buildInput, reserved_command_hashes: [b.command.command_hash] });
-record("G", "duplicate_command", g.result === "built", g.blocked_reason, [["blocked", g.result === "rejected"], ["reason", g.blocked_reason === "duplicate_command"]]);
-const h = validateProposal({ ...base, schema_version: "invalid" });
-record("H", "invalid_schema", h.valid, h.blocked_reason, [["blocked", !h.valid], ["reason", h.blocked_reason === "invalid_schema"]]);
-const i = validateProposal({ ...base, trace: { ...base.trace, source_event_hash: "invalid" } });
-record("I", "invalid_trace", i.valid, i.blocked_reason, [["blocked", !i.valid], ["reason", i.blocked_reason === "invalid_trace"]]);
-const j = runBuild({ ...buildInput, command_class: "unknown" });
-record("J", "unknown_command", j.result === "built", j.blocked_reason, [["blocked", j.result === "rejected"], ["reason", j.blocked_reason === "unknown_command_class"]]);
-
-assert.equal(counters.gateway_call_count, 0);
-assert.equal(counters.internal_execution_count, 0);
-assert.equal(counters.external_execution_count, 0);
-if (b.result === "built") assert.equal(parseFarmOsApprovedCommand(b.command).valid, true);
-console.log(JSON.stringify({ cases, test_observed_command_build_count: counters.command_build_count, test_observed_command_rejected_count: counters.command_rejected_count, test_observed_command_validation_count: counters.command_validation_count, test_observed_gateway_call_count: counters.gateway_call_count, test_observed_internal_execution_count: counters.internal_execution_count, test_observed_external_execution_count: counters.external_execution_count }));
+import { buildFarmOsApprovedCommand,parseFarmOsApprovedCommand,parseFarmOsCommandBuildRequest,type FarmOsCommandRejectionCode } from "../../src/lib/hermes/farm_os_approved_command_contract";
+import { parseFarmOsApprovedProposal } from "../../src/lib/hermes/farm_os_approved_proposal_contract";
+import { approvedProposalFixture,commandBuildRequestFixture } from "./farm_os_day132_fixture";
+type Case={test_case_id:string;passed:boolean;expected:string;actual:string;assertion_count:number};const cases:Case[]=[];const counters={command_build_count:0,command_rejected_count:0,command_validation_count:0,gateway_call_count:0,internal_execution_count:0,external_execution_count:0,business_write_count:0,proposal_apply_count:0};
+const record=(id:string,expected:string,actual:string,checks:boolean[])=>{for(const condition of checks)assert.equal(condition,true,id);cases.push({test_case_id:id,passed:checks.every(Boolean),expected,actual,assertion_count:checks.length});};
+const build=(proposal:unknown,request:unknown)=>{counters.command_validation_count+=1;const result=buildFarmOsApprovedCommand({approved_proposal:proposal,build_request:request});if(result.result==="success")counters.command_build_count+=1;else counters.command_rejected_count+=1;counters.gateway_call_count+=result.gateway_call_count;counters.internal_execution_count+=result.internal_execution_count;counters.external_execution_count+=result.external_execution_count;counters.business_write_count+=result.business_write_count;counters.proposal_apply_count+=result.proposal_apply_count;return result;};
+const code=(result:ReturnType<typeof buildFarmOsApprovedCommand>):FarmOsCommandRejectionCode|null=>result.result==="rejected"?result.rejection.code:null;const p=approvedProposalFixture(),r=commandBuildRequestFixture();
+const a=parseFarmOsApprovedProposal(p);counters.command_validation_count+=1;record("A","approved_proposal",a.valid?"approved_proposal":a.blocked_reason,[a.valid]);
+const b=build(p,r);record("B","approved_command",b.result==="success"?"approved_command":code(b)!,[b.result==="success"]);assert.equal(b.result,"success");
+const c=build({...p,proposal_type:"unknown"},r);record("C","PROPOSAL_TYPE_UNKNOWN",code(c)!,[code(c)==="PROPOSAL_TYPE_UNKNOWN"]);
+const d=build({...p,approval_evidence:null},r);record("D","APPROVAL_EVIDENCE_MISSING",code(d)!,[code(d)==="APPROVAL_EVIDENCE_MISSING"]);
+const e=build(p,{...r,capabilities:["build_approved_command"]});record("E","REQUIRED_CAPABILITY_MISSING",code(e)!,[code(e)==="REQUIRED_CAPABILITY_MISSING"]);
+const f=build({...p,risk_level:"l3_external_execution"},r);record("F","RISK_LEVEL_MISMATCH",code(f)!,[code(f)==="RISK_LEVEL_MISMATCH"]);
+const duplicate=build(p,{...r,known_command_hashes:[b.command.idempotency.command_hash]});record("G","DUPLICATE_COMMAND",code(duplicate)!,[code(duplicate)==="DUPLICATE_COMMAND",build(p,r).command?.command_id===b.command.command_id]);
+const h=build(p,{...r,unknown:true});record("H","UNKNOWN_FIELD",code(h)!,[code(h)==="UNKNOWN_FIELD"]);
+const i=build(p,{...r,correlation_id:"correlation_wrong_day132"});record("I","TRACE_INVALID",code(i)!,[code(i)==="TRACE_INVALID"]);
+const j=build(p,{...r,command_class:"unknown"});record("J","COMMAND_CLASS_UNKNOWN",code(j)!,[code(j)==="COMMAND_CLASS_UNKNOWN"]);
+assert.equal(parseFarmOsApprovedCommand(b.command).valid,true);assert.equal(parseFarmOsCommandBuildRequest({...r,execution_target:"arbitrary_target"}).blocked_reason,"COMMAND_TARGET_NOT_ALLOWED");
+for(const value of [counters.gateway_call_count,counters.internal_execution_count,counters.external_execution_count,counters.business_write_count,counters.proposal_apply_count])assert.equal(value,0);
+console.log(JSON.stringify({schema_version:"farmos.day132.fixture.report.v1",cases,fixture_count:cases.length,fixture_pass_count:cases.filter((item)=>item.passed).length,fixture_fail_count:cases.filter((item)=>!item.passed).length,test_observed_counters:counters}));

@@ -1,209 +1,99 @@
-import { createHash } from "node:crypto";
 import {
-  parseFarmOsApprovedProposal,
-  type FarmOsApprovedProposal,
+  computeFarmOsProposalIntegrityHash, hashFarmOsContract, hasExactFarmOsKeys,
+  isCanonicalFarmOsIso, isFarmOsDigest, isFarmOsIdentifier, isFarmOsRecord,
+  parseFarmOsApprovedProposal, parseFarmOsDuplicateAwareJson, type FarmOsApprovedProposal, type FarmOsApprovalEvidence,
   type FarmOsContractParseResult,
 } from "./farm_os_approved_proposal_contract";
-import {
-  resolveFarmOsCommandClass,
-  type FarmOsCommandClass,
-} from "./farm_os_command_registry";
+import { evaluateFarmOsAgentPolicy } from "./farm_os_agent_policy_matrix";
+import { resolveFarmOsCommandClass, type FarmOsCommandClass, type FarmOsCommandPayload, type FarmOsCommandTarget } from "./farm_os_command_registry";
 import type { FarmOsRiskLevel, FarmOsRollbackClass } from "./farm_os_risk_taxonomy";
-import { resolveRiskPolicy } from "./farm_os_risk_taxonomy";
 
-export const FARM_OS_APPROVED_COMMAND_SCHEMA_VERSION =
-  "farmos.approved.command.v1" as const;
-export const FARM_OS_APPROVED_COMMAND_BUILDER_VERSION = "1" as const;
+export const FARM_OS_APPROVED_COMMAND_SCHEMA_VERSION="farmos.approved.command.v1" as const;
+export const FARM_OS_COMMAND_BUILD_REQUEST_SCHEMA_VERSION="farmos.command.build.request.v1" as const;
+export const FARM_OS_APPROVED_COMMAND_BUILDER_VERSION="1" as const;
+export const FARM_OS_COMMAND_REJECTION_CODES=["PROPOSAL_NOT_APPROVED","PROPOSAL_TYPE_UNKNOWN","PROPOSAL_VERSION_UNSUPPORTED","PROPOSAL_HASH_INVALID","APPROVAL_EVIDENCE_MISSING","APPROVAL_EVIDENCE_INVALID","APPROVAL_SCOPE_MISMATCH","RISK_LEVEL_MISMATCH","REQUIRED_CAPABILITY_MISSING","OUTPUT_CLASS_NOT_APPROVED","COMMAND_CLASS_UNKNOWN","COMMAND_VERSION_UNSUPPORTED","COMMAND_TARGET_NOT_ALLOWED","COMMAND_SCHEMA_INVALID","TRACE_INVALID","AUDIT_CONTEXT_INVALID","ROLLBACK_CLASS_INVALID","REAUTHORIZATION_POLICY_INVALID","UNKNOWN_FIELD","DUPLICATE_FIELD","DUPLICATE_COMMAND"] as const;
+export type FarmOsCommandRejectionCode=(typeof FARM_OS_COMMAND_REJECTION_CODES)[number];
 
-export type FarmOsApprovedCommand = {
-  schema_version: typeof FARM_OS_APPROVED_COMMAND_SCHEMA_VERSION;
-  command_id: string;
-  command_hash: string;
-  proposal_hash: string;
-  builder_version: typeof FARM_OS_APPROVED_COMMAND_BUILDER_VERSION;
-  command_class: FarmOsCommandClass;
-  command_version: 1;
-  proposal_reference: {
-    proposal_id: string;
-    proposal_type: string;
-    proposal_version: number;
-  };
-  risk_level: Extract<FarmOsRiskLevel, "l2_internal_apply" | "l3_external_execution">;
-  required_capabilities: readonly string[];
-  approval_evidence: FarmOsApprovedProposal["approval_evidence"];
-  reauthorization_required: true;
-  rollback_class: FarmOsRollbackClass;
-  execution_scope: {
-    scope_kind: "approved_proposal_only";
-    proposal_type: string;
-  };
-  execution_target: {
-    target_kind: "reserved_internal_target" | "reserved_external_target";
-    target_reference: string;
-  };
-  execution_payload: {
-    schema_version: "farmos.approved.command.payload.reservation.v1";
-    operation: "reserved_no_execution";
-    parameters: Readonly<Record<string, string | number | boolean | null>>;
-  };
-  audit: {
-    built_at: string;
-    builder_id: "farm-os-approved-command-builder";
-  };
-  trace: FarmOsApprovedProposal["trace"];
+export type FarmOsCommandBuildRequest={schema_version:typeof FARM_OS_COMMAND_BUILD_REQUEST_SCHEMA_VERSION;command_class:FarmOsCommandClass;command_version:1;execution_target:FarmOsCommandTarget;execution_payload:FarmOsCommandPayload;capabilities:readonly string[];built_at:string;correlation_id:string;known_command_hashes:readonly string[]};
+export type FarmOsApprovedCommand={
+  schema_version:typeof FARM_OS_APPROVED_COMMAND_SCHEMA_VERSION;command_id:string;command_class:FarmOsCommandClass;command_version:1;
+  proposal_reference:{proposal_id:string;proposal_type:string;proposal_version:number;proposal_hash:string;approval_id:string};
+  risk_level:Extract<FarmOsRiskLevel,"l2_internal_apply"|"l3_external_execution">;required_capabilities:readonly string[];approval_evidence:FarmOsApprovalEvidence;
+  reauthorization_required:true;rollback_class:FarmOsRollbackClass;execution_scope:{scope_kind:"approved_proposal_only";approved_output_class:string};
+  execution_target:FarmOsCommandTarget;execution_payload:FarmOsCommandPayload;
+  idempotency:{command_id:string;command_hash:string;proposal_hash:string;builder_version:typeof FARM_OS_APPROVED_COMMAND_BUILDER_VERSION;persisted:false};
+  audit:{built_at:string;builder_id:"farm-os-approved-command-builder";review_audit_reference:string};trace:FarmOsApprovedProposal["trace"];
 };
+export type FarmOsApprovedCommandBuildResult={result:"success";command:FarmOsApprovedCommand;rejection:null;gateway_call_count:0;internal_execution_count:0;external_execution_count:0;business_write_count:0;proposal_apply_count:0}|{result:"rejected";command:null;rejection:{code:FarmOsCommandRejectionCode};gateway_call_count:0;internal_execution_count:0;external_execution_count:0;business_write_count:0;proposal_apply_count:0};
 
-export type FarmOsApprovedCommandReservation = {
-  command_id: string;
-  command_hash: string;
-  proposal_hash: string;
-  builder_version: typeof FARM_OS_APPROVED_COMMAND_BUILDER_VERSION;
-  persisted: false;
+const BUILD_KEYS=["schema_version","command_class","command_version","execution_target","execution_payload","capabilities","built_at","correlation_id","known_command_hashes"] as const;
+const COMMAND_KEYS=["schema_version","command_id","command_class","command_version","proposal_reference","risk_level","required_capabilities","approval_evidence","reauthorization_required","rollback_class","execution_scope","execution_target","execution_payload","idempotency","audit","trace"] as const;
+const REF_KEYS=["proposal_id","proposal_type","proposal_version","proposal_hash","approval_id"] as const;
+const IDEMPOTENCY_KEYS=["command_id","command_hash","proposal_hash","builder_version","persisted"] as const;
+const AUDIT_KEYS=["built_at","builder_id","review_audit_reference"] as const;
+const TRACE_KEYS=["request_id","correlation_id","source_event_hash"] as const;
+const SCOPE_KEYS=["scope_kind","approved_output_class"] as const;
+const APPROVAL_KEYS=["approval_id","decision","review_actor","review_timestamp","approved_capabilities","approved_output_classes","proposal_version","proposal_hash"] as const;
+const exactSet=(value:unknown,expected:readonly string[])=>Array.isArray(value)&&value.length===expected.length&&value.every((item)=>typeof item==="string"&&expected.includes(item))&&new Set(value).size===value.length;
+const payloadValid=(value:unknown,commandClass:FarmOsCommandClass,proposalId:string)=>{
+  if(!isFarmOsRecord(value)||!hasExactFarmOsKeys(value,["schema_version","operation","proposal_id"]))return false;
+  return value.proposal_id===proposalId&&(commandClass==="approved_internal_command"?value.schema_version==="farmos.command.payload.work_log_follow_up.v1"&&value.operation==="prepare_work_log_follow_up":value.schema_version==="farmos.command.payload.external_reservation.v1"&&value.operation==="reserve_external_execution_contract");
 };
+const reject=(code:FarmOsCommandRejectionCode):FarmOsApprovedCommandBuildResult=>({result:"rejected",command:null,rejection:{code},gateway_call_count:0,internal_execution_count:0,external_execution_count:0,business_write_count:0,proposal_apply_count:0});
+const mapProposalReason=(reason:string):FarmOsCommandRejectionCode=>FARM_OS_COMMAND_REJECTION_CODES.includes(reason as FarmOsCommandRejectionCode)?reason as FarmOsCommandRejectionCode:"COMMAND_SCHEMA_INVALID";
 
-export type FarmOsApprovedCommandBuildResult =
-  | {
-      result: "built";
-      blocked_reason: null;
-      command: FarmOsApprovedCommand;
-      reservation: FarmOsApprovedCommandReservation;
-      gateway_call_count: 0;
-      internal_execution_count: 0;
-      external_execution_count: 0;
-    }
-  | {
-      result: "rejected";
-      blocked_reason: string;
-      command: null;
-      reservation: null;
-      gateway_call_count: 0;
-      internal_execution_count: 0;
-      external_execution_count: 0;
-    };
+export function parseFarmOsCommandBuildRequest(value:unknown):FarmOsContractParseResult<FarmOsCommandBuildRequest>{
+  if(!isFarmOsRecord(value)||!hasExactFarmOsKeys(value,BUILD_KEYS))return{valid:false,value:null,blocked_reason:"UNKNOWN_FIELD"};
+  if(value.schema_version!==FARM_OS_COMMAND_BUILD_REQUEST_SCHEMA_VERSION)return{valid:false,value:null,blocked_reason:"COMMAND_SCHEMA_INVALID"};
+  const registry=resolveFarmOsCommandClass(value.command_class);if(!registry)return{valid:false,value:null,blocked_reason:"COMMAND_CLASS_UNKNOWN"};
+  if(value.command_version!==registry.command_version)return{valid:false,value:null,blocked_reason:"COMMAND_VERSION_UNSUPPORTED"};
+  if(!registry.allowed_target_systems.includes(value.execution_target as FarmOsCommandTarget))return{valid:false,value:null,blocked_reason:"COMMAND_TARGET_NOT_ALLOWED"};
+  if(!Array.isArray(value.capabilities)||value.capabilities.some((item)=>typeof item!=="string")||!isCanonicalFarmOsIso(value.built_at)||!isFarmOsIdentifier(value.correlation_id)||!Array.isArray(value.known_command_hashes)||value.known_command_hashes.some((item)=>!isFarmOsDigest(item)))return{valid:false,value:null,blocked_reason:"COMMAND_SCHEMA_INVALID"};
+  return{valid:true,value:value as FarmOsCommandBuildRequest,blocked_reason:null};
+}
+export function parseFarmOsCommandBuildRequestJson(text:unknown):FarmOsContractParseResult<FarmOsCommandBuildRequest>{const raw=parseFarmOsDuplicateAwareJson(text);if(!raw.valid)return{valid:false,value:null,blocked_reason:raw.blocked_reason};return parseFarmOsCommandBuildRequest(raw.value);}
 
-const COMMAND_KEYS = [
-  "schema_version", "command_id", "command_hash", "proposal_hash",
-  "builder_version", "command_class", "command_version", "proposal_reference",
-  "risk_level", "required_capabilities", "approval_evidence",
-  "reauthorization_required", "rollback_class", "execution_scope",
-  "execution_target", "execution_payload", "audit", "trace",
-] as const;
-const REFERENCE_KEYS = ["proposal_id", "proposal_type", "proposal_version"] as const;
-const SCOPE_KEYS = ["scope_kind", "proposal_type"] as const;
-const TARGET_KEYS = ["target_kind", "target_reference"] as const;
-const PAYLOAD_KEYS = ["schema_version", "operation", "parameters"] as const;
-const AUDIT_KEYS = ["built_at", "builder_id"] as const;
-const APPROVAL_KEYS = ["evidence_id", "approval_requirement", "capabilities", "approved_at", "approved_by", "reauthenticated_at"] as const;
-const TRACE_KEYS = ["request_id", "correlation_id", "source_event_hash"] as const;
-const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value);
-const exactKeys = (value: Record<string, unknown>, keys: readonly string[]) => Object.keys(value).length === keys.length && keys.every((key) => Object.hasOwn(value, key));
-const canonicalIso = (value: unknown): value is string => typeof value === "string" && Number.isFinite(Date.parse(value)) && new Date(Date.parse(value)).toISOString() === value;
-const digest = (value: unknown): value is string => typeof value === "string" && /^sha256:[a-f0-9]{64}$/u.test(value);
-const identifier = (value: unknown): value is string => typeof value === "string" && /^[a-z][a-z0-9_-]{7,127}$/u.test(value);
-const canonical = (value: unknown): string => {
-  if (Array.isArray(value)) return `[${value.map(canonical).join(",")}]`;
-  if (isRecord(value)) return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${canonical(value[key])}`).join(",")}}`;
-  return JSON.stringify(value);
-};
-const hash = (value: unknown) => `sha256:${createHash("sha256").update(canonical(value), "utf8").digest("hex")}`;
-const containsForbiddenExecutionValue = (value: unknown): boolean => {
-  if (typeof value === "string") return /(?:https?:\/\/|natural_language_command|direct_gateway|shell|browser)/iu.test(value);
-  if (Array.isArray(value)) return value.some(containsForbiddenExecutionValue);
-  return isRecord(value) && Object.entries(value).some(([key, item]) => /(?:url|secret|credential|command_text)/iu.test(key) || containsForbiddenExecutionValue(item));
-};
-const isParameterRecord = (
-  value: unknown,
-): value is Readonly<Record<string, string | number | boolean | null>> =>
-  isRecord(value) &&
-  Object.values(value).every(
-    (item) => item === null || ["string", "number", "boolean"].includes(typeof item),
-  );
-const exactStringSet = (value: unknown, expected: readonly string[]): value is string[] =>
-  Array.isArray(value) && value.length === expected.length &&
-  value.every((item) => typeof item === "string" && expected.includes(item)) &&
-  new Set(value).size === value.length;
-
-export function parseFarmOsApprovedCommand(value: unknown): FarmOsContractParseResult<FarmOsApprovedCommand> {
-  if (!isRecord(value) || !exactKeys(value, COMMAND_KEYS)) return { valid: false, value: null, blocked_reason: "invalid_schema" };
-  const commandPolicy = resolveFarmOsCommandClass(value.command_class);
-  if (!commandPolicy) return { valid: false, value: null, blocked_reason: "unknown_command_class" };
-  if (value.schema_version !== FARM_OS_APPROVED_COMMAND_SCHEMA_VERSION || value.builder_version !== FARM_OS_APPROVED_COMMAND_BUILDER_VERSION || value.command_version !== 1 || !identifier(value.command_id) || !digest(value.command_hash) || !digest(value.proposal_hash)) return { valid: false, value: null, blocked_reason: "invalid_schema" };
-  const expectedCommandId = `command_${(value.proposal_hash as string).slice("sha256:".length, "sha256:".length + 32)}`;
-  if (value.command_id !== expectedCommandId) return { valid: false, value: null, blocked_reason: "command_id_mismatch" };
-  if (value.risk_level !== commandPolicy.risk_level || value.reauthorization_required !== true || !exactStringSet(value.required_capabilities, commandPolicy.required_capabilities)) return { valid: false, value: null, blocked_reason: "risk_or_capability_mismatch" };
-  if (!isRecord(value.proposal_reference) || !exactKeys(value.proposal_reference, REFERENCE_KEYS) || !identifier(value.proposal_reference.proposal_id) || typeof value.proposal_reference.proposal_type !== "string" || !Number.isSafeInteger(value.proposal_reference.proposal_version) || (value.proposal_reference.proposal_version as number) < 1) return { valid: false, value: null, blocked_reason: "invalid_proposal_reference" };
-  const proposalPolicy = resolveRiskPolicy(value.proposal_reference.proposal_type);
-  if (!proposalPolicy || proposalPolicy.proposal_type_status !== "active") return { valid: false, value: null, blocked_reason: "invalid_proposal_reference" };
-  if (!isRecord(value.approval_evidence) || !exactKeys(value.approval_evidence, APPROVAL_KEYS)) return { valid: false, value: null, blocked_reason: "approval_evidence_invalid" };
-  const approval = value.approval_evidence;
-  const expectedApproval = commandPolicy.risk_level === "l2_internal_apply" ? "privileged_approval" : "final_confirmation_and_reauthentication";
-  if (!identifier(approval.evidence_id) || approval.approval_requirement !== expectedApproval || !exactStringSet(approval.capabilities, commandPolicy.required_capabilities) || !canonicalIso(approval.approved_at) || typeof approval.approved_by !== "string" || approval.approved_by.trim().length === 0 || !canonicalIso(approval.reauthenticated_at) || Date.parse(approval.reauthenticated_at as string) > Date.parse(approval.approved_at as string)) return { valid: false, value: null, blocked_reason: "approval_evidence_invalid" };
-  const expectedRollback = commandPolicy.risk_level === "l2_internal_apply" ? "reversible_internal" : "cancellation_or_correction";
-  if (value.rollback_class !== expectedRollback) return { valid: false, value: null, blocked_reason: "rollback_class_mismatch" };
-  if (!isRecord(value.execution_scope) || !exactKeys(value.execution_scope, SCOPE_KEYS) || value.execution_scope.scope_kind !== "approved_proposal_only" || value.execution_scope.proposal_type !== value.proposal_reference.proposal_type) return { valid: false, value: null, blocked_reason: "invalid_execution_scope" };
-  const targetKind = commandPolicy.external_execution ? "reserved_external_target" : "reserved_internal_target";
-  if (!isRecord(value.execution_target) || !exactKeys(value.execution_target, TARGET_KEYS) || value.execution_target.target_kind !== targetKind || value.execution_target.target_reference !== value.proposal_reference.proposal_id) return { valid: false, value: null, blocked_reason: "invalid_execution_target" };
-  if (!isRecord(value.execution_payload) || !exactKeys(value.execution_payload, PAYLOAD_KEYS) || value.execution_payload.schema_version !== "farmos.approved.command.payload.reservation.v1" || value.execution_payload.operation !== "reserved_no_execution" || !isRecord(value.execution_payload.parameters) || containsForbiddenExecutionValue(value.execution_payload.parameters)) return { valid: false, value: null, blocked_reason: "invalid_execution_payload" };
-  if (Object.values(value.execution_payload.parameters).some((item) => item !== null && !["string", "number", "boolean"].includes(typeof item))) return { valid: false, value: null, blocked_reason: "invalid_execution_payload" };
-  if (!isRecord(value.audit) || !exactKeys(value.audit, AUDIT_KEYS) || value.audit.builder_id !== "farm-os-approved-command-builder" || !canonicalIso(value.audit.built_at) || Date.parse(value.audit.built_at as string) < Date.parse(approval.approved_at as string)) return { valid: false, value: null, blocked_reason: "invalid_audit" };
-  if (!isRecord(value.trace) || !exactKeys(value.trace, TRACE_KEYS) || !identifier(value.trace.request_id) || !identifier(value.trace.correlation_id) || !digest(value.trace.source_event_hash)) return { valid: false, value: null, blocked_reason: "invalid_trace" };
-  const candidate = { ...value }; delete candidate.command_hash;
-  if (value.command_hash !== hash(candidate)) return { valid: false, value: null, blocked_reason: "command_hash_mismatch" };
-  return { valid: true, value: value as FarmOsApprovedCommand, blocked_reason: null };
+export function parseFarmOsApprovedCommand(value:unknown):FarmOsContractParseResult<FarmOsApprovedCommand>{
+  if(!isFarmOsRecord(value)||!hasExactFarmOsKeys(value,COMMAND_KEYS))return{valid:false,value:null,blocked_reason:"UNKNOWN_FIELD"};
+  const registry=resolveFarmOsCommandClass(value.command_class);if(!registry)return{valid:false,value:null,blocked_reason:"COMMAND_CLASS_UNKNOWN"};
+  if(value.schema_version!==FARM_OS_APPROVED_COMMAND_SCHEMA_VERSION||value.command_version!==registry.command_version||!isFarmOsIdentifier(value.command_id))return{valid:false,value:null,blocked_reason:"COMMAND_SCHEMA_INVALID"};
+  if(value.risk_level!==registry.required_risk_level)return{valid:false,value:null,blocked_reason:"RISK_LEVEL_MISMATCH"};
+  if(!exactSet(value.required_capabilities,registry.required_capabilities))return{valid:false,value:null,blocked_reason:"REQUIRED_CAPABILITY_MISSING"};
+  if(value.reauthorization_required!==registry.reauthorization_required)return{valid:false,value:null,blocked_reason:"REAUTHORIZATION_POLICY_INVALID"};
+  if(value.rollback_class!==registry.rollback_class)return{valid:false,value:null,blocked_reason:"ROLLBACK_CLASS_INVALID"};
+  if(!isFarmOsRecord(value.proposal_reference)||!hasExactFarmOsKeys(value.proposal_reference,REF_KEYS)||!isFarmOsIdentifier(value.proposal_reference.proposal_id)||!registry.allowed_proposal_types.includes(value.proposal_reference.proposal_type as "work_log_follow_up")||!Number.isSafeInteger(value.proposal_reference.proposal_version)||!isFarmOsDigest(value.proposal_reference.proposal_hash)||!isFarmOsIdentifier(value.proposal_reference.approval_id))return{valid:false,value:null,blocked_reason:"PROPOSAL_HASH_INVALID"};
+  if(!isFarmOsRecord(value.approval_evidence)||!hasExactFarmOsKeys(value.approval_evidence,APPROVAL_KEYS)||value.approval_evidence.approval_id!==value.proposal_reference.approval_id||value.approval_evidence.decision!=="approve"||value.approval_evidence.review_actor!=="human_reviewer"||!isCanonicalFarmOsIso(value.approval_evidence.review_timestamp)||value.approval_evidence.proposal_version!==value.proposal_reference.proposal_version||value.approval_evidence.proposal_hash!==value.proposal_reference.proposal_hash||!exactSet(value.approval_evidence.approved_capabilities,registry.required_capabilities)||!exactSet(value.approval_evidence.approved_output_classes,registry.allowed_output_classes))return{valid:false,value:null,blocked_reason:"APPROVAL_EVIDENCE_INVALID"};
+  if(!isFarmOsRecord(value.execution_scope)||!hasExactFarmOsKeys(value.execution_scope,SCOPE_KEYS)||value.execution_scope.scope_kind!=="approved_proposal_only"||!registry.allowed_output_classes.includes(value.execution_scope.approved_output_class as never))return{valid:false,value:null,blocked_reason:"OUTPUT_CLASS_NOT_APPROVED"};
+  if(!registry.allowed_target_systems.includes(value.execution_target as FarmOsCommandTarget))return{valid:false,value:null,blocked_reason:"COMMAND_TARGET_NOT_ALLOWED"};
+  if(!payloadValid(value.execution_payload,registry.command_class,value.proposal_reference.proposal_id as string))return{valid:false,value:null,blocked_reason:"COMMAND_SCHEMA_INVALID"};
+  if(!isFarmOsRecord(value.idempotency)||!hasExactFarmOsKeys(value.idempotency,IDEMPOTENCY_KEYS)||value.idempotency.command_id!==value.command_id||!isFarmOsDigest(value.idempotency.command_hash)||value.idempotency.proposal_hash!==value.proposal_reference.proposal_hash||value.idempotency.builder_version!==FARM_OS_APPROVED_COMMAND_BUILDER_VERSION||value.idempotency.persisted!==false)return{valid:false,value:null,blocked_reason:"COMMAND_SCHEMA_INVALID"};
+  if(!isFarmOsRecord(value.audit)||!hasExactFarmOsKeys(value.audit,AUDIT_KEYS)||!isCanonicalFarmOsIso(value.audit.built_at)||value.audit.builder_id!=="farm-os-approved-command-builder"||!isFarmOsIdentifier(value.audit.review_audit_reference)||Date.parse(value.audit.built_at as string)<Date.parse(value.approval_evidence.review_timestamp as string))return{valid:false,value:null,blocked_reason:"AUDIT_CONTEXT_INVALID"};
+  if(!isFarmOsRecord(value.trace)||!hasExactFarmOsKeys(value.trace,TRACE_KEYS)||!isFarmOsIdentifier(value.trace.request_id)||!isFarmOsIdentifier(value.trace.correlation_id)||!isFarmOsDigest(value.trace.source_event_hash))return{valid:false,value:null,blocked_reason:"TRACE_INVALID"};
+  const expectedProposalHash=computeFarmOsProposalIntegrityHash({proposal_id:value.proposal_reference.proposal_id as string,proposal_type:value.proposal_reference.proposal_type as string,proposal_version:value.proposal_reference.proposal_version as number,source_runtime:"farmos-native-runtime",trace:value.trace as FarmOsApprovedProposal["trace"]});
+  if(value.proposal_reference.proposal_hash!==expectedProposalHash)return{valid:false,value:null,blocked_reason:"PROPOSAL_HASH_INVALID"};
+  const expectedCommandId=`command_${hashFarmOsContract({proposal_hash:value.proposal_reference.proposal_hash,approval_id:value.proposal_reference.approval_id,command_class:registry.command_class,builder_version:FARM_OS_APPROVED_COMMAND_BUILDER_VERSION}).slice(7,39)}`;
+  if(value.command_id!==expectedCommandId)return{valid:false,value:null,blocked_reason:"COMMAND_SCHEMA_INVALID"};
+  const command=value as unknown as FarmOsApprovedCommand;const withoutHash={...command,idempotency:{...command.idempotency,command_hash:"pending"}};
+  if(command.idempotency.command_hash!==hashFarmOsContract(withoutHash))return{valid:false,value:null,blocked_reason:"COMMAND_SCHEMA_INVALID"};
+  return{valid:true,value:command,blocked_reason:null};
 }
 
-const rejected = (blocked_reason: string): FarmOsApprovedCommandBuildResult => ({ result: "rejected", blocked_reason, command: null, reservation: null, gateway_call_count: 0, internal_execution_count: 0, external_execution_count: 0 });
-
-export function buildFarmOsApprovedCommand(input: {
-  approved_proposal: unknown;
-  command_class: unknown;
-  capabilities: readonly string[];
-  execution_target_reference: unknown;
-  parameters: unknown;
-  built_at: unknown;
-  reserved_command_hashes?: readonly string[];
-}): FarmOsApprovedCommandBuildResult {
-  const parsedProposal = parseFarmOsApprovedProposal(input.approved_proposal);
-  if (!parsedProposal.valid) return rejected(parsedProposal.blocked_reason);
-  const proposal = parsedProposal.value;
-  const commandPolicy = resolveFarmOsCommandClass(input.command_class);
-  if (!commandPolicy) return rejected("unknown_command_class");
-  if (proposal.approved_outputs[0] !== commandPolicy.command_class || proposal.risk_level !== commandPolicy.risk_level) return rejected("risk_mismatch");
-  if (commandPolicy.required_capabilities.some((capability) => !input.capabilities.includes(capability))) return rejected("missing_required_capability");
-  if (input.execution_target_reference !== proposal.proposal_id) return rejected("invalid_execution_target");
-  if (!isParameterRecord(input.parameters) || containsForbiddenExecutionValue(input.parameters)) return rejected("invalid_execution_payload");
-  if (!canonicalIso(input.built_at)) return rejected("invalid_timestamp");
-  const proposalHash = hash(proposal);
-  const commandId = `command_${proposalHash.slice("sha256:".length, "sha256:".length + 32)}`;
-  const rollbackClass: Extract<
-    FarmOsRollbackClass,
-    "reversible_internal" | "cancellation_or_correction"
-  > = commandPolicy.risk_level === "l2_internal_apply"
-    ? "reversible_internal"
-    : "cancellation_or_correction";
-  const draft = {
-    schema_version: FARM_OS_APPROVED_COMMAND_SCHEMA_VERSION,
-    command_id: commandId,
-    proposal_hash: proposalHash,
-    builder_version: FARM_OS_APPROVED_COMMAND_BUILDER_VERSION,
-    command_class: commandPolicy.command_class,
-    command_version: 1 as const,
-    proposal_reference: { proposal_id: proposal.proposal_id, proposal_type: proposal.proposal_type, proposal_version: proposal.proposal_version },
-    risk_level: commandPolicy.risk_level,
-    required_capabilities: commandPolicy.required_capabilities,
-    approval_evidence: proposal.approval_evidence,
-    reauthorization_required: true as const,
-    rollback_class: rollbackClass,
-    execution_scope: { scope_kind: "approved_proposal_only" as const, proposal_type: proposal.proposal_type },
-    execution_target: { target_kind: (commandPolicy.external_execution ? "reserved_external_target" : "reserved_internal_target") as "reserved_internal_target" | "reserved_external_target", target_reference: input.execution_target_reference },
-    execution_payload: { schema_version: "farmos.approved.command.payload.reservation.v1" as const, operation: "reserved_no_execution" as const, parameters: input.parameters },
-    audit: { built_at: input.built_at, builder_id: "farm-os-approved-command-builder" as const },
-    trace: proposal.trace,
-  };
-  const commandHash = hash(draft);
-  if ((input.reserved_command_hashes ?? []).includes(commandHash)) return rejected("duplicate_command");
-  const command: FarmOsApprovedCommand = { ...draft, command_hash: commandHash };
-  const parsedCommand = parseFarmOsApprovedCommand(command);
-  if (!parsedCommand.valid) return rejected(parsedCommand.blocked_reason);
-  return { result: "built", blocked_reason: null, command, reservation: { command_id: command.command_id, command_hash: command.command_hash, proposal_hash: command.proposal_hash, builder_version: command.builder_version, persisted: false }, gateway_call_count: 0, internal_execution_count: 0, external_execution_count: 0 };
+export function buildFarmOsApprovedCommand(input:{approved_proposal:unknown;build_request:unknown}):FarmOsApprovedCommandBuildResult{
+  const proposalResult=parseFarmOsApprovedProposal(input.approved_proposal);if(!proposalResult.valid)return reject(mapProposalReason(proposalResult.blocked_reason));const proposal=proposalResult.value;
+  const requestResult=parseFarmOsCommandBuildRequest(input.build_request);if(!requestResult.valid)return reject(mapProposalReason(requestResult.blocked_reason));const request=requestResult.value;
+  const registry=resolveFarmOsCommandClass(request.command_class)!;
+  if(!registry.allowed_proposal_types.includes(proposal.proposal_type as "work_log_follow_up"))return reject("PROPOSAL_TYPE_UNKNOWN");
+  if(proposal.risk_level!==registry.required_risk_level)return reject("RISK_LEVEL_MISMATCH");
+  if(!registry.allowed_output_classes.includes(proposal.approved_outputs[0] as never))return reject("OUTPUT_CLASS_NOT_APPROVED");
+  if(!exactSet(proposal.approval_evidence.approved_capabilities,registry.required_capabilities)||registry.required_capabilities.some((capability)=>!request.capabilities.includes(capability)))return reject("REQUIRED_CAPABILITY_MISSING");
+  if(proposal.approval_evidence.proposal_hash!==computeFarmOsProposalIntegrityHash(proposal))return reject("PROPOSAL_HASH_INVALID");
+  if(request.correlation_id!==proposal.trace.correlation_id)return reject("TRACE_INVALID");
+  if(!payloadValid(request.execution_payload,registry.command_class,proposal.proposal_id))return reject("COMMAND_SCHEMA_INVALID");
+  const matrix=evaluateFarmOsAgentPolicy({actor:"approved_command_builder",action:"build_approved_command",risk_level:registry.required_risk_level,capabilities:request.capabilities,approved_proposal_evidence:proposal,approval_evidence:proposal.approval_evidence});
+  if(!matrix.allowed)return reject(matrix.blocked_reason==="missing_required_capability"?"REQUIRED_CAPABILITY_MISSING":"APPROVAL_EVIDENCE_INVALID");
+  if(Date.parse(request.built_at)<Date.parse(proposal.review_timestamp))return reject("AUDIT_CONTEXT_INVALID");
+  const proposalHash=proposal.approval_evidence.proposal_hash;const commandId=`command_${hashFarmOsContract({proposal_hash:proposalHash,approval_id:proposal.approval_evidence.approval_id,command_class:registry.command_class,builder_version:FARM_OS_APPROVED_COMMAND_BUILDER_VERSION}).slice(7,39)}`;
+  const draft:FarmOsApprovedCommand={schema_version:FARM_OS_APPROVED_COMMAND_SCHEMA_VERSION,command_id:commandId,command_class:registry.command_class,command_version:registry.command_version,proposal_reference:{proposal_id:proposal.proposal_id,proposal_type:proposal.proposal_type,proposal_version:proposal.proposal_version,proposal_hash:proposalHash,approval_id:proposal.approval_evidence.approval_id},risk_level:registry.required_risk_level,required_capabilities:registry.required_capabilities,approval_evidence:proposal.approval_evidence,reauthorization_required:registry.reauthorization_required,rollback_class:registry.rollback_class,execution_scope:{scope_kind:"approved_proposal_only",approved_output_class:proposal.approved_outputs[0]},execution_target:request.execution_target,execution_payload:request.execution_payload,idempotency:{command_id:commandId,command_hash:"pending",proposal_hash:proposalHash,builder_version:FARM_OS_APPROVED_COMMAND_BUILDER_VERSION,persisted:false},audit:{built_at:request.built_at,builder_id:"farm-os-approved-command-builder",review_audit_reference:proposal.audit.review_audit_reference},trace:proposal.trace};
+  const commandHash=hashFarmOsContract(draft);if(request.known_command_hashes.includes(commandHash))return reject("DUPLICATE_COMMAND");const command={...draft,idempotency:{...draft.idempotency,command_hash:commandHash}};
+  const parsed=parseFarmOsApprovedCommand(command);if(!parsed.valid)return reject(mapProposalReason(parsed.blocked_reason));return{result:"success",command:parsed.value,rejection:null,gateway_call_count:0,internal_execution_count:0,external_execution_count:0,business_write_count:0,proposal_apply_count:0};
 }
