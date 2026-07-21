@@ -3,6 +3,7 @@ import type {
   FarmAgentRuntimeRequest,
   FarmAgentRuntimeResult,
 } from "./farm_agent_runtime_port";
+import { guardFarmOsRuntimeRequest } from "./farm_os_agent_policy_matrix";
 
 export type NativeRuntimeDelegate = (
   request: FarmAgentRuntimeRequest,
@@ -23,6 +24,8 @@ export class FarmOsNativeRuntimeAdapter implements FarmAgentRuntimePort {
 
   async execute(request: FarmAgentRuntimeRequest): Promise<FarmAgentRuntimeResult> {
     const started = Date.now();
+    const policyBlock = guardFarmOsRuntimeRequest({ actor: "native_runtime", task_type: request.task_type, capabilities: request.allowed_capabilities });
+    if (policyBlock) return { schema_version: "farmos.agent.runtime.result.v1", request_id: request.request_id, runtime_name: this.runtime_name, runtime_mode: "formal", result_state: "blocked", output_kind: "blocked", output: null, diagnostics: [policyBlock], safety: { business_write_performed: false, review_decision_performed: false, proposal_apply_performed: false, external_execution_performed: false, formal_contract_created: false }, timing: { duration_ms: Date.now() - started, timed_out: false, cancelled: false } };
     try {
       const output = await this.delegate(request);
       return {

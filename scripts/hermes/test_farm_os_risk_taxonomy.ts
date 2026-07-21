@@ -1,0 +1,20 @@
+import assert from "node:assert/strict";
+import { FARM_OS_RISK_LEVELS, FARM_OS_RISK_POLICIES, assertNoDirectAgentExecution, classifyProposalRisk, resolveRiskPolicy, validateCommandPolicyInput, validatePolicyOverrideAttempt, validateTemporaryException } from "../../src/lib/hermes/farm_os_risk_taxonomy";
+const assertions: Record<string, boolean> = {};
+const recordAssertion = (name: string, condition: boolean) => { assertions[name] = condition; assert.equal(condition, true, name); };
+for (const level of FARM_OS_RISK_LEVELS) { const policy = FARM_OS_RISK_POLICIES[level]; recordAssertion(`complete_${level}`, Boolean(policy.schema_version && policy.policy_id && policy.static_version && policy.rollback_class)); recordAssertion(`direct_false_${level}`, assertNoDirectAgentExecution(policy)); }
+recordAssertion("proposal_registry", classifyProposalRisk("work_log_follow_up")?.risk_level === "l1_proposal_write");
+const formal = resolveRiskPolicy("work_log_follow_up");
+recordAssertion("formal_actor_flags", formal?.observer_candidate_allowed === false && formal.operator_shadow_candidate_allowed === false && formal.formal_persistence_allowed === false);
+recordAssertion("unknown_proposal", resolveRiskPolicy("unknown") === null);
+const baseException = { issuer: "fixture", reason: "fixture", scope: "fixture", valid_from: "2026-07-21T00:00:00Z", valid_until: "2026-07-21T01:00:00Z", audit_reference: "fixture-audit", revoke_condition: "fixture-revoke", post_review_required: true, approval_bypass_requested: false, risk_downgrade_requested: false, capability_additions: [], agent_direct_execution_requested: false, arbitrary_url_requested: false, secret_access_requested: false, invariant_override_requested: false };
+recordAssertion("valid_exception", validateTemporaryException(baseException).valid);
+recordAssertion("invalid_timestamp", validateTemporaryException({ ...baseException, valid_until: "invalid" }).blocked_reason === "invalid_timestamp");
+recordAssertion("unknown_key", !validateTemporaryException({ ...baseException, extra: true }).valid);
+recordAssertion("capability_addition", !validateTemporaryException({ ...baseException, capability_additions: ["extra"] }).valid);
+const override = { source_policy_class: "user_preference", target_policy_class: "operational_policy", requested_risk_change: { from: "l1_proposal_write", to: "l0_read_only" }, requested_capability_additions: [], requested_approval_change: { from: "human_review", to: "none" }, requested_direct_execution_change: false };
+recordAssertion("override_hierarchy", !validatePolicyOverrideAttempt(override).valid);
+recordAssertion("natural_language_command", validateCommandPolicyInput({ natural_language_command: "do it" }).blocked_reason === "natural_language_command_not_allowed");
+recordAssertion("arbitrary_url", validateCommandPolicyInput({ arbitrary_url: "fixture" }).blocked_reason === "arbitrary_url_not_allowed");
+recordAssertion("direct_gateway", validateCommandPolicyInput({ direct_gateway_invocation: true }).blocked_reason === "direct_gateway_invocation_not_allowed");
+console.log(JSON.stringify({ assertions, assertion_count: Object.keys(assertions).length }));

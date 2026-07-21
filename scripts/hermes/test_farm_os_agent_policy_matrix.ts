@@ -1,0 +1,15 @@
+import assert from "node:assert/strict";
+import { evaluateFarmOsAgentPolicy, validateMatrixCompleteness } from "../../src/lib/hermes/farm_os_agent_policy_matrix";
+const assertions: Record<string, boolean> = {};
+const recordAssertion = (name: string, condition: boolean) => { assertions[name] = condition; assert.equal(condition, true, name); };
+const matrix = validateMatrixCompleteness();
+recordAssertion("pair_complete", matrix.actual_pair_count === matrix.expected_pair_count && matrix.missing_pair_count === 0 && matrix.duplicate_pair_count === 0);
+recordAssertion("direct_execution_zero", matrix.direct_execution_true_count === 0);
+recordAssertion("observer_l1", evaluateFarmOsAgentPolicy({ actor: "nous_hermes_observer", action: "create_policy_candidate", risk_level: "l1_proposal_write" }).allowed);
+recordAssertion("observer_persistence_denied", !evaluateFarmOsAgentPolicy({ actor: "nous_hermes_observer", action: "persist_proposal", risk_level: "l1_proposal_write" }).allowed);
+recordAssertion("observer_l2_denied", !evaluateFarmOsAgentPolicy({ actor: "nous_hermes_observer", action: "perform_internal_apply", risk_level: "l2_internal_apply" }).allowed);
+recordAssertion("review_capability", evaluateFarmOsAgentPolicy({ actor: "human_reviewer", action: "make_review_decision", risk_level: "l1_proposal_write" }).blocked_reason === "missing_required_capability");
+recordAssertion("review_approval", evaluateFarmOsAgentPolicy({ actor: "human_reviewer", action: "make_review_decision", risk_level: "l1_proposal_write", capabilities: ["review_operational_proposal"] }).blocked_reason === "approval_required");
+recordAssertion("unknown_actor", evaluateFarmOsAgentPolicy({ actor: "unknown", action: "read_context", risk_level: "l0_read_only" }).blocked_reason === "unknown_actor");
+recordAssertion("unknown_action", evaluateFarmOsAgentPolicy({ actor: "native_runtime", action: "unknown", risk_level: "l0_read_only" }).blocked_reason === "unknown_action");
+console.log(JSON.stringify({ assertions, assertion_count: Object.keys(assertions).length, matrix }));

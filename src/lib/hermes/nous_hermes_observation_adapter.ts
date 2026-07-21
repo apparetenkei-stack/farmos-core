@@ -3,6 +3,7 @@ import type {
   FarmAgentRuntimeRequest,
   FarmAgentRuntimeResult,
 } from "./farm_agent_runtime_port";
+import { guardFarmOsRuntimeRequest } from "./farm_os_agent_policy_matrix";
 
 const OBSERVATION_TASKS = new Set([
   "observation_draft",
@@ -52,6 +53,9 @@ export class NousHermesObservationAdapter implements FarmAgentRuntimePort {
       },
       timing: { duration_ms: Date.now() - started, timed_out: false, cancelled: false },
     });
+
+    const policyBlock = guardFarmOsRuntimeRequest({ actor: request.runtime_profile === "observer" ? "nous_hermes_observer" : "nous_hermes_operator", task_type: request.task_type, capabilities: request.allowed_capabilities });
+    if (policyBlock) return blocked(policyBlock);
 
     if (!OBSERVATION_TASKS.has(request.task_type)) return blocked("task_type_not_allowed_for_shadow");
     if (request.allowed_capabilities.some((capability) => !ALLOWED_CAPABILITIES.has(capability))) {
