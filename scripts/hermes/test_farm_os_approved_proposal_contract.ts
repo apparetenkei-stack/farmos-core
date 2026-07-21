@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
-import { parseFarmOsApprovedProposal,parseFarmOsApprovedProposalJson } from "../../src/lib/hermes/farm_os_approved_proposal_contract";
-import { approvedProposalFixture } from "./farm_os_day132_fixture";
+import { computeFarmOsProposalIntegrityHash,createFarmOsProposalIntegrityMaterial,parseFarmOsApprovedProposal,parseFarmOsApprovedProposalJson } from "../../src/lib/hermes/farm_os_approved_proposal_contract";
+import { approvedProposalFixture,externalApprovedProposalFixture } from "./farm_os_day132_fixture";
 const p=approvedProposalFixture();const assertions:Record<string,boolean>={};const check=(name:string,value:boolean)=>{assertions[name]=value;assert.equal(value,true,name);};
 check("approved",parseFarmOsApprovedProposal(p).valid);
 check("pending_rejected",parseFarmOsApprovedProposal({...p,review_result:"pending"}).blocked_reason==="PROPOSAL_NOT_APPROVED");
@@ -11,4 +11,13 @@ check("hash_invalid",parseFarmOsApprovedProposal({...p,approval_evidence:{...p.a
 check("unknown_field",parseFarmOsApprovedProposal({...p,unknown:true}).blocked_reason==="UNKNOWN_FIELD");
 const raw=JSON.stringify(p);const duplicate=raw.replace('"proposal_id":','"proposal_id":"proposal_duplicate_day132","proposal_id":');
 check("raw_valid",parseFarmOsApprovedProposalJson(raw).valid);check("duplicate",parseFarmOsApprovedProposalJson(duplicate).blocked_reason==="DUPLICATE_FIELD");
+const external=externalApprovedProposalFixture();check("l2_without_reauth",parseFarmOsApprovedProposal(p).valid);check("l3_valid",parseFarmOsApprovedProposal(external).valid);
+check("l3_reauth_missing",parseFarmOsApprovedProposal({...external,approval_evidence:{...external.approval_evidence,reauthentication_evidence:null}}).blocked_reason==="REAUTHENTICATION_EVIDENCE_MISSING");
+const reauth=external.approval_evidence.reauthentication_evidence!;
+check("l3_final_missing",parseFarmOsApprovedProposal({...external,approval_evidence:{...external.approval_evidence,reauthentication_evidence:{...reauth,final_confirmation_at:null}}}).blocked_reason==="FINAL_CONFIRMATION_MISSING");
+check("l3_reauth_invalid",parseFarmOsApprovedProposal({...external,approval_evidence:{...external.approval_evidence,reauthentication_evidence:{...reauth,reauthenticated_at:"2026-07-21T07:59:00.000Z"}}}).blocked_reason==="REAUTHENTICATION_EVIDENCE_INVALID");
+check("l3_reauth_stale",parseFarmOsApprovedProposal({...external,approval_evidence:{...external.approval_evidence,reauthentication_evidence:{...reauth,reauthenticated_at:"2026-07-21T08:00:00.000Z",final_confirmation_at:"2026-07-21T08:00:30.000Z"}}}).blocked_reason==="REAUTHENTICATION_EVIDENCE_INVALID");
+check("l3_scope_mismatch",parseFarmOsApprovedProposal({...external,approval_evidence:{...external.approval_evidence,reauthentication_evidence:{...reauth,confirmation_scope_hash:`sha256:${"c".repeat(64)}`}}}).blocked_reason==="FINAL_CONFIRMATION_SCOPE_MISMATCH");
+const material=createFarmOsProposalIntegrityMaterial(external);const originalHash=computeFarmOsProposalIntegrityHash(material);
+for(const [name,changed] of Object.entries({risk_level:{...material,risk_level:"l2_internal_apply" as const},approval_requirement:{...material,approval_requirement:"privileged_approval" as const},approved_outputs:{...material,approved_outputs:["approved_internal_command_candidate"] as const},approved_capabilities:{...material,approved_capabilities:["approve_internal_execution"]},review_actor:{...material,review_actor:"human_reviewer_changed" as never},review_timestamp:{...material,review_timestamp:"2026-07-21T08:00:01.000Z"},approval_id:{...material,approval_id:"approval_changed_day132"},correlation_id:{...material,trace:{...material.trace,correlation_id:"correlation_changed_day132"}},reauthentication:{...material,reauthentication_evidence:{...reauth,reauthenticated_at:"2026-07-21T08:00:31.000Z"}},confirmation_scope:{...material,reauthentication_evidence:{...reauth,confirmation_scope_hash:`sha256:${"d".repeat(64)}`}}}))check(`hash_binds_${name}`,computeFarmOsProposalIntegrityHash(changed) !== originalHash);
 console.log(JSON.stringify({assertions,assertion_count:Object.keys(assertions).length}));

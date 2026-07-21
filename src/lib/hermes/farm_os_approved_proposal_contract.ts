@@ -3,6 +3,8 @@ import { FARM_OS_RISK_POLICIES, resolveRiskPolicy, type FarmOsApprovalRequiremen
 import { resolveFarmOsCommandClass, type FarmOsApprovedOutputClass } from "./farm_os_command_registry";
 
 export const FARM_OS_APPROVED_PROPOSAL_SCHEMA_VERSION = "farmos.approved.proposal.v1" as const;
+export const FARM_OS_L3_REAUTHENTICATION_MAX_AGE_MS = 5 * 60 * 1000;
+export type FarmOsReauthenticationEvidence={reauthenticated_actor:"human_reviewer";reauthenticated_at:string;reauthentication_method:"human_session_reauthentication";final_confirmation_at:string;confirmation_scope_hash:string};
 export type FarmOsApprovalEvidence = {
   approval_id: string;
   decision: "approve";
@@ -12,6 +14,7 @@ export type FarmOsApprovalEvidence = {
   approved_output_classes: readonly FarmOsApprovedOutputClass[];
   proposal_version: number;
   proposal_hash: string;
+  reauthentication_evidence: FarmOsReauthenticationEvidence | null;
 };
 export type FarmOsApprovedProposal = {
   schema_version: typeof FARM_OS_APPROVED_PROPOSAL_SCHEMA_VERSION;
@@ -26,7 +29,8 @@ export type FarmOsApprovedProposal = {
 export type FarmOsContractParseResult<T> = { valid: true; value: T; blocked_reason: null } | { valid: false; value: null; blocked_reason: string };
 
 const KEYS = ["schema_version","proposal_id","proposal_type","proposal_version","risk_level","review_result","review_timestamp","review_actor","approval_requirement","approval_evidence","approved_outputs","source_runtime","trace","audit"] as const;
-const APPROVAL_KEYS = ["approval_id","decision","review_actor","review_timestamp","approved_capabilities","approved_output_classes","proposal_version","proposal_hash"] as const;
+const APPROVAL_KEYS = ["approval_id","decision","review_actor","review_timestamp","approved_capabilities","approved_output_classes","proposal_version","proposal_hash","reauthentication_evidence"] as const;
+const REAUTH_KEYS=["reauthenticated_actor","reauthenticated_at","reauthentication_method","final_confirmation_at","confirmation_scope_hash"] as const;
 const TRACE_KEYS = ["request_id","correlation_id","source_event_hash"] as const;
 const AUDIT_KEYS = ["review_audit_reference","recorded_at"] as const;
 export const isFarmOsRecord = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value);
@@ -40,8 +44,24 @@ export const canonicalFarmOsJson = (value: unknown): string => {
   return JSON.stringify(value);
 };
 export const hashFarmOsContract = (value: unknown) => `sha256:${createHash("sha256").update(canonicalFarmOsJson(value), "utf8").digest("hex")}`;
-export const computeFarmOsProposalIntegrityHash = (value: Pick<FarmOsApprovedProposal,"proposal_id"|"proposal_type"|"proposal_version"|"source_runtime"|"trace">) => hashFarmOsContract({ proposal_id: value.proposal_id, proposal_type: value.proposal_type, proposal_version: value.proposal_version, source_runtime: value.source_runtime, source_event_hash: value.trace.source_event_hash });
+export type FarmOsProposalIntegrityMaterial={proposal_id:string;proposal_type:string;proposal_version:number;risk_level:FarmOsApprovedProposal["risk_level"];approval_requirement:FarmOsApprovalRequirement;approved_outputs:readonly FarmOsApprovedOutputClass[];approved_capabilities:readonly string[];source_runtime:"farmos-native-runtime";trace:FarmOsApprovedProposal["trace"];review_result:"approved";review_actor:"human_reviewer";review_timestamp:string;approval_id:string;decision:"approve";reauthentication_evidence:FarmOsReauthenticationEvidence|null};
+const sorted=(values:readonly string[])=>[...values].sort();
+const scopeMaterial=(value:FarmOsProposalIntegrityMaterial)=>({proposal_id:value.proposal_id,proposal_type:value.proposal_type,proposal_version:value.proposal_version,risk_level:value.risk_level,approval_requirement:value.approval_requirement,approved_outputs:sorted(value.approved_outputs),approved_capabilities:sorted(value.approved_capabilities),source_runtime:value.source_runtime,trace:{request_id:value.trace.request_id,correlation_id:value.trace.correlation_id,source_event_hash:value.trace.source_event_hash},review_result:value.review_result,review_actor:value.review_actor,review_timestamp:value.review_timestamp,approval_id:value.approval_id,decision:value.decision});
+export const computeFarmOsConfirmationScopeHash=(value:FarmOsProposalIntegrityMaterial)=>hashFarmOsContract(scopeMaterial(value));
+export const computeFarmOsProposalIntegrityHash=(value:FarmOsProposalIntegrityMaterial)=>hashFarmOsContract({...scopeMaterial(value),reauthentication_evidence:value.reauthentication_evidence});
+export const createFarmOsProposalIntegrityMaterial=(proposal:Omit<FarmOsApprovedProposal,"approval_evidence">&{approval_evidence:Omit<FarmOsApprovalEvidence,"proposal_hash">}):FarmOsProposalIntegrityMaterial=>({proposal_id:proposal.proposal_id,proposal_type:proposal.proposal_type,proposal_version:proposal.proposal_version,risk_level:proposal.risk_level,approval_requirement:proposal.approval_requirement,approved_outputs:proposal.approved_outputs,approved_capabilities:proposal.approval_evidence.approved_capabilities,source_runtime:proposal.source_runtime,trace:proposal.trace,review_result:proposal.review_result,review_actor:proposal.review_actor,review_timestamp:proposal.review_timestamp,approval_id:proposal.approval_evidence.approval_id,decision:proposal.approval_evidence.decision,reauthentication_evidence:proposal.approval_evidence.reauthentication_evidence});
 const exactSet = (value: unknown, expected: readonly string[]): value is string[] => Array.isArray(value) && value.length === expected.length && value.every((item) => typeof item === "string" && expected.includes(item)) && new Set(value).size === value.length;
+export function validateFarmOsReauthenticationEvidence(material:FarmOsProposalIntegrityMaterial):string|null{
+  const evidence=material.reauthentication_evidence;
+  if(material.risk_level==="l2_internal_apply")return evidence===null?null:"REAUTHENTICATION_EVIDENCE_INVALID";
+  if(evidence===null||evidence===undefined)return"REAUTHENTICATION_EVIDENCE_MISSING";
+  if(!isFarmOsRecord(evidence)||!hasExactFarmOsKeys(evidence,REAUTH_KEYS)||evidence.reauthenticated_actor!==material.review_actor||evidence.reauthentication_method!=="human_session_reauthentication"||!isCanonicalFarmOsIso(evidence.reauthenticated_at))return"REAUTHENTICATION_EVIDENCE_INVALID";
+  if(!isCanonicalFarmOsIso(evidence.final_confirmation_at))return"FINAL_CONFIRMATION_MISSING";
+  const reviewed=Date.parse(material.review_timestamp),reauthenticated=Date.parse(evidence.reauthenticated_at),confirmed=Date.parse(evidence.final_confirmation_at),evaluated=Date.now();
+  if(reauthenticated<reviewed||confirmed<reauthenticated||confirmed-reauthenticated>FARM_OS_L3_REAUTHENTICATION_MAX_AGE_MS||evaluated<confirmed||evaluated-confirmed>FARM_OS_L3_REAUTHENTICATION_MAX_AGE_MS)return"REAUTHENTICATION_EVIDENCE_INVALID";
+  if(!isFarmOsDigest(evidence.confirmation_scope_hash)||evidence.confirmation_scope_hash!==computeFarmOsConfirmationScopeHash(material))return"FINAL_CONFIRMATION_SCOPE_MISMATCH";
+  return null;
+}
 
 export function parseFarmOsApprovedProposal(value: unknown): FarmOsContractParseResult<FarmOsApprovedProposal> {
   if (!isFarmOsRecord(value)) return { valid:false,value:null,blocked_reason:"COMMAND_SCHEMA_INVALID" };
@@ -64,8 +84,10 @@ export function parseFarmOsApprovedProposal(value: unknown): FarmOsContractParse
   const evidence = value.approval_evidence;
   const candidate = value as unknown as FarmOsApprovedProposal;
   if (!isFarmOsIdentifier(evidence.approval_id) || evidence.decision !== "approve" || evidence.review_actor !== value.review_actor || evidence.review_timestamp !== value.review_timestamp || evidence.proposal_version !== value.proposal_version) return { valid:false,value:null,blocked_reason:"APPROVAL_EVIDENCE_INVALID" };
-  if (!isFarmOsDigest(evidence.proposal_hash) || evidence.proposal_hash !== computeFarmOsProposalIntegrityHash(candidate)) return { valid:false,value:null,blocked_reason:"PROPOSAL_HASH_INVALID" };
   if (!exactSet(evidence.approved_capabilities, command.required_capabilities) || !exactSet(evidence.approved_output_classes, value.approved_outputs as unknown[] as string[])) return { valid:false,value:null,blocked_reason:"APPROVAL_SCOPE_MISMATCH" };
+  const reauthenticationError=validateFarmOsReauthenticationEvidence(createFarmOsProposalIntegrityMaterial(candidate));
+  if(reauthenticationError)return{valid:false,value:null,blocked_reason:reauthenticationError};
+  if (!isFarmOsDigest(evidence.proposal_hash) || evidence.proposal_hash !== computeFarmOsProposalIntegrityHash(createFarmOsProposalIntegrityMaterial(candidate))) return { valid:false,value:null,blocked_reason:"PROPOSAL_HASH_INVALID" };
   if (Date.parse(value.audit.recorded_at as string) < Date.parse(value.review_timestamp as string)) return { valid:false,value:null,blocked_reason:"AUDIT_CONTEXT_INVALID" };
   return { valid:true,value:candidate,blocked_reason:null };
 }

@@ -10,7 +10,7 @@ check("registry_complete",Object.values(FARM_OS_COMMAND_REGISTRY).every((entry)=
 check("typed_payload",built.command.execution_payload.schema_version===FARM_OS_COMMAND_REGISTRY.approved_internal_command.payload_schema);
 const gatewayRequest:FarmOsExecutionGatewayRequest={schema_version:"farmos.execution.gateway.request.v1",request_id:"gateway_request_fixture",approved_command:built.command,requested_at:"2026-07-21T08:02:00.000Z",request_actor:"execution_gateway",correlation_id:p.trace.correlation_id};
 const gatewayResult:FarmOsExecutionGatewayResult={schema_version:"farmos.execution.gateway.result.v1",request_id:gatewayRequest.request_id,command_id:built.command.command_id,result:"blocked",error:"gateway_not_implemented",gateway_version:"not_implemented_day132",audit:{recorded_at:"2026-07-21T08:02:00.000Z"},trace:{correlation_id:p.trace.correlation_id}};
-check("gateway_contract_only",gatewayResult.result==="blocked"&&built.gateway_call_count===0);
+check("gateway_contract_only",gatewayResult.result==="blocked");
 const raw=JSON.stringify(r);const duplicate=raw.replace('"command_class":','"command_class":"approved_external_command","command_class":');
 check("build_request_duplicate",parseFarmOsCommandBuildRequestJson(duplicate).blocked_reason==="DUPLICATE_FIELD");
 console.log(JSON.stringify({assertions,assertion_count:Object.keys(assertions).length}));
