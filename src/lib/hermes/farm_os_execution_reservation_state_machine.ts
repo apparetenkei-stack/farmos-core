@@ -12,6 +12,7 @@ export const FARM_OS_RESERVATION_TRANSITION_TABLE:readonly FarmOsReservationTran
   {from:"reserved",to:"expired",event:"expire",required_version:"compare_and_set",owner_required:false,command_identity_required:true,audit_required:true,business_write_allowed:false,external_execution_allowed:false},
   {from:"claimed",to:"expired",event:"expire",required_version:"compare_and_set",owner_required:false,command_identity_required:true,audit_required:true,business_write_allowed:false,external_execution_allowed:false},
   {from:"executing",to:"expired",event:"expire",required_version:"compare_and_set",owner_required:false,command_identity_required:true,audit_required:true,business_write_allowed:false,external_execution_allowed:false},
+  {from:"claimed",to:"released",event:"release",required_version:"compare_and_set",owner_required:true,command_identity_required:true,audit_required:true,business_write_allowed:false,external_execution_allowed:false},
   {from:"failed",to:"released",event:"release",required_version:"compare_and_set",owner_required:true,command_identity_required:true,audit_required:true,business_write_allowed:false,external_execution_allowed:false},
   {from:"expired",to:"released",event:"release",required_version:"compare_and_set",owner_required:true,command_identity_required:true,audit_required:true,business_write_allowed:false,external_execution_allowed:false},
 ] as const;
