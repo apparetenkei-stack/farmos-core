@@ -1,0 +1,13 @@
+{
+  "schema_version": "farmos.day135.foundation.release.v1",
+  "foundation_commit": "f91e419aca27c829061c99496a83fc5c1e7272c7",
+  "foundation_tree_hash": "sha256:bd7c30d885f7b352fa1d75b3c013c94515547e218775ea5faa05620f6db2bbe0",
+  "formal_decision": "go",
+  "independent_review": {
+    "p1": 0,
+    "p2": 0
+  },
+  "antigravity_handoff": "docs/architecture/farm-os-day135-antigravity-contract-handoff.md",
+  "api_changes": false,
+  "execution_status_changes": false
+}
