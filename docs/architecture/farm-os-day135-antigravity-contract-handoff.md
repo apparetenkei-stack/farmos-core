@@ -1,0 +1,7 @@
+# Day135 Antigravity read-only handoff
+
+Release metadata, including the Core commit SHA, is supplied with this document rather than embedded into the commit it identifies. Day131 fixed the Risk Taxonomy; Day132 approved-command contract; Day133 Execution Gateway; Day134 idempotency reservation; Day135 Runtime Reauthorization; this addition fixes L1-only Crop/Workforce/Sales typed-reference governance. There are no API additions or changes and no execution-status changes.
+
+Review, read-only: current work-plan and crop-plan UI; crop-cycle, work-record, inventory, staff assignment and member schemas; employment state, role/capability equivalent, authentication, RLS and migrations; Core API parser and Proposal Review UI; Sales storage. Return this inventory: `area`, `source path/schema`, `SOT owner`, `current states`, `authorization/RLS`, `API/UI consumer`, `unknowns`, `risk`. Do not change the farming app, create migrations, roles, or RLS.
+
+Core fixture evidence: 40 targeted assertions pass; recursive dependency fixture detects direct/re-export imports, fetch/alias, dynamic import, property/computed calls, filesystem/network/process/repository/adapter/secret fixtures; all production findings are zero. The immutable release reference is `docs/releases/farm-os-day135-foundation-release.json`, created only after Foundation Commit A. Unconfirmed items remain real app states, capability mappings, sales locations, and application persistence. This contract remains L1 proposal-only and fail-closed.
