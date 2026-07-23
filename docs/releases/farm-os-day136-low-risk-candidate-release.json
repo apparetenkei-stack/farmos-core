@@ -1,0 +1,20 @@
+{
+  "schema_version": "farmos.day136.antigravity-release.v1",
+  "contract_version": "farmos.low-risk-candidate.v1",
+  "candidate_kinds": ["safe_metadata", "confirmation_task", "administrative_memo", "crop_plan_review_request"],
+  "statuses": ["candidate", "validation_failed", "review_ready", "expired", "superseded", "rejected"],
+  "risk_mapping": {"safe_metadata": "l1_proposal_write", "confirmation_task": "l1_proposal_write", "administrative_memo": "l1_proposal_write", "crop_plan_review_request": "l1_proposal_write"},
+  "required_capabilities": ["review_farm_metadata", "review_operational_proposal", "review_administrative_memo", "review_crop_plan"],
+  "approval_required": true,
+  "command_conversion_allowed": false,
+  "business_write_allowed": false,
+  "external_side_effect_allowed": false,
+  "fixture_count": 21,
+  "expected_ui_impact": "read-only impact review only; implementation deferred",
+  "expected_api_impact": "contract sync only; no public or farming-app write API",
+  "expected_db_impact": "none",
+  "write_impact": 0,
+  "day137_prerequisites": ["human-approved apply contract", "server-side authorization", "idempotency", "audit", "rollback or compensation"],
+  "core_commit_sha": "503e6203aaade511e1f0e504a92b1dcbfa581317",
+  "test_evidence": ["pnpm run test-farm-os-day136-boundary", "pnpm exec tsc --noEmit", "pnpm run run-farm-os-day136-isolated-build"]
+}
