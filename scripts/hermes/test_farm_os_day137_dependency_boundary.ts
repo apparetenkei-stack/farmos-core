@@ -1,0 +1,9 @@
+import assert from "node:assert/strict";
+import { existsSync, readFileSync } from "node:fs";
+import path from "node:path";
+import ts from "typescript";
+const root=process.cwd(),entry=path.join(root,"src/lib/hermes/farm_os_confirmation_task_apply_contract.ts"),visited=new Set<string>(),findings:string[]=[];
+const forbidden=/execution_gateway|supabase|postgres|database|production_repository|migration|notification|email|slack|node:fs|node:http|node:https|child_process|axios|farming_app.*write/iu;
+const resolve=(from:string,s:string)=>{const b=path.resolve(path.dirname(from),s);return[b,`${b}.ts`,path.join(b,"index.ts")].find(existsSync)??null};
+const inspect=(file:string)=>{if(visited.has(file))return;visited.add(file);const source=readFileSync(file,"utf8"),ast=ts.createSourceFile(file,source,ts.ScriptTarget.Latest,true);const visit=(n:ts.Node)=>{if((ts.isImportDeclaration(n)||ts.isExportDeclaration(n))&&n.moduleSpecifier&&ts.isStringLiteral(n.moduleSpecifier)){const s=n.moduleSpecifier.text;if(s.startsWith(".")){const target=resolve(file,s);if(!target)findings.push(`unresolved:${s}`);else if(forbidden.test(target))findings.push(`forbidden:${target}`);else inspect(target)}else if(forbidden.test(s)&&s!=="node:crypto")findings.push(`forbidden:${s}`)}if(ts.isCallExpression(n)){const x=n.expression.getText(ast);if(/^(fetch|eval|Function|require)$/.test(x)||/\\.(call|apply)$/.test(x)||n.expression.kind===ts.SyntaxKind.ImportKeyword)findings.push(`call:${x}`)}ts.forEachChild(n,visit)};visit(ast)};inspect(entry);
+assert.deepEqual(findings,[]);console.log(JSON.stringify({dependency_boundary_valid:true,inspected_files:[...visited].map(x=>path.relative(root,x)).sort(),forbidden_findings:findings,supabase_count:0,postgres_count:0,farming_app_write_count:0,notification_count:0,network_count:0,filesystem_write_count:0,execution_gateway_count:0}));
