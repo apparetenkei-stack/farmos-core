@@ -1,0 +1,12 @@
+import assert from "node:assert/strict";
+import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
+import path from "node:path";
+import ts from "typescript";
+const root=process.cwd(),entry=path.join(root,"src/lib/hermes/farm_os_confirmation_task_persistence_contract.ts"),seen=new Set<string>(),bad:string[]=[];
+const forbidden=/execution_gateway|supabase|postgres|database|production_repository|migration|notification|email|slack|node:fs|node:http|node:https|child_process|axios|farming_app.*write/iu;
+const resolve=(f:string,s:string)=>{const b=path.resolve(path.dirname(f),s);return[b,`${b}.ts`,path.join(b,"index.ts")].find(existsSync)??null};
+const inspect=(f:string)=>{if(seen.has(f))return;seen.add(f);const text=readFileSync(f,"utf8"),ast=ts.createSourceFile(f,text,ts.ScriptTarget.Latest,true);const visit=(n:ts.Node)=>{if((ts.isImportDeclaration(n)||ts.isExportDeclaration(n))&&n.moduleSpecifier&&ts.isStringLiteral(n.moduleSpecifier)){const s=n.moduleSpecifier.text;if(s.startsWith(".")){const t=resolve(f,s);if(!t)bad.push(`unresolved:${s}`);else if(forbidden.test(t))bad.push(`forbidden:${t}`);else inspect(t)}else if(forbidden.test(s)&&s!=="node:crypto")bad.push(`forbidden:${s}`)}if(ts.isCallExpression(n)){const x=n.expression.getText(ast);if(/^(fetch|eval|Function|require)$/.test(x)||/\.(call|apply)$/.test(x)||n.expression.kind===ts.SyntaxKind.ImportKeyword)bad.push(`call:${x}`)}ts.forEachChild(n,visit)};visit(ast)};inspect(entry);
+const productionSource=readFileSync(entry,"utf8"),agentAuthorityReferences=(productionSource.match(/\b(?:hermes|native_runtime)\b/giu)??[]).length,reverseConsumers:string[]=[];
+const scanReverse=(folder:string)=>{for(const name of readdirSync(folder)){const file=path.join(folder,name);if(statSync(file).isDirectory())scanReverse(file);else if(name.endsWith(".ts")&&file!==entry){const source=readFileSync(file,"utf8");if(source.includes("farm_os_confirmation_task_persistence_contract"))reverseConsumers.push(path.relative(root,file));}}};scanReverse(path.join(root,"src"));
+assert.deepEqual(bad,[]);assert.equal(agentAuthorityReferences,0);assert.deepEqual(reverseConsumers,[]);
+console.log(JSON.stringify({dependency_boundary_valid:true,inspected_files:[...seen].map(x=>path.relative(root,x)).sort(),forbidden_findings:bad,reverse_production_consumers:reverseConsumers,hermes_persistence_authority_count:0,native_persistence_authority_count:0,production_db_count:0,network_count:0,filesystem_write_count:0,notification_count:0,execution_gateway_count:0}));
