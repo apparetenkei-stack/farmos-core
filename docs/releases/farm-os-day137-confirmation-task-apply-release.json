@@ -1,0 +1,19 @@
+{
+  "schema_version": "farmos.day137.antigravity-release.v1",
+  "contract_version": "farmos.confirmation-task-apply.v1",
+  "operation_kind": "confirmation_task_draft_apply",
+  "source_candidate_kind": "confirmation_task",
+  "task_draft_schema": "farmos.confirmation-task-draft.v1",
+  "approval_evidence": "approved human decision; candidate id and canonical snapshot hash bound; reviewer capability required",
+  "reauthorization": "active human actor; apply_confirmation_task; exact target scope; current policy; fresh authorization",
+  "idempotency": "same key and fingerprint replays; mismatched fingerprint conflicts; candidate/approval reuse rejects",
+  "dry_run_required": true,
+  "business_write_allowed": false,
+  "external_side_effect_allowed": false,
+  "expected_ui_impact": "contract sync and read-only impact review only",
+  "expected_api_impact": "no farming-app write API",
+  "expected_db_impact": "none",
+  "day138_prerequisites": ["task persistence contract", "cancellation contract", "server authorization", "durable idempotency", "audit", "UI boundary"],
+  "core_commit_sha": "c03a6faa397f987644bc633f3f3fae1441277052",
+  "test_evidence": ["pnpm run test-farm-os-day137-boundary", "pnpm exec tsc --noEmit", "pnpm run run-farm-os-day137-isolated-build"]
+}
