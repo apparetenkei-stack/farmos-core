@@ -1,0 +1,17 @@
+{
+  "manifest_version": "farmos.core-db-provisioning-manifest.v1",
+  "startup_auto_apply": false,
+  "production_apply_authority": "authenticated_human_operator",
+  "history_table": "core_schema.migration_history",
+  "migrations": [
+    {
+      "migration_id": "202607260001_eligible_proposal_persistence",
+      "sequence": 202607260001,
+      "description": "Add eligible proposal persistence and execution projection foundation",
+      "checksum": "sha256:41fbbfb931f03ad42c0c52159749fa8529c84321d6fcc643930c2b03c5c2ee4b",
+      "apply_script": "db/migrations/202607260001_eligible_proposal_persistence.sql",
+      "verification_script": "db/migrations/202607260001_eligible_proposal_persistence.verify.sql",
+      "created_at": "2026-07-26T00:00:00.000Z"
+    }
+  ]
+}

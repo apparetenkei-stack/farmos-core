@@ -103,7 +103,7 @@ export async function runDay127ProposalReviewPostgresReadinessBoundary() {
   assert.match(sql, /inet_server_addr\(\) is null/u);
   assert.match(sql, /current_user='farmos_ai_proposal_local'/u);
   assert.match(sql, /current_setting\('transaction_read_only'\)='on'/u);
-  assert.match(sql, /count\(\*\)=19/u);
+  assert.match(sql, /count\(\*\)>=19/u);
   assert.match(sql, /not rolsuper and not rolbypassrls/u);
   assert.match(sql, /has_schema_privilege\('public','ai','USAGE'\)/u);
   assert.match(sql, /rollback;/u);

@@ -95,7 +95,7 @@ select jsonb_build_object(
   'identity_valid',current_user='${HERMES_DAY127_POSTGRES_RUNTIME_ROLE}',
   'transaction_read_only',current_setting('transaction_read_only')='on',
   'relation_present',to_regclass('ai.proposal_inbox') is not null,
-  'schema_contract_valid',coalesce((select count(*)=19 and count(*) filter (where column_name=any(array['id','proposal_type','title','body','payload_json','source_refs_json','model_name','agent_name','confidence','reason','risk_level','status','reviewed_by','reviewed_at','review_note','applied_at','applied_by','created_at','updated_at']))=19 from information_schema.columns where table_schema='ai' and table_name='proposal_inbox'),false),
+  'schema_contract_valid',coalesce((select count(*)>=19 and count(*) filter (where column_name=any(array['id','proposal_type','title','body','payload_json','source_refs_json','model_name','agent_name','confidence','reason','risk_level','status','reviewed_by','reviewed_at','review_note','applied_at','applied_by','created_at','updated_at']))=19 from information_schema.columns where table_schema='ai' and table_name='proposal_inbox'),false),
   'select_privilege',coalesce(has_table_privilege(current_user,to_regclass('ai.proposal_inbox'),'SELECT'),false),
   'update_privilege',coalesce(has_table_privilege(current_user,to_regclass('ai.proposal_inbox'),'UPDATE'),false),
   'delete_privilege',coalesce(has_table_privilege(current_user,to_regclass('ai.proposal_inbox'),'DELETE'),false),

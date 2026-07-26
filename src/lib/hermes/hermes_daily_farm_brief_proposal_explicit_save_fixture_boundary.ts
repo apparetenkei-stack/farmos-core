@@ -103,7 +103,7 @@ select jsonb_build_object(
   'records_present',:'day126_records_present'::boolean,
   'commands_present',:'day126_commands_present'::boolean,
   'fixture_ready',
-    (select count(*)=19 and count(*) filter (where column_name=any(array['id','proposal_type','title','body','payload_json','source_refs_json','model_name','agent_name','confidence','reason','risk_level','status','reviewed_by','reviewed_at','review_note','applied_at','applied_by','created_at','updated_at']))=19 from information_schema.columns where table_schema='ai' and table_name='proposal_inbox')
+    (select count(*)>=19 and count(*) filter (where column_name=any(array['id','proposal_type','title','body','payload_json','source_refs_json','model_name','agent_name','confidence','reason','risk_level','status','reviewed_by','reviewed_at','review_note','applied_at','applied_by','created_at','updated_at']))=19 from information_schema.columns where table_schema='ai' and table_name='proposal_inbox')
     and exists(select 1 from pg_catalog.pg_constraint where conrelid=to_regclass('ai.proposal_inbox') and contype='p')
     and (select count(*)=3 from pg_catalog.pg_constraint where conrelid=to_regclass('ai.proposal_inbox') and contype='c' and conname in ('proposal_inbox_status_check','proposal_inbox_risk_level_check','proposal_inbox_confidence_check'))
     and coalesce((select c.relowner=n.nspowner from pg_catalog.pg_class c join pg_catalog.pg_namespace n on n.oid=c.relnamespace where n.nspname='ai' and c.relname='proposal_inbox'),false)

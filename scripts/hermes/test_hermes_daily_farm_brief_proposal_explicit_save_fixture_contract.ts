@@ -92,7 +92,7 @@ export async function runDay126FixtureContractScenario() {
   assert.match(preflightSql, /r\.oid=n\.nspowner/u);
   assert.match(preflightSql, /has_schema_privilege\(current_user,n\.oid,'CREATE'\)/u);
   assert.match(preflightSql, /\\if :day126_fixture_relation_present/u);
-  assert.match(preflightSql, /count\(\*\)=19/u);
+  assert.match(preflightSql, /count\(\*\)>=19/u);
   assert.match(preflightSql, /contype='p'/u);
   assert.match(preflightSql, /proposal_inbox_status_check/u);
   assert.match(preflightSql, /c\.relowner=n\.nspowner/u);
