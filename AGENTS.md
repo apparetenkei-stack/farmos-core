@@ -125,3 +125,102 @@ Codex は、このリポジトリ内に限り、次を承認なしで実行し�
 - AI 生成処理から app または Sales 業務 schema への直接 write
 - Proposal First または Human in the Loop の回避
 - ユーザーから明示指示されていない `.codex/` セキュリティ設定の変更
+
+## Codex Usage Budget and Model Routing
+
+Maintain implementation quality and FarmOS safety while minimizing weekly Codex usage.
+
+### Default routing
+
+- Use Luna-class work for deterministic read-only inspection, targeted searches, test execution, build, lint, typecheck, diff checks, evidence collection, log classification, and strictly mechanical edits.
+- Use Terra-class work for normal implementation, multi-file changes, parser or validator work, ordinary debugging, and extensions that preserve existing contracts.
+- Use Sol-class work only for architecture, source-of-truth changes, authorization, RLS, migrations, production writes, Execution Gateway, idempotency, rollback or compensation, secrets, unresolved complex failures, and final P1/P2 semantic review.
+- Never claim that a model was changed or delegated unless the runtime confirms it.
+- If model-specific delegation is unavailable, continue with the current model while applying the same task classification and usage controls.
+
+### Escalation
+
+- One failed Luna-class attempt for the same task escalates to Terra-class work.
+- Two Terra-class attempts failing for the same root cause escalate to Sol-class work.
+- Authorization, RLS, migration, production write, external execution, secret handling, rollback, and compensation require Sol-class review from the start.
+- Do not repeatedly retry a lower-cost model after its escalation threshold is reached.
+
+### Usage controls
+
+- Do not scan the entire repository by default.
+- Inspect in this order: Git state, explicitly named files, direct dependencies, related tests, then surrounding code only when necessary.
+- Do not reread unchanged files or repeat successful commands without a concrete reason.
+- Default to zero subagents. Use delegation only when it clearly reduces total work.
+- Use at most one independent reviewer, only at the final semantic gate when required.
+- Do not use Ultra or competitive multi-agent generation unless explicitly requested or required by an unresolved Sol-class problem.
+- Subagents consume additional usage; do not delegate trivial work that the parent can complete with less total processing.
+- Run validation in this order: targeted test, related regression tests, typecheck or build, then final diff checks.
+- Do not repeat a full build while a targeted test still fails.
+- Summarize long command output instead of reproducing successful logs.
+- Implement one recommended solution rather than generating multiple complete alternatives unless an irreversible architectural tradeoff exists.
+
+### Token management
+
+- Maximize evidence per token: check the baseline once, inspect the current diff first, and prefer targeted search and targeted tests.
+- Do not repeat an audit or root-cause investigation without new evidence.
+- Stop when additional work cannot change the decision.
+- Keep handoffs compact and evidence-based.
+
+### Concrete model delegation
+
+When model delegation is useful and reduces total work:
+
+- Delegate deterministic read-only inspection, targeted searches,
+  test execution, build/lint/typecheck, evidence collection,
+  diff checks, and log classification to `farmos_luna_inspector`.
+
+- Perform normal implementation in the current Terra parent session.
+  Use `farmos_terra_worker` only when an isolated implementation
+  thread materially reduces context pollution or coordination cost.
+
+- Delegate architecture, authorization, RLS, migration,
+  production persistence, Execution Gateway, idempotency,
+  rollback, compensation, Secret-boundary, and final P1/P2 review
+  to `farmos_sol_reviewer`.
+
+- Do not spawn a subagent merely to relabel the same work.
+- Default to no subagents.
+- Spawn at most one Luna inspector and one Sol reviewer per Day
+  unless the user explicitly authorizes more.
+- Use `/agent` to inspect the actual spawned thread and model.
+- If the expected custom agent cannot be spawned, report the failure
+  and continue under the existing escalation policy.
+
+### FarmOS safety invariants
+
+Usage reduction must never bypass:
+
+- Proposal First
+- Human in the Loop
+- Fail Closed
+- server-side authorization
+- no AI direct write to confirmed business data
+- no secret exposure
+- stale-data rejection
+- idempotency
+- audit
+- rollback or compensation
+- protected-file constraints
+- explicit human approval before Level 2 or Level 3 execution
+
+Do not commit, push, merge, rebase, deploy, apply migrations, change RLS, mutate production data, apply proposals, or execute external operations without explicit user authorization.
+
+### Day execution
+
+For every FarmOS Day task:
+
+1. Classify the risk level and the minimum sufficient model class.
+2. State the relevant safety boundary internally before editing.
+3. Reuse existing contracts and patterns before creating new abstractions.
+4. Prefer one vertical implementation slice over broad exploratory work.
+5. Use bounded retries and escalate according to this policy.
+6. Report actual model delegation only when confirmed by the runtime.
+7. Include the applied model class, escalation history, tests, safety checks, and remaining risks in the final report.
+8. Use the `farmos-efficient-execution` skill for implementation, review, debugging, testing, and Day handoff work.
+9. Do not advance to the next Day until the current Day completion gates pass.
+10. Resolve incomplete work as a supplement of the same Day unless the roadmap explicitly authorizes advancing.
