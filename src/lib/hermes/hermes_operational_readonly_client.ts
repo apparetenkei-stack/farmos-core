@@ -1351,3 +1351,39 @@ export async function readHermesOperationalReadonlySources(input?: {
     arbitrary_method_allowed: false,
   };
 }
+
+export async function readHermesOperationalReadonlyFields(input?: {
+  env?: EnvMap;
+  limit?: unknown;
+  fetchImpl?: typeof fetch;
+}): Promise<
+  HermesOperationalReadonlySourceResult<HermesOperationalFieldRecord>
+> {
+  const config = resolveConfig({
+    env: input?.env ?? process.env,
+    limit: input?.limit,
+  });
+  if (config.ok === false) {
+    return createErrorSource<HermesOperationalFieldRecord>({
+      sourceType: "field",
+      endpointPath: FIELD_ENDPOINT_PATH,
+      limit: config.limit,
+      errorCode: config.errorCode,
+    });
+  }
+  return readDay122Source<HermesOperationalFieldRecord>({
+    baseUrl: config.baseUrl,
+    token: config.token,
+    timeoutMs: config.timeoutMs,
+    limit: config.limit,
+    sourceType: "field",
+    endpointPath: FIELD_ENDPOINT_PATH,
+    schemaVersion: "farmos.core.fields.read.v1",
+    expectedSource: "apparetenkei_fields_readonly",
+    validateRecordKeys: validateFieldRecordKeys,
+    validateRecordReference: validateFieldRecordReference,
+    validateRecordValues: validateFieldRecordValues,
+    recordReference: (record) => record.reference,
+    fetchImpl: input?.fetchImpl ?? fetch,
+  });
+}
