@@ -163,9 +163,9 @@ create or replace function ai.persist_operational_memory_bundle(
 language plpgsql
 as $$
 declare
-  snapshot_count integer := jsonb_array_length(p_snapshots);
-  projection_count integer := jsonb_array_length(p_projections);
-  lineage_count integer := jsonb_array_length(p_lineage);
+  snapshot_count integer;
+  projection_count integer;
+  lineage_count integer;
 begin
   if jsonb_typeof(p_snapshots) <> 'array'
     or jsonb_typeof(p_snapshot_events) <> 'array'
@@ -176,19 +176,23 @@ begin
   then
     raise exception 'operational_memory_bundle_invalid';
   end if;
+  snapshot_count := jsonb_array_length(p_snapshots);
+  projection_count := jsonb_array_length(p_projections);
+  lineage_count := jsonb_array_length(p_lineage);
 
   insert into ai.operational_memory_source_snapshots (
     snapshot_id, contract_version, source_system, source_record_id,
     source_record_version, source_content_hash, operation, business_date,
     recorded_at, source_updated_at, deleted_at, field_reference,
     crop_cycle_reference, work_type_reference, safe_payload, observed_at,
-    initial_state, supersedes_snapshot_id, rejection_code
+    ingestion_sequence, initial_state, supersedes_snapshot_id, rejection_code
   )
+  overriding system value
   select snapshot_id, contract_version, source_system, source_record_id,
     source_record_version, source_content_hash, operation, business_date,
     recorded_at, source_updated_at, deleted_at, field_reference,
     crop_cycle_reference, work_type_reference, safe_payload, observed_at,
-    initial_state, supersedes_snapshot_id, rejection_code
+    ingestion_sequence, initial_state, supersedes_snapshot_id, rejection_code
   from jsonb_to_recordset(p_snapshots) as row(
     snapshot_id text, contract_version text, source_system text,
     source_record_id text, source_record_version bigint,
@@ -196,16 +200,18 @@ begin
     recorded_at timestamptz, source_updated_at timestamptz,
     deleted_at timestamptz, field_reference text,
     crop_cycle_reference text, work_type_reference text, safe_payload jsonb,
-    observed_at timestamptz, initial_state text,
+    observed_at timestamptz, ingestion_sequence bigint, initial_state text,
     supersedes_snapshot_id text, rejection_code text
   );
 
   insert into ai.operational_memory_snapshot_state_events (
-    event_id, snapshot_id, state, occurred_at
+    event_id, snapshot_id, state, event_sequence, occurred_at
   )
-  select event_id, snapshot_id, state, occurred_at
+  overriding system value
+  select event_id, snapshot_id, state, sequence, occurred_at
   from jsonb_to_recordset(p_snapshot_events) as row(
-    event_id text, snapshot_id text, state text, occurred_at timestamptz
+    event_id text, snapshot_id text, state text, sequence bigint,
+    occurred_at timestamptz
   );
 
   insert into ai.operational_memory_daily_projections (
@@ -224,11 +230,13 @@ begin
   );
 
   insert into ai.operational_memory_projection_state_events (
-    event_id, projection_id, status, occurred_at
+    event_id, projection_id, status, event_sequence, occurred_at
   )
-  select event_id, projection_id, status, occurred_at
+  overriding system value
+  select event_id, projection_id, status, sequence, occurred_at
   from jsonb_to_recordset(p_projection_events) as row(
-    event_id text, projection_id text, status text, occurred_at timestamptz
+    event_id text, projection_id text, status text, sequence bigint,
+    occurred_at timestamptz
   );
 
   insert into ai.operational_memory_projection_lineage (
