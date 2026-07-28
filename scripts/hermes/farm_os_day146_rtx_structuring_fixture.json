@@ -1,0 +1,116 @@
+{
+  "schema_version": "farm_os.day146.rtx_structuring.fixture.v1",
+  "contains_real_user_data": false,
+  "job": {
+    "job_id": "rtx_job_fixture_001",
+    "contract_version": "farmos.operational_memory.rtx_structuring_job.v1",
+    "source_snapshot_id": "snapshot_fixture_semantic_001",
+    "source_record_id": "work_fixture_semantic_001",
+    "source_content_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "business_date": "2026-07-28",
+    "semantic_source_status": "fixture_only",
+    "production_job_creation": false,
+    "allowed_source": {
+      "fields": {
+        "work_note": "葉の色むらを観察。追加確認が必要。",
+        "observation": "圃場状態の意味は未確定。"
+      }
+    },
+    "requested_tasks": [
+      "semantic_classification",
+      "short_summary",
+      "ambiguity_detection",
+      "missing_information_detection"
+    ],
+    "schema_version": 1,
+    "compiler_target": "candidate_only",
+    "created_at": "2026-07-28T21:00:00+09:00",
+    "not_before": "2026-07-28T22:00:00+09:00",
+    "attempt": 0,
+    "maximum_attempts": 3,
+    "status": "queued"
+  },
+  "valid_candidate": {
+    "job_id": "rtx_job_fixture_001",
+    "job_contract_version": "farmos.operational_memory.rtx_structuring_job.v1",
+    "result_contract_version": "farmos.operational_memory.rtx_structuring_candidate.v1",
+    "source_snapshot_id": "snapshot_fixture_semantic_001",
+    "source_record_id": "work_fixture_semantic_001",
+    "source_content_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "model_provenance": {
+      "model_id": "fixture-model",
+      "model_artifact_id": "fixture-artifact",
+      "quantization": "fixture-quantization",
+      "runtime_id": "fixture-runtime",
+      "prompt_template_version": "prompt-v1",
+      "structured_output_schema_version": "candidate-v1"
+    },
+    "semantic_classification": {
+      "work_category_candidates": ["observation"],
+      "field_state_candidates": ["state_mentioned"],
+      "crop_state_candidates": ["state_not_available"],
+      "follow_up_candidates": ["human_review"]
+    },
+    "summary": "葉の色むらを観察。",
+    "evidence": [
+      {
+        "source_field": "work_note",
+        "excerpt": "葉の色むらを観察。"
+      }
+    ],
+    "missing_information": ["crop_state_missing"],
+    "ambiguities": ["meaning_ambiguous"],
+    "confidence": 0.62,
+    "verification_state": "candidate"
+  },
+  "fixtures": [
+    {
+      "id": "valid_candidate",
+      "mutation": {},
+      "expected": "accepted_candidate"
+    },
+    {
+      "id": "unsupported_fact",
+      "mutation": {
+        "summary": "北圃場で病害を確認。"
+      },
+      "expected": "SUMMARY_NOT_GROUNDED"
+    },
+    {
+      "id": "invalid_evidence",
+      "mutation": {
+        "evidence_excerpt": "存在しない根拠"
+      },
+      "expected": "EVIDENCE_NOT_GROUNDED"
+    },
+    {
+      "id": "source_hash_mismatch",
+      "mutation": {
+        "source_content_hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      },
+      "expected": "SOURCE_IDENTITY_MISMATCH"
+    },
+    {
+      "id": "worker_unavailable",
+      "mutation": {},
+      "expected": "retry_pending"
+    },
+    {
+      "id": "lease_expired_retry",
+      "mutation": {},
+      "expected": "retry_pending"
+    },
+    {
+      "id": "maximum_attempts_failed",
+      "mutation": {},
+      "expected": "failed"
+    },
+    {
+      "id": "model_disagreement_review_required",
+      "mutation": {
+        "verification_state": "review_required"
+      },
+      "expected": "review_required"
+    }
+  ]
+}
