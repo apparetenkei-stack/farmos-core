@@ -418,9 +418,13 @@ function formatEphemeralResponse(input: {
   nowMs: number;
   maxAgeMs: number;
 }): string {
+  const localizedAnswer = input.answer
+    .replace(/\btomorrow\b/giu, "明日")
+    .replace(/\btoday\b/giu, "今日")
+    .replace(/\byesterday\b/giu, "昨日");
   return [
     "Interactive Response（Slash Command実行者限定）",
-    `Hermes回答: ${input.answer}`,
+    `Hermes回答:\n${localizedAnswer}`,
     "AIによる参考情報です。確定判断や業務実行ではありません。",
     "農場データはread-only参照です。",
     `参照時刻: ${input.referencedAt}`,

@@ -381,6 +381,10 @@ async function main(): Promise<void> {
   );
   assert.match(
     capturedPromptBody,
+    /日本語回答ではtomorrow、today、yesterdayを使わず/u,
+  );
+  assert.match(
+    capturedPromptBody,
     /development Day番号を暦日として扱わない/u,
   );
   assert.match(
@@ -398,7 +402,7 @@ async function main(): Promise<void> {
   );
   assert.match(
     capturedPromptBody,
-    /statusがcontextに明示されない限り「完了」「未完了」「進行中」と断定せず/u,
+    /status、started_at、開始日のいずれもcontextに明示されない限り「開始した」「完了した」「未完了」「進行中」と断定せず/u,
   );
   assert.match(
     capturedPromptBody,
@@ -434,11 +438,15 @@ async function main(): Promise<void> {
   );
   assert.match(
     capturedPromptBody,
-    /通常回答は最大3項目、各項目2文以内/u,
+    /「今日の確認結果」「必要な確認」の2見出しだけ/u,
   );
   assert.match(
     capturedPromptBody,
-    /安全説明が必要な場合は回答末尾に1回だけ/u,
+    /重要事項を短い箇条書き/u,
+  );
+  assert.match(
+    capturedPromptBody,
+    /回答本文にはread-only、AIの権限、確定判断、業務実行などの独自の安全説明を生成しない/u,
   );
   assert.match(
     capturedPromptBody,

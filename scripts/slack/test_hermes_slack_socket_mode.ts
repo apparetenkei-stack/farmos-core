@@ -202,7 +202,12 @@ async function main(): Promise<void> {
   }
 
   {
-    const f = fixture();
+    const f = fixture({
+      envelope: okEnvelope({
+        response_text:
+          "*今日の確認結果*\n- tomorrowの作業記録があります。\n*必要な確認*\n- todayの予定とyesterdayの記録を確認してください。",
+      }),
+    });
     const result = await f.handle(command(), "slack-envelope-request-1");
     assert.equal(result.status, "succeeded");
     assert.deepEqual(f.events, ["ack", "hermes", "ephemeral"]);
@@ -216,7 +221,21 @@ async function main(): Promise<void> {
     });
     assert.equal(f.responses[0]?.user, "U-allowed");
     assert.equal(f.responses[0]?.channel, "C-allowed");
-    assert.match(f.responses[0]?.text ?? "", /Hermes回答/);
+    assert.match(f.responses[0]?.text ?? "", /Hermes回答:\n/);
+    assert.match(f.responses[0]?.text ?? "", /\*今日の確認結果\*\n-/);
+    assert.match(f.responses[0]?.text ?? "", /\*必要な確認\*\n-/);
+    assert.match(
+      f.responses[0]?.text ?? "",
+      /明日の作業記録があります/u,
+    );
+    assert.match(
+      f.responses[0]?.text ?? "",
+      /今日の予定と昨日の記録/u,
+    );
+    assert.doesNotMatch(
+      f.responses[0]?.text ?? "",
+      /\b(?:tomorrow|today|yesterday)\b/iu,
+    );
     assert.match(f.responses[0]?.text ?? "", /Interactive Response/);
     assert.match(f.responses[0]?.text ?? "", /AIによる参考情報/);
     assert.match(f.responses[0]?.text ?? "", /農場データはread-only参照/);
