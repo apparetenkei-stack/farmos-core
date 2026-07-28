@@ -391,6 +391,8 @@
     "run-hermes-operational-readonly-client-smoke-test": "tsx scripts/hermes/run_hermes_operational_readonly_client_smoke_test.ts",
     "check-hermes-operational-readonly-client": "pnpm run test-hermes-operational-readonly-client && pnpm run build",
     "test-hermes-operational-context-integration": "tsx scripts/hermes/test_hermes_operational_context_integration.ts",
+    "test-farmos-readonly-observer-mcp": "tsx scripts/hermes/test_farmos_readonly_observer_mcp.ts",
+    "test-farmos-readonly-observer-guard": "tsx scripts/hermes/test_farmos_readonly_observer_guard.ts",
     "run-hermes-operational-context-integration-smoke-test": "tsx scripts/hermes/run_hermes_operational_context_integration_smoke_test.ts",
     "check-hermes-operational-context-integration": "pnpm run test-hermes-operational-context-integration && pnpm run build",
     "run-hermes-day93-final-go-assessment": "node --env-file=.env.local --import tsx scripts/hermes/run_hermes_day93_final_go_assessment.ts",
@@ -436,6 +438,7 @@
   "license": "ISC",
   "type": "module",
   "dependencies": {
+    "@modelcontextprotocol/sdk": "1.26.0",
     "next": "^16.2.10",
     "pg": "^8.22.0",
     "react": "^19.2.7",
