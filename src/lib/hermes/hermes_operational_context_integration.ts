@@ -12,10 +12,17 @@ import {
 export const HERMES_OPERATIONAL_CONTEXT_INTEGRATION =
   "day93_hermes_operational_context_integration" as const;
 
-export const HERMES_OPERATIONAL_CONTEXT_MAX_CHARS = 1100 as const;
+export const HERMES_OPERATIONAL_CONTEXT_MAX_CHARS = 1800 as const;
 const INVENTORY_PREVIEW_LIMIT = 3;
 const WORK_LOG_PREVIEW_LIMIT = 3;
 const MAX_TEXT_FIELD_CHARS = 80;
+const HERMES_OPERATIONAL_CONTEXT_TIMEZONE = "Asia/Tokyo" as const;
+
+type HermesOperationalCalendarContext = {
+  current_date: string;
+  tomorrow_date: string;
+  timezone: typeof HERMES_OPERATIONAL_CONTEXT_TIMEZONE;
+};
 
 export type HermesOperationalContextIntegrationResult = {
   result: "ok" | "partial" | "error";
@@ -67,7 +74,7 @@ function normalizeMaxChars(value: unknown): number {
     return HERMES_OPERATIONAL_CONTEXT_MAX_CHARS;
   }
 
-  return Math.min(Math.max(parsed, 300), 1200);
+  return Math.min(Math.max(parsed, 300), 1800);
 }
 
 function safeText(value: unknown): string | null {
@@ -93,6 +100,39 @@ function safeId(value: string | number | null): string | number | null {
   }
 
   return value;
+}
+
+function createTokyoCalendarContext(
+  now: Date,
+): HermesOperationalCalendarContext {
+  if (!Number.isFinite(now.getTime())) {
+    throw new Error("operational_context_now_invalid");
+  }
+
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: HERMES_OPERATIONAL_CONTEXT_TIMEZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(now);
+  const values = Object.fromEntries(
+    parts.map((part) => [part.type, part.value]),
+  );
+  const currentDate =
+    `${values.year}-${values.month}-${values.day}`;
+  const tomorrowDate = new Date(
+    Date.UTC(
+      Number(values.year),
+      Number(values.month) - 1,
+      Number(values.day) + 1,
+    ),
+  ).toISOString().slice(0, 10);
+
+  return {
+    current_date: currentDate,
+    tomorrow_date: tomorrowDate,
+    timezone: HERMES_OPERATIONAL_CONTEXT_TIMEZONE,
+  };
 }
 
 function inventoryRecordToSuggestionRecord(
@@ -130,15 +170,41 @@ function workLogRecordToSuggestionRecord(
   };
 }
 
+function inventoryRecordToPromptRecord(
+  record: HermesOperationalInventoryRecord,
+): Record<string, unknown> {
+  return {
+    name: safeText(record.name),
+    baseType: safeText(record.baseType),
+    currentQuantity: record.currentQuantity,
+    unit: safeText(record.unit),
+  };
+}
+
+function workLogRecordToPromptRecord(
+  record: HermesOperationalWorkLogRecord,
+): Record<string, unknown> {
+  return {
+    startedAt: safeText(record.startedAt),
+    workTypeName: safeText(record.workTypeName),
+    durationMinutes: record.durationMinutes,
+    targetCrop: safeText(record.targetCrop),
+    appliedMaterialCount:
+      Array.isArray(record.appliedMaterials)
+        ? record.appliedMaterials.length
+        : 0,
+  };
+}
+
 function buildPayload(input: {
   sources: HermesOperationalReadonlyClientResult;
-  suggestions: HermesInventoryWorkLogSuggestionResult;
+  calendarContext: HermesOperationalCalendarContext;
   inventoryPreviewLimit: number;
   workLogPreviewLimit: number;
-  includeSuggestionDetails: boolean;
 }): Record<string, unknown> {
   return {
     source: "apparetenkei_operational_readonly",
+    calendar_context: input.calendarContext,
     context_policy: {
       untrusted_data: true,
       prompt_instructions_allowed: false,
@@ -153,7 +219,7 @@ function buildPayload(input: {
       has_more: input.sources.inventory.has_more,
       records: input.sources.inventory.records
         .slice(0, input.inventoryPreviewLimit)
-        .map(inventoryRecordToSuggestionRecord),
+        .map(inventoryRecordToPromptRecord),
     },
     work_log: {
       connected: input.sources.work_log_source_connected,
@@ -164,24 +230,7 @@ function buildPayload(input: {
       has_more: input.sources.work_log.has_more,
       records: input.sources.work_log.records
         .slice(0, input.workLogPreviewLimit)
-        .map(workLogRecordToSuggestionRecord),
-    },
-    suggestion_preview: {
-      result: input.suggestions.result,
-      created: input.suggestions.suggestion_preview_created,
-      suggestion_count: input.suggestions.suggestions.length,
-      suggestions: input.includeSuggestionDetails
-        ? input.suggestions.suggestions.map((suggestion) => ({
-            suggestion_type: suggestion.suggestion_type,
-            source_type: suggestion.source_type,
-            severity: suggestion.severity,
-            title: suggestion.title,
-            summary: suggestion.summary,
-            evidence: suggestion.evidence,
-            requires_human_review: suggestion.requires_human_review,
-            proposal_ready: suggestion.proposal_ready,
-          }))
-        : [],
+        .map(workLogRecordToPromptRecord),
     },
     safety: {
       transaction_read_only: true,
@@ -189,6 +238,8 @@ function buildPayload(input: {
       proposal_created: false,
       proposal_saved: false,
       proposal_apply_performed: false,
+      app_db_write_performed: false,
+      core_db_write_performed: false,
       credentials_exposed: false,
     },
   };
@@ -196,7 +247,7 @@ function buildPayload(input: {
 
 function serializeWithinLimit(input: {
   sources: HermesOperationalReadonlyClientResult;
-  suggestions: HermesInventoryWorkLogSuggestionResult;
+  calendarContext: HermesOperationalCalendarContext;
   maxChars: number;
 }): {
   text: string;
@@ -206,22 +257,18 @@ function serializeWithinLimit(input: {
     {
       inventoryPreviewLimit: INVENTORY_PREVIEW_LIMIT,
       workLogPreviewLimit: WORK_LOG_PREVIEW_LIMIT,
-      includeSuggestionDetails: true,
+    },
+    {
+      inventoryPreviewLimit: 2,
+      workLogPreviewLimit: 2,
     },
     {
       inventoryPreviewLimit: 1,
       workLogPreviewLimit: 1,
-      includeSuggestionDetails: true,
-    },
-    {
-      inventoryPreviewLimit: 1,
-      workLogPreviewLimit: 1,
-      includeSuggestionDetails: false,
     },
     {
       inventoryPreviewLimit: 0,
       workLogPreviewLimit: 0,
-      includeSuggestionDetails: false,
     },
   ];
 
@@ -229,7 +276,7 @@ function serializeWithinLimit(input: {
     const text = JSON.stringify(
       buildPayload({
         sources: input.sources,
-        suggestions: input.suggestions,
+        calendarContext: input.calendarContext,
         ...variants[index],
       }),
     );
@@ -243,21 +290,15 @@ function serializeWithinLimit(input: {
   }
 
   const fallback = JSON.stringify({
-    source: "apparetenkei_operational_readonly",
-    inventory_source_connected: input.sources.inventory_source_connected,
-    work_log_source_connected: input.sources.work_log_source_connected,
-    inventory_record_count: input.sources.inventory.record_count,
-    work_log_record_count: input.sources.work_log.record_count,
-    suggestion_preview_created:
-      input.suggestions.suggestion_preview_created,
-    suggestion_count: input.suggestions.suggestions.length,
-    untrusted_data: true,
-    prompt_instructions_allowed: false,
-    database_write_performed: false,
+    calendar_context: input.calendarContext,
+    safety: {
+      transaction_read_only: true,
+      database_write_performed: false,
+    },
   });
 
   return {
-    text: fallback.slice(0, input.maxChars),
+    text: fallback,
     truncated: true,
   };
 }
@@ -265,10 +306,14 @@ function serializeWithinLimit(input: {
 export async function readHermesOperationalContextIntegration(input?: {
   readSources?: typeof readHermesOperationalReadonlySources;
   maxChars?: unknown;
+  now?: Date;
 }): Promise<HermesOperationalContextIntegrationResult> {
   const readSources =
     input?.readSources ?? readHermesOperationalReadonlySources;
   const maxChars = normalizeMaxChars(input?.maxChars);
+  const calendarContext = createTokyoCalendarContext(
+    input?.now ?? new Date(),
+  );
   const sources = await readSources();
 
   const inventoryRecords =
@@ -309,7 +354,7 @@ export async function readHermesOperationalContextIntegration(input?: {
   const serialized = operationalContextIncluded
     ? serializeWithinLimit({
         sources,
-        suggestions: suggestionPreview,
+        calendarContext,
         maxChars,
       })
     : null;

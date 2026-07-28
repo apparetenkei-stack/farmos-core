@@ -150,6 +150,9 @@ export type HermesOperationalReadonlySourceResult<TRecord> = {
   requested_limit: number;
   http_status: number | null;
   response_source: HermesOperationalResponseSource | null;
+  observed_at: string | null;
+  source_updated_at: string | null;
+  /** @deprecated Use source_updated_at. Retained as a compatibility alias. */
   generated_at: string | null;
   record_count: number;
   records: TRecord[];
@@ -325,6 +328,8 @@ const OPERATIONAL_SOURCE_RESULT_KEYS = [
 ] as const;
 const OPERATIONAL_SOURCE_RESULT_ALLOWED_KEYS = new Set([
   ...OPERATIONAL_SOURCE_RESULT_KEYS,
+  "observed_at",
+  "source_updated_at",
   "response_contract_diagnostics",
 ]);
 
@@ -607,6 +612,8 @@ export function parseHermesOperationalReadonlySourceResult(
     "remote_http_error",
     "invalid_response",
   ];
+  const observedAtPresent = Object.hasOwn(value, "observed_at");
+  const sourceUpdatedAtPresent = Object.hasOwn(value, "source_updated_at");
 
   if (
     !["ok", "error"].includes(String(value.result)) ||
@@ -627,6 +634,22 @@ export function parseHermesOperationalReadonlySourceResult(
         Number(value.http_status) > 599)) ||
     (value.response_source !== null &&
       value.response_source !== expectedResponseSource[sourceType]) ||
+    observedAtPresent !== sourceUpdatedAtPresent ||
+    (observedAtPresent &&
+      (value.result === "ok"
+        ? !isCanonicalIso(value.observed_at)
+        : value.observed_at !== null)) ||
+    (value.observed_at !== undefined &&
+      value.observed_at !== null &&
+      !isCanonicalIso(value.observed_at)) ||
+    (value.source_updated_at !== undefined &&
+      value.source_updated_at !== null &&
+      !isCanonicalIso(value.source_updated_at)) ||
+    (value.source_updated_at !== undefined &&
+      value.generated_at !== value.source_updated_at) ||
+    (sourceUpdatedAtPresent &&
+      value.result === "error" &&
+      value.source_updated_at !== null) ||
     (value.generated_at !== null && !isCanonicalIso(value.generated_at)) ||
     !Number.isSafeInteger(value.record_count) ||
     Number(value.record_count) < 0 ||
@@ -652,7 +675,15 @@ export function parseHermesOperationalReadonlySourceResult(
     return null;
   }
 
-  return structuredClone(value) as HermesOperationalReadonlySourceResult<HermesOperationalRecord>;
+  return structuredClone(
+    observedAtPresent
+      ? value
+      : {
+          ...value,
+          observed_at: null,
+          source_updated_at: value.generated_at,
+        },
+  ) as HermesOperationalReadonlySourceResult<HermesOperationalRecord>;
 }
 
 function normalizeBaseUrl(value: unknown): string | null {
@@ -781,6 +812,8 @@ function createErrorSource<TRecord>(input: {
     requested_limit: input.limit,
     http_status: input.httpStatus ?? null,
     response_source: null,
+    observed_at: null,
+    source_updated_at: null,
     generated_at: null,
     record_count: 0,
     records: [],
@@ -817,7 +850,7 @@ function validateEnvelope<TRecord>(input: {
     input.value.result !== "ok" ||
     input.value.source !== input.expectedSource ||
     typeof input.value.generatedAt !== "string" ||
-    Number.isNaN(Date.parse(input.value.generatedAt)) ||
+    !isCanonicalIso(input.value.generatedAt) ||
     input.value.readOnly !== true ||
     !Number.isSafeInteger(input.value.recordCount) ||
     Number(input.value.recordCount) < 0 ||
@@ -1015,6 +1048,8 @@ async function readSource<TRecord>(input: {
       requested_limit: input.limit,
       http_status: response.status,
       response_source: envelope.source,
+      observed_at: envelope.generatedAt,
+      source_updated_at: envelope.sourceUpdatedAt,
       generated_at: envelope.sourceUpdatedAt,
       record_count: envelope.recordCount,
       records: envelope.records,
@@ -1110,6 +1145,8 @@ async function readDay122Source<TRecord>(input: {
       requested_limit: input.limit,
       http_status: response.status,
       response_source: envelope.source,
+      observed_at: envelope.generatedAt,
+      source_updated_at: envelope.sourceUpdatedAt,
       generated_at: envelope.sourceUpdatedAt,
       record_count: envelope.recordCount,
       records: envelope.records,

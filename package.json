@@ -8,6 +8,8 @@
   },
   "scripts": {
     "test-hermes-routing-resume-boundary": "tsx scripts/hermes/test_hermes_routing_resume_boundary.ts",
+    "test-hermes-slack-socket-mode": "tsx scripts/slack/test_hermes_slack_socket_mode.ts",
+    "run-hermes-slack-socket-mode": "tsx scripts/slack/run_hermes_slack_socket_mode.ts",
     "run-hermes-routing-resume-preview": "tsx scripts/hermes/run_hermes_routing_resume_preview.ts",
     "run-hermes-routing-resume-smoke-test": "node --env-file=.env --import tsx scripts/hermes/run_hermes_routing_resume_smoke_test.ts",
     "run-hermes-runtime-phase-gate": "tsx scripts/hermes/run_hermes_runtime_phase_gate.ts",

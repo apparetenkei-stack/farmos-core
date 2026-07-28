@@ -254,6 +254,8 @@ function createUnavailableOperationalResult(): HermesOperationalReadonlyClientRe
     requested_limit: 100,
     http_status: null,
     response_source: null,
+    observed_at: null,
+    source_updated_at: null,
     generated_at: null,
     record_count: 0,
     records: [],

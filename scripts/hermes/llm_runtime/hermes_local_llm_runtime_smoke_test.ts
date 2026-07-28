@@ -461,6 +461,7 @@ export async function runHermesLocalLlmRuntimeSmokeTest(
         model,
         prompt,
         stream: false,
+        think: false,
       }),
       signal: controller.signal,
     });

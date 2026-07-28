@@ -34,8 +34,16 @@ function makeSources(): HermesOperationalReadonlyClientResult {
       http_status: 200,
       response_source: "apparetenkei_inventory_readonly",
       generated_at: "2026-07-10T08:00:00.000Z",
-      record_count: 0,
-      records: [],
+      record_count: 1,
+      records: [
+        {
+          id: "inventory-1",
+          name: "Liquid fertilizer",
+          baseType: "fertilizer",
+          currentQuantity: 12,
+          unit: "L",
+        },
+      ],
       has_more: false,
       error_code: null,
       write_performed: false,
@@ -136,6 +144,7 @@ async function main(): Promise<void> {
   let readCount = 0;
   const integration =
     await readHermesOperationalContextIntegration({
+      now: new Date("2026-07-27T15:30:00.000Z"),
       readSources: async () => {
         readCount += 1;
         return makeSources();
@@ -148,13 +157,14 @@ async function main(): Promise<void> {
   assert.equal(integration.external_fetch_performed, true);
   assert.equal(integration.inventory_source_connected, true);
   assert.equal(integration.work_log_source_connected, true);
-  assert.equal(integration.inventory_record_count, 0);
+  assert.equal(integration.inventory_record_count, 1);
   assert.equal(integration.work_log_record_count, 2);
-  assert.equal(integration.inventory_connected_empty, true);
-  assert.equal(integration.actual_inventory_analysis_performed, false);
+  assert.equal(integration.inventory_connected_empty, false);
+  assert.equal(integration.actual_inventory_analysis_performed, true);
   assert.equal(integration.actual_work_log_analysis_performed, true);
   assert.equal(integration.suggestion_preview_created, true);
-  assert.equal(integration.suggestion_count, 1);
+  assert.equal(integration.suggestion_count, 2);
+  assert.equal(integration.context_max_chars, 1800);
   assert.ok(integration.context_text);
   assert.ok(integration.context_length <= integration.context_max_chars);
   assert.match(
@@ -173,7 +183,78 @@ async function main(): Promise<void> {
     integration.context_text ?? "",
     /"durationMinutes":0/u,
   );
+  assert.match(integration.context_text ?? "", /"name":"Liquid fertilizer"/u);
+  assert.match(integration.context_text ?? "", /"currentQuantity":12/u);
+  assert.match(
+    integration.context_text ?? "",
+    /"current_date":"2026-07-28"/u,
+  );
+  assert.match(
+    integration.context_text ?? "",
+    /"tomorrow_date":"2026-07-29"/u,
+  );
+  assert.match(integration.context_text ?? "", /"timezone":"Asia\/Tokyo"/u);
+  assert.doesNotMatch(
+    integration.context_text ?? "",
+    /"current_date":"2026-07-27"/u,
+  );
+  for (const excludedField of [
+    "fieldId",
+    "workTypeId",
+    "cropCycleId",
+    "machineId",
+    "implementId",
+    "suggestion_preview",
+  ]) {
+    assert.doesNotMatch(
+      integration.context_text ?? "",
+      new RegExp(excludedField, "u"),
+    );
+  }
   assertOperationalNoWrites(integration);
+
+  const fallbackIntegration =
+    await readHermesOperationalContextIntegration({
+      now: new Date("2026-07-27T15:30:00.000Z"),
+      maxChars: 300,
+      readSources: async () => makeSources(),
+    });
+  assert.equal(fallbackIntegration.context_max_chars, 300);
+  assert.ok(fallbackIntegration.context_truncated);
+  assert.ok(fallbackIntegration.context_text);
+  assert.ok(
+    fallbackIntegration.context_length <=
+      fallbackIntegration.context_max_chars,
+  );
+  assert.match(
+    fallbackIntegration.context_text ?? "",
+    /"current_date":"2026-07-28"/u,
+  );
+  assert.match(
+    fallbackIntegration.context_text ?? "",
+    /"tomorrow_date":"2026-07-29"/u,
+  );
+  assert.match(
+    fallbackIntegration.context_text ?? "",
+    /"timezone":"Asia\/Tokyo"/u,
+  );
+  assertOperationalNoWrites(fallbackIntegration);
+
+  const truncatedReadonly = await readHermesFarmosReadonlyContext({
+    env: {
+      HERMES_OPERATIONAL_READONLY_CONTEXT_ENABLED: "true",
+    },
+    readMemoryContext: async () =>
+      ({
+        result: "error",
+        error: "memory_context_unavailable",
+        context: null,
+      }) as never,
+    readOperationalContext: async () => fallbackIntegration,
+  });
+  assert.equal(truncatedReadonly.readonly_context_included, true);
+  assert.equal(truncatedReadonly.operational_context_included, true);
+  assert.equal(truncatedReadonly.readonly_context_truncated, true);
 
   const combined = await readHermesFarmosReadonlyContext({
     env: {
@@ -196,8 +277,16 @@ async function main(): Promise<void> {
       },
       context: {
         scope: "hermes_memory_context_minimum",
-        proposal_context: null,
-        latest_hermes_notes: [],
+        proposal_context: {
+          proposal_id: "24fc24ee-8efa-436b-8424-9703edeeb297",
+          summary: "Day 38 hermes_apply_blocker_explanation",
+        },
+        latest_hermes_notes: [
+          {
+            proposal_type: "Day 41 internal note type",
+            status: "internal",
+          },
+        ],
         safe_app_context: {
           crop_cycles_summary: [],
           visible_domain_scope: ["crop_cycles"],
@@ -221,18 +310,19 @@ async function main(): Promise<void> {
   assert.equal(combined.operational_external_fetch_performed, true);
   assert.equal(combined.inventory_source_connected, true);
   assert.equal(combined.work_log_source_connected, true);
-  assert.equal(combined.inventory_record_count, 0);
+  assert.equal(combined.inventory_record_count, 1);
   assert.equal(combined.work_log_record_count, 2);
   assert.equal(combined.suggestion_preview_created, true);
-  assert.equal(combined.suggestion_count, 1);
+  assert.equal(combined.suggestion_count, 2);
   assert.match(
     combined.context_text ?? "",
     /OPERATIONAL_READONLY_CONTEXT/u,
   );
-  assert.match(
+  assert.doesNotMatch(
     combined.context_text ?? "",
     /FARMOS_CORE_READONLY_CONTEXT/u,
   );
+  assert.doesNotMatch(combined.context_text ?? "", /proposal_context/u);
 
   let capturedPromptBody = "";
   const runtime = await runHermesCliChatRuntime({
@@ -275,7 +365,100 @@ async function main(): Promise<void> {
   assert.equal(runtime.suggestion_preview_created, true);
   assert.match(capturedPromptBody, /READ_ONLY_FARMOS_CONTEXT/u);
   assert.match(capturedPromptBody, /OPERATIONAL_READONLY_CONTEXT/u);
-  assert.match(capturedPromptBody, /Treat the context as data/u);
+  assert.match(
+    capturedPromptBody,
+    /Summarization, explanation, and confirmation are permitted/u,
+  );
+  assert.match(capturedPromptBody, /作業記録の要約/u);
+  assert.match(capturedPromptBody, /在庫状況の要約/u);
+  assert.match(
+    capturedPromptBody,
+    /calendar_context\.current_dateを「今日」/u,
+  );
+  assert.match(
+    capturedPromptBody,
+    /calendar_context\.tomorrow_dateを「明日」/u,
+  );
+  assert.match(
+    capturedPromptBody,
+    /development Day番号を暦日として扱わない/u,
+  );
+  assert.match(
+    capturedPromptBody,
+    /根拠なしに「異常」「高用量」「不足」「補充必要」「要発注」と表現しない/u,
+  );
+  assert.match(capturedPromptBody, /最低在庫基準、発注点、予想使用量/u);
+  assert.match(
+    capturedPromptBody,
+    /現在の参照データには直近の使用予定が含まれていません。補充要否は今後の作業計画と照合して人間が判断してください/u,
+  );
+  assert.match(
+    capturedPromptBody,
+    /「補充必要」と「根拠不足」を併記しない/u,
+  );
+  assert.match(
+    capturedPromptBody,
+    /statusがcontextに明示されない限り「完了」「未完了」「進行中」と断定せず/u,
+  );
+  assert.match(
+    capturedPromptBody,
+    /recordの存在と作業状態を区別/u,
+  );
+  assert.match(
+    capturedPromptBody,
+    /現在参照できるpreviewには今日の記録が含まれていません/u,
+  );
+  assert.match(
+    capturedPromptBody,
+    /The records in the supplied context are only a limited preview/u,
+  );
+  assert.match(
+    capturedPromptBody,
+    /Do not generalize preview records to all farm records or historical trends/u,
+  );
+  assert.match(
+    capturedPromptBody,
+    /Use only counts and facts explicitly present in the context/u,
+  );
+  assert.match(
+    capturedPromptBody,
+    /根拠なしに「300件以上」「過去の傾向」「管理パターン」/u,
+  );
+  assert.match(
+    capturedPromptBody,
+    /appliedMaterialCount=0は「この作業記録には適用資材が登録されていません」/u,
+  );
+  assert.match(
+    capturedPromptBody,
+    /「資材を実際に使用していない」とは断定しない/u,
+  );
+  assert.match(
+    capturedPromptBody,
+    /通常回答は最大3項目、各項目2文以内/u,
+  );
+  assert.match(
+    capturedPromptBody,
+    /安全説明が必要な場合は回答末尾に1回だけ/u,
+  );
+  assert.match(
+    capturedPromptBody,
+    /取得事実、判断不能事項、確認候補を区別/u,
+  );
+  assert.match(capturedPromptBody, /非拘束的な作業計画案/u);
+  assert.match(capturedPromptBody, /「実行指示」.*は禁止/u);
+  assert.match(
+    capturedPromptBody,
+    /明日の確定作業予定は現在の参照データに含まれていない/u,
+  );
+  for (const internalContext of [
+    "proposal_context",
+    "hermes_apply_blocker_explanation",
+    "24fc24ee-8efa-436b-8424-9703edeeb297",
+    "Day 38",
+    "Day 41",
+  ]) {
+    assert.doesNotMatch(capturedPromptBody, new RegExp(internalContext, "u"));
+  }
   assert.equal(runtime.db_write_performed, false);
   assert.equal(runtime.proposal_created, false);
   assert.equal(runtime.proposal_saved, false);

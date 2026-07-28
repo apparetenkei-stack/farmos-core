@@ -258,6 +258,14 @@ async function main(): Promise<void> {
   assert.equal(success.work_log.record_count, 1);
   assert.equal(success.field?.record_count, 71);
   assert.equal(success.crop_cycle?.record_count, 40);
+  assert.equal(success.inventory.observed_at, "2026-07-10T00:00:00.000Z");
+  assert.equal(success.work_log.observed_at, "2026-07-10T00:00:00.000Z");
+  assert.equal(success.field.observed_at, "2026-07-10T00:00:00.000Z");
+  assert.equal(success.crop_cycle.observed_at, "2026-07-10T00:00:00.000Z");
+  assert.equal(success.inventory.source_updated_at, null);
+  assert.equal(success.work_log.source_updated_at, null);
+  assert.equal(success.field.source_updated_at, null);
+  assert.equal(success.crop_cycle.source_updated_at, null);
   assert.equal(success.inventory.generated_at, null);
   assert.equal(success.work_log.generated_at, null);
   assert.equal(success.field.generated_at, null);
@@ -340,6 +348,14 @@ async function main(): Promise<void> {
       return new Response(JSON.stringify(envelope), { status: 200 });
     },
   });
+  assert.equal(updatedAt.inventory.observed_at, "2026-07-10T00:00:00.000Z");
+  assert.equal(updatedAt.work_log.observed_at, "2026-07-10T00:00:00.000Z");
+  assert.equal(updatedAt.field.observed_at, "2026-07-10T00:00:00.000Z");
+  assert.equal(updatedAt.crop_cycle.observed_at, "2026-07-10T00:00:00.000Z");
+  assert.equal(updatedAt.inventory.source_updated_at, UPDATED_AT);
+  assert.equal(updatedAt.work_log.source_updated_at, UPDATED_AT);
+  assert.equal(updatedAt.field.source_updated_at, UPDATED_AT);
+  assert.equal(updatedAt.crop_cycle.source_updated_at, UPDATED_AT);
   assert.equal(updatedAt.inventory.generated_at, UPDATED_AT);
   assert.equal(updatedAt.work_log.generated_at, UPDATED_AT);
   assert.equal(updatedAt.field.generated_at, UPDATED_AT);
@@ -408,6 +424,29 @@ async function main(): Promise<void> {
   assert.equal(badCount.field?.error_code, "invalid_response");
   assert.equal(badCount.crop_cycle?.error_code, "invalid_response");
 
+  for (const generatedAt of [undefined, "2026-07-10 00:00:00Z"]) {
+    const invalidGeneratedAt = await readHermesOperationalReadonlySources({
+      env: makeEnv(),
+      fetchImpl: async (input) => {
+        const envelope = envelopeForUrl(String(input));
+        if (Object.hasOwn(envelope, "generatedAt")) {
+          if (generatedAt === undefined) delete envelope.generatedAt;
+          else envelope.generatedAt = generatedAt;
+        } else if (generatedAt === undefined) {
+          delete envelope.generated_at;
+        } else {
+          envelope.generated_at = generatedAt;
+        }
+        return new Response(JSON.stringify(envelope), { status: 200 });
+      },
+    });
+    assert.equal(invalidGeneratedAt.result, "error");
+    assert.equal(invalidGeneratedAt.inventory.error_code, "invalid_response");
+    assert.equal(invalidGeneratedAt.work_log.error_code, "invalid_response");
+    assert.equal(invalidGeneratedAt.field.error_code, "invalid_response");
+    assert.equal(invalidGeneratedAt.crop_cycle.error_code, "invalid_response");
+  }
+
   const overrideFetch = (target: "fields" | "crop-cycles", mutate: (envelope: Record<string, unknown>) => void): typeof fetch => async (input) => {
     const url = String(input);
     const envelope = envelopeForUrl(url);
@@ -463,6 +502,8 @@ async function main(): Promise<void> {
   });
   assert.equal(omittedUpdatedAt.field.result, "ok");
   assert.equal(omittedUpdatedAt.crop_cycle.result, "ok");
+  assert.equal(omittedUpdatedAt.field.source_updated_at, null);
+  assert.equal(omittedUpdatedAt.crop_cycle.source_updated_at, null);
   assert.equal(omittedUpdatedAt.field.generated_at, null);
   assert.equal(omittedUpdatedAt.crop_cycle.generated_at, null);
 
