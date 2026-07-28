@@ -1,0 +1,245 @@
+{
+  "schema_version": "farm_os.day146.operational_memory.fixture.v1",
+  "contains_real_user_data": false,
+  "fixtures": [
+    {
+      "fixture_id": "valid_idempotent",
+      "input_changes": [
+        {
+          "operation": "upsert",
+          "source_record_id": "work_fixture_valid",
+          "source_record_version": 1,
+          "source_content_hash": "1111111111111111111111111111111111111111111111111111111111111111",
+          "business_date": "2026-07-28",
+          "recorded_at": "2026-07-28T08:15:00+09:00",
+          "source_updated_at": "2026-07-28T08:15:00+09:00",
+          "deleted_at": null,
+          "field_reference": "field_fixture_alpha",
+          "crop_cycle_reference": null,
+          "work_type_reference": "work_type_fixture_observation",
+          "safe_payload": {}
+        },
+        {
+          "operation": "upsert",
+          "source_record_id": "work_fixture_valid",
+          "source_record_version": 1,
+          "source_content_hash": "1111111111111111111111111111111111111111111111111111111111111111",
+          "business_date": "2026-07-28",
+          "recorded_at": "2026-07-28T08:15:00+09:00",
+          "source_updated_at": "2026-07-28T08:15:00+09:00",
+          "deleted_at": null,
+          "field_reference": "field_fixture_alpha",
+          "crop_cycle_reference": null,
+          "work_type_reference": "work_type_fixture_observation",
+          "safe_payload": {}
+        }
+      ],
+      "expected_snapshots": [
+        {
+          "source_record_id": "work_fixture_valid",
+          "snapshot_revision": 1,
+          "state": "active"
+        }
+      ],
+      "affected_business_dates": [
+        "2026-07-28"
+      ],
+      "expected_projection_actions": [
+        "generate_daily_projection_once"
+      ],
+      "expected_active_state": "active",
+      "expected_failure_or_status": "duplicate_change_ignored"
+    },
+    {
+      "fixture_id": "late_entry",
+      "input_changes": [
+        {
+          "operation": "upsert",
+          "source_record_id": "work_fixture_late",
+          "source_record_version": 1,
+          "source_content_hash": null,
+          "business_date": "2026-07-27",
+          "recorded_at": "2026-07-28T09:30:00+09:00",
+          "source_updated_at": "2026-07-28T09:30:00+09:00",
+          "deleted_at": null,
+          "field_reference": "field_fixture_alpha",
+          "crop_cycle_reference": "cycle_fixture_summer",
+          "work_type_reference": "work_type_fixture_observation",
+          "safe_payload": {}
+        }
+      ],
+      "expected_snapshots": [
+        {
+          "source_record_id": "work_fixture_late",
+          "snapshot_revision": 1,
+          "state": "active"
+        }
+      ],
+      "affected_business_dates": [
+        "2026-07-27"
+      ],
+      "expected_projection_actions": [
+        "regenerate_daily_projection_2026-07-27",
+        "register_field_projection_regeneration",
+        "register_crop_cycle_projection_regeneration"
+      ],
+      "expected_active_state": "active",
+      "expected_failure_or_status": "accepted_late_entry"
+    },
+    {
+      "fixture_id": "update_supersede",
+      "input_changes": [
+        {
+          "operation": "upsert",
+          "source_record_id": "work_fixture_update",
+          "source_record_version": null,
+          "source_content_hash": "2222222222222222222222222222222222222222222222222222222222222222",
+          "business_date": "2026-07-28",
+          "recorded_at": "2026-07-28T10:00:00+09:00",
+          "source_updated_at": "2026-07-28T10:00:00+09:00",
+          "deleted_at": null,
+          "field_reference": "field_fixture_beta",
+          "crop_cycle_reference": null,
+          "work_type_reference": "work_type_fixture_inspection",
+          "safe_payload": {}
+        },
+        {
+          "operation": "upsert",
+          "source_record_id": "work_fixture_update",
+          "source_record_version": null,
+          "source_content_hash": "3333333333333333333333333333333333333333333333333333333333333333",
+          "business_date": "2026-07-28",
+          "recorded_at": "2026-07-28T10:00:00+09:00",
+          "source_updated_at": "2026-07-28T10:20:00+09:00",
+          "deleted_at": null,
+          "field_reference": "field_fixture_beta",
+          "crop_cycle_reference": null,
+          "work_type_reference": "work_type_fixture_inspection",
+          "safe_payload": {}
+        }
+      ],
+      "expected_snapshots": [
+        {
+          "source_record_id": "work_fixture_update",
+          "snapshot_revision": 1,
+          "state": "superseded"
+        },
+        {
+          "source_record_id": "work_fixture_update",
+          "snapshot_revision": 2,
+          "state": "active"
+        }
+      ],
+      "affected_business_dates": [
+        "2026-07-28"
+      ],
+      "expected_projection_actions": [
+        "supersede_previous_projection",
+        "generate_replacement_projection"
+      ],
+      "expected_active_state": "active_revision_2",
+      "expected_failure_or_status": "accepted_update"
+    },
+    {
+      "fixture_id": "delete_tombstone",
+      "input_changes": [
+        {
+          "operation": "tombstone",
+          "source_record_id": "work_fixture_deleted",
+          "source_record_version": 2,
+          "source_content_hash": null,
+          "business_date": "2026-07-27",
+          "recorded_at": null,
+          "source_updated_at": "2026-07-28T11:00:00+09:00",
+          "deleted_at": "2026-07-28T11:00:00+09:00",
+          "field_reference": null,
+          "crop_cycle_reference": null,
+          "work_type_reference": null,
+          "safe_payload": {}
+        }
+      ],
+      "expected_snapshots": [
+        {
+          "source_record_id": "work_fixture_deleted",
+          "snapshot_revision": 2,
+          "state": "tombstoned"
+        }
+      ],
+      "affected_business_dates": [
+        "2026-07-27"
+      ],
+      "expected_projection_actions": [
+        "exclude_from_active_results",
+        "regenerate_daily_projection_2026-07-27",
+        "reconcile_affected_projection_lineage"
+      ],
+      "expected_active_state": "absent_from_active_results",
+      "expected_failure_or_status": "accepted_tombstone"
+    },
+    {
+      "fixture_id": "stale_or_missing_required_time",
+      "input_changes": [
+        {
+          "operation": "upsert",
+          "source_record_id": "work_fixture_missing_date",
+          "source_record_version": null,
+          "source_content_hash": "4444444444444444444444444444444444444444444444444444444444444444",
+          "business_date": null,
+          "recorded_at": "2026-07-28T12:00:00+09:00",
+          "source_updated_at": "2026-07-28T12:00:00+09:00",
+          "deleted_at": null,
+          "field_reference": "field_fixture_gamma",
+          "crop_cycle_reference": null,
+          "work_type_reference": null,
+          "safe_payload": {}
+        }
+      ],
+      "expected_snapshots": [],
+      "affected_business_dates": [],
+      "expected_projection_actions": [],
+      "expected_active_state": "not_ingested",
+      "expected_failure_or_status": "missing_business_date_fail_closed_no_inference"
+    },
+    {
+      "fixture_id": "version_hash_conflict",
+      "existing_snapshots": [
+        {
+          "source_record_id": "work_fixture_conflict",
+          "source_record_version": 7,
+          "source_content_hash": "5555555555555555555555555555555555555555555555555555555555555555",
+          "snapshot_revision": 7,
+          "state": "active"
+        }
+      ],
+      "input_changes": [
+        {
+          "operation": "upsert",
+          "source_record_id": "work_fixture_conflict",
+          "source_record_version": 7,
+          "source_content_hash": "6666666666666666666666666666666666666666666666666666666666666666",
+          "business_date": "2026-07-28",
+          "recorded_at": "2026-07-28T13:00:00+09:00",
+          "source_updated_at": "2026-07-28T13:00:00+09:00",
+          "deleted_at": null,
+          "field_reference": "field_fixture_delta",
+          "crop_cycle_reference": null,
+          "work_type_reference": null,
+          "safe_payload": {}
+        }
+      ],
+      "expected_snapshots": [
+        {
+          "source_record_id": "work_fixture_conflict",
+          "snapshot_revision": 7,
+          "state": "active"
+        }
+      ],
+      "affected_business_dates": [],
+      "expected_projection_actions": [],
+      "expected_active_state": "active_revision_7_unchanged",
+      "snapshot_written": false,
+      "projection_generated": false,
+      "expected_failure_or_status": "source_version_hash_conflict"
+    }
+  ]
+}
