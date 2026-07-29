@@ -4,12 +4,14 @@ import {
   FARM_OS_RTX_BRIDGE_PATHS,
   FARM_OS_RTX_WORKER_BRIDGE_CONTRACT,
   FARM_OS_RTX_WORKER_ID,
+  parseFarmOsRtxBridgeRequest,
 } from "../../src/lib/hermes/farm_os_rtx_worker_bridge_contract";
 import {
   FarmOsRtxBridgeClientError,
   FarmOsRtxBridgeWorkerClient,
   loadFarmOsRtxBridgeHmacKey,
   loadFarmOsRtxBridgeWorkerClientConfig,
+  type FarmOsRtxBridgeClientEvent,
   type FarmOsRtxBridgeLease,
   type FarmOsRtxBridgeWorkerClientConfig,
 } from "../../src/lib/hermes/farm_os_rtx_bridge_worker_client";
@@ -97,6 +99,7 @@ function claimBody(overrides: Record<string, unknown> = {}): unknown {
 function clientWith(
   fetchImpl: typeof fetch,
   keyFile = secretFile,
+  onEvent?: (event: FarmOsRtxBridgeClientEvent) => void,
 ): FarmOsRtxBridgeWorkerClient {
   return new FarmOsRtxBridgeWorkerClient(
     { ...bridgeConfig, hmacKeyFile: keyFile },
@@ -104,6 +107,7 @@ function clientWith(
       fetchImpl,
       now: () => now,
       nonceFactory: () => "n".repeat(32),
+      onEvent,
     },
   );
 }
@@ -351,6 +355,7 @@ async function run(): Promise<void> {
     "BRIDGE_RESPONSE_INVALID",
   );
 
+  const heartbeatClientEvents: string[] = [];
   const heartbeatClient = clientWith(async (url) => {
     assert.ok(String(url).endsWith(FARM_OS_RTX_BRIDGE_PATHS.heartbeat));
     return response({
@@ -358,20 +363,47 @@ async function run(): Promise<void> {
       result: "lease_extended",
       lease_expires_at: "2026-07-29T00:20:00.000Z",
     });
-  });
+  }, secretFile, (event) => heartbeatClientEvents.push(event));
   assert.equal(
     (await heartbeatClient.heartbeat(lease())).leaseExpiresAt,
     "2026-07-29T00:20:00.000Z",
   );
+  assert.deepEqual(heartbeatClientEvents, [
+    "RTX_BRIDGE_HEARTBEAT_REQUEST_STARTED",
+    "RTX_BRIDGE_HEARTBEAT_RESPONSE_RECEIVED",
+  ]);
+  const rejectedHeartbeatEvents: string[] = [];
   await rejectsCode(
     clientWith(async () =>
       response({
         contract_version: FARM_OS_RTX_WORKER_BRIDGE_CONTRACT,
         result: "rejected",
-      })).heartbeat(lease()),
+      }), secretFile, (event) => rejectedHeartbeatEvents.push(event))
+      .heartbeat(lease()),
     "BRIDGE_OPERATION_REJECTED",
   );
+  assert.deepEqual(rejectedHeartbeatEvents, [
+    "RTX_BRIDGE_HEARTBEAT_REQUEST_STARTED",
+    "RTX_BRIDGE_HEARTBEAT_RESPONSE_RECEIVED",
+    "RTX_BRIDGE_HEARTBEAT_RESPONSE_REJECTED",
+  ]);
+  const failedHeartbeatEvents: string[] = [];
+  await rejectsCode(
+    clientWith(
+      async () => {
+        throw new Error("FIXTURE_NETWORK_FAILURE");
+      },
+      secretFile,
+      (event) => failedHeartbeatEvents.push(event),
+    ).heartbeat(lease()),
+    "BRIDGE_UNREACHABLE",
+  );
+  assert.deepEqual(failedHeartbeatEvents, [
+    "RTX_BRIDGE_HEARTBEAT_REQUEST_STARTED",
+    "RTX_BRIDGE_HEARTBEAT_REQUEST_FAILED",
+  ]);
 
+  const candidateClientEvents: string[] = [];
   const submitClient = clientWith(async (url) => {
     const path = new URL(String(url)).pathname;
     const result = path === FARM_OS_RTX_BRIDGE_PATHS.submit_candidate
@@ -381,7 +413,7 @@ async function run(): Promise<void> {
       contract_version: FARM_OS_RTX_WORKER_BRIDGE_CONTRACT,
       result,
     });
-  });
+  }, secretFile, (event) => candidateClientEvents.push(event));
   assert.equal(
     await submitClient.submitCandidate(lease(), candidate, {
       pass_1_latency_ms: null,
@@ -395,6 +427,10 @@ async function run(): Promise<void> {
     }),
     "accepted",
   );
+  assert.deepEqual(candidateClientEvents, [
+    "RTX_BRIDGE_CANDIDATE_REQUEST_STARTED",
+    "RTX_BRIDGE_CANDIDATE_RESPONSE_RECEIVED",
+  ]);
   assert.equal(
     await submitClient.submitFailure(
       lease(),
@@ -413,13 +449,15 @@ async function run(): Promise<void> {
     ),
     "failure_recorded",
   );
+  const rejectedCandidateEvents: string[] = [];
   await rejectsCode(
     clientWith(async () =>
       response({
         contract_version: FARM_OS_RTX_WORKER_BRIDGE_CONTRACT,
         result: "rejected",
         failure_code: "LEASE_INVALID",
-      })).submitCandidate(
+      }), secretFile, (event) => rejectedCandidateEvents.push(event))
+      .submitCandidate(
         lease({ leaseReceipt: "x".repeat(43) }),
         candidate,
         {
@@ -432,9 +470,14 @@ async function run(): Promise<void> {
           gpu_utilization_percent: null,
           gpu_temperature_celsius: null,
         },
-      ),
+    ),
     "BRIDGE_OPERATION_REJECTED",
   );
+  assert.deepEqual(rejectedCandidateEvents, [
+    "RTX_BRIDGE_CANDIDATE_REQUEST_STARTED",
+    "RTX_BRIDGE_CANDIDATE_RESPONSE_RECEIVED",
+    "RTX_BRIDGE_CANDIDATE_RESPONSE_REJECTED",
+  ]);
 
   const successPort = fakePort();
   const successRuntime = new FarmOsRtxBridgeWorkerRuntime({
@@ -448,6 +491,92 @@ async function run(): Promise<void> {
     job_id: job.job_id,
   });
   assert.deepEqual(successPort.calls, ["claim", "candidate"]);
+
+  let earlyHeartbeatCount = 0;
+  let earlyCandidateCount = 0;
+  let earlyNow = new Date("2026-07-29T00:00:00.000Z");
+  const earlyCompletionEvents: string[] = [];
+  const earlyCompletionPort = fakePort({
+    claim: async () => ({
+      result: "leased",
+      lease: lease({ leaseExpiresAt: "2026-07-29T00:10:00.000Z" }),
+    }),
+    heartbeat: async (value) => {
+      earlyHeartbeatCount += 1;
+      return value;
+    },
+    submitCandidate: async (currentLease, value, workerMetrics) => {
+      assert.equal(workerMetrics.pass_1_latency_ms, 1);
+      assert.equal(workerMetrics.pass_2_latency_ms, 3);
+      assert.notEqual(
+        parseFarmOsRtxBridgeRequest("submit_candidate", {
+          contract_version: FARM_OS_RTX_WORKER_BRIDGE_CONTRACT,
+          job_id: currentLease.job.job_id,
+          lease_receipt: currentLease.leaseReceipt,
+          candidate: value,
+          worker_metrics: workerMetrics,
+        }),
+        null,
+      );
+      earlyCandidateCount += 1;
+      return "accepted";
+    },
+  });
+  const earlyCompletionResult = await new FarmOsRtxBridgeWorkerRuntime({
+    client: earlyCompletionPort,
+    modelConfig,
+    modelRunner: async () => {
+      earlyNow = new Date("2026-07-29T00:00:30.000Z");
+      return {
+        ...candidateReady(),
+        pass_1: diagnostics(1.25),
+        pass_2: diagnostics(2.75),
+      };
+    },
+    sleep: (_milliseconds, signal) => waitUntilAbort(signal),
+    now: () => earlyNow,
+    onEvent: (event) => earlyCompletionEvents.push(event),
+  }).runOnce();
+  assert.equal(earlyCompletionResult.status, "candidate_submitted");
+  assert.equal(earlyHeartbeatCount, 0);
+  assert.equal(earlyCandidateCount, 1);
+  assert.deepEqual(earlyCompletionEvents, [
+    "RTX_BRIDGE_JOB_CLAIMED",
+    "RTX_BRIDGE_HEARTBEAT_LOOP_STARTED",
+    "RTX_BRIDGE_HEARTBEAT_DELAY_SCHEDULED",
+    "RTX_BRIDGE_INFERENCE_COMPLETED",
+    "RTX_BRIDGE_CANDIDATE_ELIGIBILITY_PASSED",
+    "RTX_BRIDGE_CANDIDATE_SUBMITTED",
+  ]);
+
+  const candidateRejectionPort = fakePort({
+    submitCandidate: async () => {
+      candidateRejectionPort.calls.push("candidate");
+      throw new FarmOsRtxBridgeClientError("BRIDGE_OPERATION_REJECTED");
+    },
+  });
+  const candidateRejectionEvents: string[] = [];
+  await rejectsCode(
+    new FarmOsRtxBridgeWorkerRuntime({
+      client: candidateRejectionPort,
+      modelConfig,
+      modelRunner: async () => candidateReady(),
+      sleep: (_milliseconds, signal) => waitUntilAbort(signal),
+      now: () => now,
+      onEvent: (event) => candidateRejectionEvents.push(event),
+    }).runOnce(),
+    "BRIDGE_OPERATION_REJECTED",
+  );
+  assert.deepEqual(candidateRejectionPort.calls, ["claim", "candidate"]);
+  assert.ok(
+    candidateRejectionEvents.includes(
+      "RTX_BRIDGE_CANDIDATE_ELIGIBILITY_PASSED",
+    ),
+  );
+  assert.equal(
+    candidateRejectionEvents.includes("RTX_BRIDGE_CANDIDATE_SUBMITTED"),
+    false,
+  );
 
   const emptyQueuePort = fakePort({
     claim: async () => ({ result: "no_jobs" }),
@@ -538,6 +667,7 @@ async function run(): Promise<void> {
 
   let virtualNow = new Date("2026-07-29T00:00:00.000Z");
   let resolveWork!: (value: FarmOsRtxNightTwoPassResult) => void;
+  let candidateLeaseExpiry: string | null = null;
   const heartbeatSleeps: number[] = [];
   let heartbeatCount = 0;
   const heartbeatPort = fakePort({
@@ -558,6 +688,11 @@ async function run(): Promise<void> {
           virtualNow.getTime() + 600_000,
         ).toISOString(),
       };
+    },
+    submitCandidate: async (value) => {
+      heartbeatPort.calls.push("candidate");
+      candidateLeaseExpiry = value.leaseExpiresAt;
+      return "accepted";
     },
   });
   const heartbeatEvents: string[] = [];
@@ -585,12 +720,19 @@ async function run(): Promise<void> {
     "candidate",
   ]);
   assert.deepEqual(heartbeatSleeps, [100_000, 200_000]);
+  assert.equal(candidateLeaseExpiry, "2026-07-29T00:15:00.000Z");
   assert.deepEqual(heartbeatEvents, [
     "RTX_BRIDGE_JOB_CLAIMED",
     "RTX_BRIDGE_HEARTBEAT_LOOP_STARTED",
+    "RTX_BRIDGE_HEARTBEAT_DELAY_SCHEDULED",
+    "RTX_BRIDGE_HEARTBEAT_DUE",
     "RTX_BRIDGE_HEARTBEAT_ACCEPTED",
+    "RTX_BRIDGE_HEARTBEAT_DELAY_SCHEDULED",
+    "RTX_BRIDGE_HEARTBEAT_DUE",
     "RTX_BRIDGE_HEARTBEAT_ACCEPTED",
+    "RTX_BRIDGE_HEARTBEAT_DELAY_SCHEDULED",
     "RTX_BRIDGE_INFERENCE_COMPLETED",
+    "RTX_BRIDGE_CANDIDATE_ELIGIBILITY_PASSED",
     "RTX_BRIDGE_CANDIDATE_SUBMITTED",
   ]);
 

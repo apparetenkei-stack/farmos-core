@@ -74,10 +74,23 @@ export class FarmOsRtxBridgeClientError extends Error {
 
 type FetchLike = typeof fetch;
 type JsonRecord = Record<string, unknown>;
+export const FARM_OS_RTX_BRIDGE_CLIENT_EVENTS = [
+  "RTX_BRIDGE_HEARTBEAT_REQUEST_STARTED",
+  "RTX_BRIDGE_HEARTBEAT_RESPONSE_RECEIVED",
+  "RTX_BRIDGE_HEARTBEAT_REQUEST_FAILED",
+  "RTX_BRIDGE_HEARTBEAT_RESPONSE_REJECTED",
+  "RTX_BRIDGE_CANDIDATE_REQUEST_STARTED",
+  "RTX_BRIDGE_CANDIDATE_RESPONSE_RECEIVED",
+  "RTX_BRIDGE_CANDIDATE_REQUEST_FAILED",
+  "RTX_BRIDGE_CANDIDATE_RESPONSE_REJECTED",
+] as const;
+export type FarmOsRtxBridgeClientEvent =
+  typeof FARM_OS_RTX_BRIDGE_CLIENT_EVENTS[number];
 type ClientDependencies = {
   fetchImpl?: FetchLike;
   now?: () => Date;
   nonceFactory?: () => string;
+  onEvent?: (event: FarmOsRtxBridgeClientEvent) => void;
 };
 
 function record(value: unknown): value is JsonRecord {
@@ -222,6 +235,7 @@ export class FarmOsRtxBridgeWorkerClient {
   private readonly now: () => Date;
   private readonly nonceFactory: () => string;
   private readonly hmacKey: string;
+  private readonly onEvent?: (event: FarmOsRtxBridgeClientEvent) => void;
 
   constructor(
     readonly config: FarmOsRtxBridgeWorkerClientConfig,
@@ -232,6 +246,48 @@ export class FarmOsRtxBridgeWorkerClient {
     this.nonceFactory = dependencies.nonceFactory ??
       (() => randomBytes(24).toString("base64url"));
     this.hmacKey = loadFarmOsRtxBridgeHmacKey(config.hmacKeyFile);
+    this.onEvent = dependencies.onEvent;
+  }
+
+  private emit(event: FarmOsRtxBridgeClientEvent): void {
+    try {
+      this.onEvent?.(event);
+    } catch {
+      // Diagnostics cannot change authentication or request behavior.
+    }
+  }
+
+  private requestEvent(
+    operation: FarmOsRtxBridgeOperation,
+    phase: "started" | "received" | "failed" | "rejected",
+  ): FarmOsRtxBridgeClientEvent | null {
+    if (operation === "heartbeat") {
+      return phase === "started"
+        ? "RTX_BRIDGE_HEARTBEAT_REQUEST_STARTED"
+        : phase === "received"
+        ? "RTX_BRIDGE_HEARTBEAT_RESPONSE_RECEIVED"
+        : phase === "failed"
+        ? "RTX_BRIDGE_HEARTBEAT_REQUEST_FAILED"
+        : "RTX_BRIDGE_HEARTBEAT_RESPONSE_REJECTED";
+    }
+    if (operation === "submit_candidate") {
+      return phase === "started"
+        ? "RTX_BRIDGE_CANDIDATE_REQUEST_STARTED"
+        : phase === "received"
+        ? "RTX_BRIDGE_CANDIDATE_RESPONSE_RECEIVED"
+        : phase === "failed"
+        ? "RTX_BRIDGE_CANDIDATE_REQUEST_FAILED"
+        : "RTX_BRIDGE_CANDIDATE_RESPONSE_REJECTED";
+    }
+    return null;
+  }
+
+  private emitRequestEvent(
+    operation: FarmOsRtxBridgeOperation,
+    phase: "started" | "received" | "failed" | "rejected",
+  ): void {
+    const event = this.requestEvent(operation, phase);
+    if (event !== null) this.emit(event);
   }
 
   private async post(
@@ -255,6 +311,9 @@ export class FarmOsRtxBridgeWorkerClient {
       () => controller.abort(),
       this.config.requestTimeoutMs,
     );
+    let responseReceived = false;
+    let rejectionEmitted = false;
+    this.emitRequestEvent(operation, "started");
     try {
       const response = await this.fetchImpl(`${this.config.bridgeUrl}${path}`, {
         method: "POST",
@@ -262,25 +321,49 @@ export class FarmOsRtxBridgeWorkerClient {
         body: rawBody,
         signal: controller.signal,
       });
+      responseReceived = true;
+      this.emitRequestEvent(operation, "received");
       if (response.status === 401) {
+        this.emitRequestEvent(operation, "rejected");
+        rejectionEmitted = true;
         throw new FarmOsRtxBridgeClientError("BRIDGE_UNAUTHORIZED");
       }
       if (response.status === 403) {
+        this.emitRequestEvent(operation, "rejected");
+        rejectionEmitted = true;
         throw new FarmOsRtxBridgeClientError("BRIDGE_FORBIDDEN");
       }
       const maximum = operation === "claim"
         ? FARM_OS_RTX_BRIDGE_RESPONSE_LIMITS.claim
         : FARM_OS_RTX_BRIDGE_RESPONSE_LIMITS.ordinary;
-      const value = await boundedJson(response, maximum);
+      let value: unknown;
+      try {
+        value = await boundedJson(response, maximum);
+      } catch (error) {
+        this.emitRequestEvent(operation, "rejected");
+        rejectionEmitted = true;
+        throw error;
+      }
       if (response.status >= 500) {
+        this.emitRequestEvent(operation, "rejected");
+        rejectionEmitted = true;
         throw new FarmOsRtxBridgeClientError("BRIDGE_UNREACHABLE", true);
       }
       return { status: response.status, value };
     } catch (error) {
-      if (error instanceof FarmOsRtxBridgeClientError) throw error;
+      if (error instanceof FarmOsRtxBridgeClientError) {
+        if (responseReceived && !rejectionEmitted) {
+          this.emitRequestEvent(operation, "rejected");
+        } else if (!responseReceived) {
+          this.emitRequestEvent(operation, "failed");
+        }
+        throw error;
+      }
       if (controller.signal.aborted) {
+        this.emitRequestEvent(operation, "failed");
         throw new FarmOsRtxBridgeClientError("BRIDGE_REQUEST_TIMEOUT", true);
       }
+      this.emitRequestEvent(operation, "failed");
       throw new FarmOsRtxBridgeClientError("BRIDGE_UNREACHABLE", true);
     } finally {
       clearTimeout(timeout);
@@ -353,10 +436,12 @@ export class FarmOsRtxBridgeWorkerClient {
       response.value.contract_version !== FARM_OS_RTX_WORKER_BRIDGE_CONTRACT ||
       response.value.result !== "lease_extended"
     ) {
+      this.emitRequestEvent("heartbeat", "rejected");
       throw new FarmOsRtxBridgeClientError("BRIDGE_OPERATION_REJECTED");
     }
     const expiry = parseIsoOffset(response.value.lease_expires_at);
     if (expiry === null || Date.parse(expiry) <= Date.parse(lease.leaseExpiresAt)) {
+      this.emitRequestEvent("heartbeat", "rejected");
       throw new FarmOsRtxBridgeClientError("BRIDGE_RESPONSE_INVALID");
     }
     return { ...lease, leaseExpiresAt: expiry };
@@ -375,6 +460,7 @@ export class FarmOsRtxBridgeWorkerClient {
       worker_metrics: workerMetrics,
     });
     return this.acceptedResult(
+      "submit_candidate",
       response,
       ["accepted", "idempotent_replay"] as const,
     );
@@ -395,12 +481,14 @@ export class FarmOsRtxBridgeWorkerClient {
       safe_metrics: safeMetrics,
     });
     return this.acceptedResult(
+      "submit_failure",
       response,
       ["failure_recorded", "idempotent_replay"] as const,
     );
   }
 
   private acceptedResult<T extends string>(
+    operation: "submit_candidate" | "submit_failure",
     response: { status: number; value: unknown },
     allowed: readonly T[],
   ): T {
@@ -412,6 +500,7 @@ export class FarmOsRtxBridgeWorkerClient {
       typeof response.value.result !== "string" ||
       !allowed.includes(response.value.result as T)
     ) {
+      this.emitRequestEvent(operation, "rejected");
       throw new FarmOsRtxBridgeClientError("BRIDGE_OPERATION_REJECTED");
     }
     return response.value.result as T;

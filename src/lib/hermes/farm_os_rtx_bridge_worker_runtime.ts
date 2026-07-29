@@ -35,8 +35,11 @@ export const FARM_OS_RTX_HEARTBEAT_DEFAULT_MAX_INTERVAL_MS = Math.floor(
 export const FARM_OS_RTX_BRIDGE_WORKER_EVENTS = [
   "RTX_BRIDGE_JOB_CLAIMED",
   "RTX_BRIDGE_HEARTBEAT_LOOP_STARTED",
+  "RTX_BRIDGE_HEARTBEAT_DELAY_SCHEDULED",
+  "RTX_BRIDGE_HEARTBEAT_DUE",
   "RTX_BRIDGE_HEARTBEAT_ACCEPTED",
   "RTX_BRIDGE_INFERENCE_COMPLETED",
+  "RTX_BRIDGE_CANDIDATE_ELIGIBILITY_PASSED",
   "RTX_BRIDGE_CANDIDATE_SUBMITTED",
   "RTX_BRIDGE_HEARTBEAT_LOOP_FAILED",
   "RTX_BRIDGE_INFERENCE_FAILED",
@@ -148,15 +151,33 @@ export function computeFarmOsRtxHeartbeatDelayMs(input: {
 function metrics(result: FarmOsRtxNightTwoPassResult): SafeMetrics {
   const pass1 = result.pass_1;
   const pass2 = result.pass_2;
+  const boundedInteger = (
+    value: number | null | undefined,
+    maximum: number,
+  ): number | null => {
+    if (
+      typeof value !== "number" ||
+      !Number.isFinite(value) ||
+      value < 0 ||
+      value > maximum
+    ) return null;
+    return Math.round(value);
+  };
+  const completionTokens =
+    (pass1.completion_tokens ?? 0) + (pass2?.completion_tokens ?? 0);
   return {
-    pass_1_latency_ms: pass1.latency_ms,
-    pass_2_latency_ms: pass2?.latency_ms ?? null,
-    completion_tokens:
-      (pass1.completion_tokens ?? 0) + (pass2?.completion_tokens ?? 0) || null,
-    handoff_bytes: result.handoff_utf8_bytes,
+    pass_1_latency_ms: boundedInteger(pass1.latency_ms, 86_400_000),
+    pass_2_latency_ms: boundedInteger(pass2?.latency_ms, 86_400_000),
+    completion_tokens: completionTokens === 0
+      ? null
+      : boundedInteger(completionTokens, 1_000_000),
+    handoff_bytes: boundedInteger(result.handoff_utf8_bytes, 1_000_000),
     candidate_bytes: result.candidate === null
       ? null
-      : Buffer.byteLength(JSON.stringify(result.candidate), "utf8"),
+      : boundedInteger(
+        Buffer.byteLength(JSON.stringify(result.candidate), "utf8"),
+        1_000_000,
+      ),
     reasoning_present: pass1.reasoning_content_present ||
       (pass2?.reasoning_content_present ?? false),
     gpu_utilization_percent: null,
@@ -231,8 +252,10 @@ export class FarmOsRtxBridgeWorkerRuntime {
         this.emit("RTX_BRIDGE_LEASE_EXPIRED");
         throw new FarmOsRtxBridgeClientError("BRIDGE_OPERATION_REJECTED");
       }
+      this.emit("RTX_BRIDGE_HEARTBEAT_DELAY_SCHEDULED");
       await this.sleep(heartbeatDelay, signal);
       if (signal.aborted) return lease;
+      this.emit("RTX_BRIDGE_HEARTBEAT_DUE");
       if (!leaseValid(lease, this.now())) {
         this.emit("RTX_BRIDGE_LEASE_EXPIRED");
         throw new FarmOsRtxBridgeClientError("BRIDGE_OPERATION_REJECTED");
@@ -406,6 +429,11 @@ export class FarmOsRtxBridgeWorkerRuntime {
         failure_code: "candidate_rejected",
       };
     }
+    if (!leaseValid(lease, this.now())) {
+      this.emit("RTX_BRIDGE_LEASE_EXPIRED");
+      throw new FarmOsRtxBridgeClientError("BRIDGE_OPERATION_REJECTED");
+    }
+    this.emit("RTX_BRIDGE_CANDIDATE_ELIGIBILITY_PASSED");
     await this.dependencies.client.submitCandidate(
       lease,
       grounded.value,

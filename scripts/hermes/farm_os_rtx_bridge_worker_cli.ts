@@ -12,11 +12,14 @@ import {
 async function main(): Promise<void> {
   const bridgeConfig = loadFarmOsRtxBridgeWorkerClientConfig(process.env);
   const modelConfig = loadFarmOsRtxWorkerConfig(process.env);
-  const client = new FarmOsRtxBridgeWorkerClient(bridgeConfig);
+  const emit = (event: string) => process.stdout.write(`${event}\n`);
+  const client = new FarmOsRtxBridgeWorkerClient(bridgeConfig, {
+    onEvent: emit,
+  });
   const runtime = new FarmOsRtxBridgeWorkerRuntime({
     client,
     modelConfig,
-    onEvent: (event) => process.stdout.write(`${event}\n`),
+    onEvent: emit,
   });
   const controller = new AbortController();
   const stop = () => controller.abort();

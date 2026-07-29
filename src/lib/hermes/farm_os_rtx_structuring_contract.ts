@@ -305,16 +305,16 @@ export function parseFarmOsRtxStructuringCandidate(
       String(value.verification_state),
     )
   ) errors.push("CANDIDATE_SCHEMA_INVALID");
+  const modelProvenance = value.model_provenance;
   if (
-    !record(value.model_provenance) ||
-    !exact(value.model_provenance, PROVENANCE_KEYS) ||
-    !PROVENANCE_KEYS.every((key) =>
-      typeof value.model_provenance === "object" &&
-      value.model_provenance !== null &&
-      typeof value.model_provenance[key] === "string" &&
-      PROVENANCE.test(value.model_provenance[key]) &&
-      !SECRET_OR_URL.test(value.model_provenance[key])
-    )
+    !record(modelProvenance) ||
+    !exact(modelProvenance, PROVENANCE_KEYS) ||
+    !PROVENANCE_KEYS.every((key) => {
+      const item = modelProvenance[key];
+      return typeof item === "string" &&
+        PROVENANCE.test(item) &&
+        !SECRET_OR_URL.test(item);
+    })
   ) errors.push("MODEL_PROVENANCE_INVALID");
   if (
     !record(value.semantic_classification) ||
