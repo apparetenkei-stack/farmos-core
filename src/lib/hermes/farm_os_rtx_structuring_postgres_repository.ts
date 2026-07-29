@@ -53,7 +53,9 @@ function sequence(value: string | number): number {
   return parsed;
 }
 
-async function readState(client: PoolClient): Promise<FarmOsRtxQueueState> {
+export async function readFarmOsRtxQueueState(
+  client: PoolClient,
+): Promise<FarmOsRtxQueueState> {
   const jobs = await client.query<JobRow>(`
     select job_json from ai.rtx_structuring_jobs order by created_at, job_id
   `);
@@ -92,6 +94,33 @@ async function readState(client: PoolClient): Promise<FarmOsRtxQueueState> {
     next_sequence:
       Math.max(0, ...normalizedEvents.map((event) => event.sequence)) + 1,
   };
+}
+
+export async function applyFarmOsRtxQueueMutation(
+  client: PoolClient,
+  operation: (
+    queue: FarmOsInMemoryRtxStructuringQueue,
+  ) => FarmOsRtxQueueResult,
+): Promise<FarmOsRtxQueueResult> {
+  const before = await readFarmOsRtxQueueState(client);
+  const queue = new FarmOsInMemoryRtxStructuringQueue(before);
+  const result = operation(queue);
+  const after = queue.snapshot();
+  const jobDelta = delta(before.jobs, after.jobs);
+  const eventDelta = delta(before.events, after.events);
+  const candidateDelta = delta(before.candidates, after.candidates);
+  if (jobDelta.length + eventDelta.length + candidateDelta.length > 0) {
+    await client.query(BUNDLE_SQL, [
+      JSON.stringify(jobRows(jobDelta)),
+      JSON.stringify(eventDelta),
+      JSON.stringify(candidateDelta),
+    ]);
+  }
+  const persisted = await readFarmOsRtxQueueState(client);
+  if (ids(after) !== ids(persisted)) {
+    throw new Error("RTX_DB_READBACK_MISMATCH");
+  }
+  return result;
 }
 
 function delta<T>(before: T[], after: T[]): T[] {
@@ -158,22 +187,7 @@ export class FarmOsRtxStructuringPostgresRepository {
       await client.query("set local statement_timeout = '10000ms'");
       await client.query("set local lock_timeout = '10000ms'");
       await client.query(LOCK_SQL, [LOCK_KEY]);
-      const before = await readState(client);
-      const queue = new FarmOsInMemoryRtxStructuringQueue(before);
-      const result = operation(queue);
-      const after = queue.snapshot();
-      const jobDelta = delta(before.jobs, after.jobs);
-      const eventDelta = delta(before.events, after.events);
-      const candidateDelta = delta(before.candidates, after.candidates);
-      if (jobDelta.length + eventDelta.length + candidateDelta.length > 0) {
-        await client.query(BUNDLE_SQL, [
-          JSON.stringify(jobRows(jobDelta)),
-          JSON.stringify(eventDelta),
-          JSON.stringify(candidateDelta),
-        ]);
-      }
-      const persisted = await readState(client);
-      if (ids(after) !== ids(persisted)) throw new Error("RTX_DB_READBACK_MISMATCH");
+      const result = await applyFarmOsRtxQueueMutation(client, operation);
       await client.query("commit");
       started = false;
       return result;
@@ -211,9 +225,28 @@ export class FarmOsRtxStructuringPostgresRepository {
   claim(input: {
     authenticated_worker_id: string;
     now: string;
-    maximum_jobs: 3;
+    maximum_jobs: number;
   }): Promise<FarmOsRtxQueueResult> {
     return this.mutate((queue) => queue.claim(input));
+  }
+
+  extendLease(input: {
+    authenticated_worker_id: string;
+    job_id: string;
+    now: string;
+    lease_expires_at: string;
+  }): Promise<FarmOsRtxQueueResult> {
+    return this.mutate((queue) => queue.extendLease(input));
+  }
+
+  reportFailure(input: {
+    authenticated_worker_id: string;
+    job_id: string;
+    now: string;
+    failure_code: string;
+    retryable: boolean;
+  }): Promise<FarmOsRtxQueueResult> {
+    return this.mutate((queue) => queue.reportFailure(input));
   }
 
   recoverExpired(now: string): Promise<FarmOsRtxQueueResult> {
@@ -259,7 +292,7 @@ export class FarmOsRtxStructuringPostgresRepository {
     try {
       await client.query("begin isolation level repeatable read read only");
       started = true;
-      const state = await readState(client);
+      const state = await readFarmOsRtxQueueState(client);
       await client.query("commit");
       started = false;
       return state;

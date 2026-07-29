@@ -68,6 +68,8 @@ export type FarmOsRtxQueueResult = {
     | "worker_unavailable"
     | "candidate_saved"
     | "candidate_rejected"
+    | "lease_extended"
+    | "failure_recorded"
     | "no_jobs";
   jobs: FarmOsRtxStructuringJob[];
   candidate: FarmOsRtxPersistedCandidate | null;
@@ -190,11 +192,13 @@ export class FarmOsInMemoryRtxStructuringQueue {
   claim(input: {
     authenticated_worker_id: string;
     now: string;
-    maximum_jobs: typeof FARM_OS_RTX_MAX_JOBS_PER_CLAIM;
+    maximum_jobs: number;
   }): FarmOsRtxQueueResult {
     if (
       !WORKER_ID.test(input.authenticated_worker_id) ||
-      input.maximum_jobs !== FARM_OS_RTX_MAX_JOBS_PER_CLAIM ||
+      !Number.isSafeInteger(input.maximum_jobs) ||
+      input.maximum_jobs < 1 ||
+      input.maximum_jobs > FARM_OS_RTX_MAX_JOBS_PER_CLAIM ||
       !Number.isFinite(Date.parse(input.now))
     ) return result("no_jobs");
     this.recoverExpired(input.now);
@@ -236,6 +240,79 @@ export class FarmOsInMemoryRtxStructuringQueue {
         jobs: clone(claimable),
         writes: { jobs: 0, events: claimable.length, candidates: 0 },
       });
+  }
+
+  extendLease(input: {
+    authenticated_worker_id: string;
+    job_id: string;
+    now: string;
+    lease_expires_at: string;
+  }): FarmOsRtxQueueResult {
+    const job = this.state.jobs.find((candidate) =>
+      candidate.job_id === input.job_id
+    );
+    const current = job ? currentEvent(this.state, job.job_id) : null;
+    const valid = WORKER_ID.test(input.authenticated_worker_id) &&
+      Number.isFinite(Date.parse(input.now)) &&
+      Number.isFinite(Date.parse(input.lease_expires_at)) &&
+      Date.parse(input.lease_expires_at) > Date.parse(input.now) &&
+      current?.status === "leased" &&
+      current.lease_owner === input.authenticated_worker_id &&
+      current.lease_expires_at !== null &&
+      Date.parse(input.now) < Date.parse(current.lease_expires_at);
+    if (!job || !current || !valid) return result("no_jobs");
+    appendEvent(this.state, {
+      job_id: job.job_id,
+      status: "leased",
+      attempt: current.attempt,
+      available_at: current.available_at,
+      lease_owner: input.authenticated_worker_id,
+      lease_expires_at: input.lease_expires_at,
+      created_at: input.now,
+      updated_at: input.now,
+      completed_at: null,
+      failure_code: null,
+    });
+    return result("lease_extended", {
+      jobs: [clone(job)],
+      writes: { jobs: 0, events: 1, candidates: 0 },
+    });
+  }
+
+  reportFailure(input: {
+    authenticated_worker_id: string;
+    job_id: string;
+    now: string;
+    failure_code: string;
+    retryable: boolean;
+  }): FarmOsRtxQueueResult {
+    const job = this.state.jobs.find((candidate) =>
+      candidate.job_id === input.job_id
+    );
+    const current = job ? currentEvent(this.state, job.job_id) : null;
+    const leaseValid = job && current?.status === "leased" &&
+      current.lease_owner === input.authenticated_worker_id &&
+      current.lease_expires_at !== null &&
+      Number.isFinite(Date.parse(input.now)) &&
+      Date.parse(input.now) < Date.parse(current.lease_expires_at);
+    if (!job || !current || !leaseValid) return result("no_jobs");
+    const retry = input.retryable && current.attempt < job.maximum_attempts;
+    appendEvent(this.state, {
+      job_id: job.job_id,
+      status: retry ? "retry_pending" : "failed",
+      attempt: current.attempt,
+      available_at: input.now,
+      lease_owner: null,
+      lease_expires_at: null,
+      created_at: input.now,
+      updated_at: input.now,
+      completed_at: retry ? null : input.now,
+      failure_code: input.failure_code,
+    });
+    return result("failure_recorded", {
+      jobs: [clone(job)],
+      writes: { jobs: 0, events: 1, candidates: 0 },
+    });
   }
 
   recoverExpired(now: string): void {
