@@ -148,18 +148,42 @@ export class FarmOsRtxWorkerBridgePostgresRepository
     input: FarmOsRtxBridgeRepositoryInput,
   ): Promise<FarmOsRtxBridgeRepositoryResult> {
     if (!this.featureEnabled) return result("unavailable");
-    const client = await this.pool.connect();
+    const client = await this.connectBeforeAbort(input.abort_signal);
+    if (client === null) {
+      return result("rejected", {
+        failure_code: "BRIDGE_TRANSACTION_FAILED",
+      });
+    }
     let started = false;
+    let committed = false;
+    let released = false;
+    const abort = () => {
+      if (released || committed) return;
+      released = true;
+      client.release(true);
+    };
+    const ensureActive = () => {
+      if (released || input.abort_signal?.aborted) {
+        throw new Error("RTX_BRIDGE_REQUEST_ABORTED");
+      }
+    };
+    input.abort_signal?.addEventListener("abort", abort, { once: true });
     try {
+      ensureActive();
       await client.query("begin isolation level read committed read write");
       started = true;
+      ensureActive();
       await client.query("set local statement_timeout = '10000ms'");
+      ensureActive();
       await client.query("set local lock_timeout = '10000ms'");
+      ensureActive();
       await client.query(LOCK_SQL, [LOCK_KEY]);
+      ensureActive();
       await client.query(`
         delete from ai.rtx_worker_bridge_nonces
         where expires_at <= statement_timestamp()
       `);
+      ensureActive();
       const nonce = await client.query(`
         insert into ai.rtx_worker_bridge_nonces (
           worker_id, nonce, request_id, received_at, expires_at
@@ -173,9 +197,12 @@ export class FarmOsRtxWorkerBridgePostgresRepository
         input.received_at,
         input.nonce_expires_at,
       ]);
+      ensureActive();
       if (nonce.rowCount !== 1) {
+        ensureActive();
         await client.query("commit");
         started = false;
+        committed = true;
         return result("replay_rejected");
       }
       let outcome: FarmOsRtxBridgeRepositoryResult;
@@ -184,6 +211,7 @@ export class FarmOsRtxWorkerBridgePostgresRepository
       } else {
         outcome = await this.withLease(client, input);
       }
+      ensureActive();
       await client.query(`
         insert into ai.rtx_worker_bridge_audit_events (
           audit_id, worker_id, operation, request_id, accepted,
@@ -201,11 +229,13 @@ export class FarmOsRtxWorkerBridgePostgresRepository
         input.received_at,
         input.body_size,
       ]);
+      ensureActive();
       await client.query("commit");
       started = false;
+      committed = true;
       return outcome;
     } catch {
-      if (started) {
+      if (started && !released) {
         try {
           await client.query("rollback");
         } catch {
@@ -214,8 +244,45 @@ export class FarmOsRtxWorkerBridgePostgresRepository
       }
       return result("rejected", { failure_code: "BRIDGE_TRANSACTION_FAILED" });
     } finally {
-      client.release();
+      input.abort_signal?.removeEventListener("abort", abort);
+      if (!released) {
+        released = true;
+        client.release();
+      }
     }
+  }
+
+  private async connectBeforeAbort(
+    signal: AbortSignal | undefined,
+  ): Promise<PoolClient | null> {
+    if (signal?.aborted) return null;
+    return await new Promise<PoolClient | null>((resolve, reject) => {
+      let settled = false;
+      const abort = () => {
+        if (settled) return;
+        settled = true;
+        resolve(null);
+      };
+      signal?.addEventListener("abort", abort, { once: true });
+      this.pool.connect().then((client) => {
+        signal?.removeEventListener("abort", abort);
+        if (settled || signal?.aborted) {
+          client.release(true);
+          if (!settled) {
+            settled = true;
+            resolve(null);
+          }
+          return;
+        }
+        settled = true;
+        resolve(client);
+      }, (error) => {
+        signal?.removeEventListener("abort", abort);
+        if (settled) return;
+        settled = true;
+        reject(error);
+      });
+    });
   }
 
   private async claim(

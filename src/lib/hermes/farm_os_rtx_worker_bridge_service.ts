@@ -32,6 +32,7 @@ export type FarmOsRtxBridgeRepositoryInput = {
   received_at: string;
   nonce_expires_at: string;
   request: FarmOsRtxBridgeRequest;
+  abort_signal?: AbortSignal;
 };
 
 export type FarmOsRtxBridgeRepositoryResult = {
@@ -157,6 +158,7 @@ export class FarmOsRtxWorkerBridgeService {
     path: string;
     headers: Readonly<Record<string, string | undefined>>;
     raw_body: string;
+    abort_signal?: AbortSignal;
     transport_context: {
       source: "tailscale_private" | "loopback_private_proxy";
       public_request: false;
@@ -224,6 +226,7 @@ export class FarmOsRtxWorkerBridgeService {
         now.getTime() + FARM_OS_RTX_BRIDGE_NONCE_RETENTION_SECONDS * 1000,
       ).toISOString(),
       request: parsed,
+      abort_signal: input.abort_signal,
     });
     const body = {
       contract_version: "farmos.operational_memory.rtx_worker_bridge.v1" as const,
@@ -248,6 +251,9 @@ export class FarmOsRtxWorkerBridgeService {
     return {
       http_status: result.result === "conflict"
         ? 409
+        : result.result === "rejected" &&
+            result.failure_code === "BRIDGE_TRANSACTION_FAILED"
+        ? 503
         : result.result === "unavailable"
         ? 503
         : 200,
@@ -292,6 +298,13 @@ export class FarmOsInMemoryRtxWorkerBridgeRepository
   async execute(
     input: FarmOsRtxBridgeRepositoryInput,
   ): Promise<FarmOsRtxBridgeRepositoryResult> {
+    if (input.abort_signal?.aborted) {
+      return {
+        result: "rejected",
+        failure_code: "BRIDGE_TRANSACTION_FAILED",
+        safety: safety(),
+      };
+    }
     if (!this.featureEnabled) {
       return { result: "unavailable", safety: safety() };
     }

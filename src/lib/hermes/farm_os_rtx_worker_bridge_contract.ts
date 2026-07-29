@@ -8,11 +8,17 @@ export const FARM_OS_RTX_WORKER_ID = "worker_windows_main_01" as const;
 export const FARM_OS_RTX_BRIDGE_HMAC_KEY_ENV =
   "FARMOS_RTX_BRIDGE_HMAC_KEY" as const;
 export const FARM_OS_RTX_BRIDGE_NETWORK_POLICY = {
-  allowed_bind: ["loopback_behind_existing_private_proxy", "tailscale_interface"],
-  public_access: false,
-  ordinary_lan_access: false,
-  tailscale_only: true,
-  tls_or_private_overlay_required: true,
+  contract_id: "farmos.operational_memory.rtx_bridge_network.v1",
+  listener: "loopback_only",
+  listener_host: "127.0.0.1",
+  listener_port: 18746,
+  private_transport: "tailscale_serve",
+  tailscale_https_port: 8443,
+  tailscale_funnel: "prohibited",
+  ordinary_lan: "prohibited",
+  public_internet: "prohibited",
+  client_transport_override: "prohibited",
+  existing_public_funnel_port: 443,
 } as const;
 export const FARM_OS_RTX_BRIDGE_PATHS = {
   claim: "/internal/rtx-worker/v1/claim",
