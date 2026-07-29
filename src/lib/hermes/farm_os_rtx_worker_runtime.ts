@@ -280,6 +280,57 @@ export type FarmOsRtxNightAnalysisResult =
     diagnostics: FarmOsRtxWorkerDiagnostics;
   };
 
+export const FARM_OS_RTX_STRUCTURED_EMIT_FAILURE_CODES = [
+  "pass_1_request_failed",
+  "pass_1_response_empty",
+  "pass_1_schema_invalid",
+  "pass_1_grounding_invalid",
+  "pass_2_request_failed",
+  "pass_2_response_empty",
+  "pass_2_schema_invalid",
+  "pass_2_grounding_invalid",
+  "model_output_parse_failed",
+  "model_output_contract_mismatch",
+  "model_output_unsupported_fact",
+  "model_output_reasoning_present",
+] as const;
+
+export type FarmOsRtxStructuredEmitFailureCode =
+  typeof FARM_OS_RTX_STRUCTURED_EMIT_FAILURE_CODES[number];
+
+export type FarmOsRtxStructuredEmitFailure = {
+  pass: 1 | 2;
+  stage: "request" | "response" | "parse" | "contract" | "grounding" | "safety";
+  failure_code: FarmOsRtxStructuredEmitFailureCode;
+  retryable: boolean;
+};
+
+export const FARM_OS_RTX_TWO_PASS_EVENTS = [
+  "RTX_BRIDGE_PASS1_REQUEST_STARTED",
+  "RTX_BRIDGE_PASS1_RESPONSE_RECEIVED",
+  "RTX_BRIDGE_PASS1_COMPLETED",
+  "RTX_BRIDGE_PASS1_FAILED",
+  "RTX_BRIDGE_PASS2_REQUEST_STARTED",
+  "RTX_BRIDGE_PASS2_RESPONSE_RECEIVED",
+  "RTX_BRIDGE_PASS2_COMPLETED",
+  "RTX_BRIDGE_PASS2_FAILED",
+  "RTX_BRIDGE_STRUCTURED_EMIT_FAILED",
+] as const;
+
+export type FarmOsRtxTwoPassEvent =
+  typeof FARM_OS_RTX_TWO_PASS_EVENTS[number];
+
+function emitTwoPassEvent(
+  onEvent: ((event: FarmOsRtxTwoPassEvent) => void) | undefined,
+  event: FarmOsRtxTwoPassEvent,
+): void {
+  try {
+    onEvent?.(event);
+  } catch {
+    // Fixed diagnostics must never change inference behavior.
+  }
+}
+
 export type FarmOsRtxNightTwoPassResult =
   | {
     status: "candidate_ready";
@@ -290,6 +341,7 @@ export type FarmOsRtxNightTwoPassResult =
     pass_1: FarmOsRtxWorkerDiagnostics;
     pass_2: FarmOsRtxWorkerDiagnostics;
     handoff_utf8_bytes: number;
+    failure: null;
   }
   | {
     status: "night_analysis_failed" | "structured_emit_failed";
@@ -300,6 +352,7 @@ export type FarmOsRtxNightTwoPassResult =
     pass_1: FarmOsRtxWorkerDiagnostics;
     pass_2: FarmOsRtxWorkerDiagnostics | null;
     handoff_utf8_bytes: number | null;
+    failure: FarmOsRtxStructuredEmitFailure;
   };
 
 export type FarmOsRtxRuntimeMode =
@@ -1067,6 +1120,7 @@ export async function runFarmOsRtxNightAnalysis(input: {
   config: FarmOsRtxWorkerConfig;
   fetchImpl?: FetchLike;
   signal?: AbortSignal;
+  onEvent?: (event: FarmOsRtxTwoPassEvent) => void;
 }): Promise<FarmOsRtxNightAnalysisResult> {
   const parsedJob = parseFarmOsRtxStructuringJob(input.job);
   if (!parsedJob.valid) {
@@ -1122,6 +1176,7 @@ export async function runFarmOsRtxNightAnalysis(input: {
   const startedAt = performance.now();
   let response: Response;
   try {
+    emitTwoPassEvent(input.onEvent, "RTX_BRIDGE_PASS1_REQUEST_STARTED");
     response = await (input.fetchImpl ?? fetch)(
       `${baseUrl}/v1/chat/completions`,
       {
@@ -1155,6 +1210,7 @@ export async function runFarmOsRtxNightAnalysis(input: {
         }),
       },
     );
+    emitTwoPassEvent(input.onEvent, "RTX_BRIDGE_PASS1_RESPONSE_RECEIVED");
   } catch {
     const latencyMs = performance.now() - startedAt;
     clearTimeout(timeout);
@@ -1343,6 +1399,7 @@ export async function runFarmOsRtxWorker(input: {
   fetchImpl?: FetchLike;
   analysisHandoff?: unknown;
   signal?: AbortSignal;
+  onEvent?: (event: FarmOsRtxTwoPassEvent) => void;
 }): Promise<FarmOsRtxWorkerResult> {
   const parsedJob = parseFarmOsRtxStructuringJob(input.job);
   if (!parsedJob.valid) {
@@ -1432,6 +1489,7 @@ export async function runFarmOsRtxWorker(input: {
   const startedAt = performance.now();
   let response: Response;
   try {
+    emitTwoPassEvent(input.onEvent, "RTX_BRIDGE_PASS2_REQUEST_STARTED");
     response = await (input.fetchImpl ?? fetch)(
       `${baseUrl}/v1/chat/completions`,
       {
@@ -1468,6 +1526,7 @@ export async function runFarmOsRtxWorker(input: {
         }),
       },
     );
+    emitTwoPassEvent(input.onEvent, "RTX_BRIDGE_PASS2_RESPONSE_RECEIVED");
   } catch (error) {
     const latencyMs = performance.now() - startedAt;
     clearTimeout(timeout);
@@ -1617,6 +1676,16 @@ export async function runFarmOsRtxWorker(input: {
       diagnostics: withInvalidJsonReason(diagnostics, "empty_content"),
     };
   }
+  if (diagnostics.reasoning_content_present) {
+    return {
+      status: "rejected",
+      candidate: null,
+      retryable: false,
+      errors: ["RTX_MODEL_OUTPUT_REASONING_PRESENT"],
+      safety: SAFETY,
+      diagnostics,
+    };
+  }
   if (Buffer.byteLength(content, "utf8") > FARM_OS_RTX_CANDIDATE_MAX_UTF8_BYTES) {
     return {
       status: "rejected",
@@ -1720,14 +1789,185 @@ export async function runFarmOsRtxWorker(input: {
   };
 }
 
+function includesError(
+  errors: readonly string[],
+  expected: readonly string[],
+): boolean {
+  return errors.some((error) =>
+    expected.some((value) => error === value || error.startsWith(`${value}:`))
+  );
+}
+
+export function classifyFarmOsRtxPass1Failure(
+  result: Extract<
+    FarmOsRtxNightAnalysisResult,
+    { status: "night_analysis_failed" }
+  >,
+): FarmOsRtxStructuredEmitFailure {
+  if (
+    includesError(result.errors, [
+      "RTX_NIGHT_ANALYSIS_TIMEOUT",
+      "RTX_NIGHT_ANALYSIS_REQUEST_FAILED",
+      "RTX_NIGHT_ANALYSIS_REDIRECT_REJECTED",
+      "RTX_NIGHT_ANALYSIS_AUTHENTICATION_FAILED",
+      "RTX_NIGHT_ANALYSIS_HTTP_ERROR",
+    ])
+  ) {
+    return {
+      pass: 1,
+      stage: "request",
+      failure_code: "pass_1_request_failed",
+      retryable: result.retryable,
+    };
+  }
+  if (
+    includesError(result.errors, [
+      "RTX_NIGHT_ANALYSIS_CONTENT_EMPTY",
+      "RTX_NIGHT_ANALYSIS_CONTENT_NOT_STRING",
+    ])
+  ) {
+    return {
+      pass: 1,
+      stage: "response",
+      failure_code: "pass_1_response_empty",
+      retryable: result.retryable,
+    };
+  }
+  if (
+    includesError(result.errors, [
+      "RTX_NIGHT_ANALYSIS_IDENTITY_MISMATCH",
+      "RTX_NIGHT_ANALYSIS_SUMMARY_NOT_GROUNDED",
+      "RTX_NIGHT_ANALYSIS_EVIDENCE_NOT_GROUNDED",
+    ])
+  ) {
+    return {
+      pass: 1,
+      stage: "grounding",
+      failure_code: "pass_1_grounding_invalid",
+      retryable: result.retryable,
+    };
+  }
+  return {
+    pass: 1,
+    stage: "parse",
+    failure_code: "pass_1_schema_invalid",
+    retryable: result.retryable,
+  };
+}
+
+export function classifyFarmOsRtxPass2Failure(
+  result: Exclude<FarmOsRtxWorkerResult, { status: "candidate_ready" }>,
+): FarmOsRtxStructuredEmitFailure {
+  if (
+    includesError(result.errors, [
+      "RTX_REQUEST_TIMEOUT",
+      "RTX_REQUEST_FAILED",
+      "RTX_HTTP_REDIRECT_REJECTED",
+      "RTX_AUTHENTICATION_FAILED",
+      "RTX_HTTP_ERROR",
+    ])
+  ) {
+    return {
+      pass: 2,
+      stage: "request",
+      failure_code: "pass_2_request_failed",
+      retryable: result.retryable,
+    };
+  }
+  if (
+    includesError(result.errors, [
+      "RTX_RESPONSE_CONTENT_EMPTY",
+      "RTX_RESPONSE_CONTENT_NOT_STRING",
+    ])
+  ) {
+    return {
+      pass: 2,
+      stage: "response",
+      failure_code: "pass_2_response_empty",
+      retryable: result.retryable,
+    };
+  }
+  if (includesError(result.errors, ["RTX_MODEL_OUTPUT_REASONING_PRESENT"])) {
+    return {
+      pass: 2,
+      stage: "safety",
+      failure_code: "model_output_reasoning_present",
+      retryable: result.retryable,
+    };
+  }
+  if (
+    includesError(result.errors, [
+      "EVIDENCE_NOT_GROUNDED",
+      "SUMMARY_NOT_GROUNDED",
+      "DETERMINISTIC_FACT_RETURNED",
+    ])
+  ) {
+    return {
+      pass: 2,
+      stage: "grounding",
+      failure_code: "model_output_unsupported_fact",
+      retryable: result.retryable,
+    };
+  }
+  if (
+    includesError(result.errors, [
+      "RTX_MODEL_OUTPUT_SCHEMA_INVALID",
+      "SOURCE_IDENTITY_MISMATCH",
+    ])
+  ) {
+    return {
+      pass: 2,
+      stage: "contract",
+      failure_code: "model_output_contract_mismatch",
+      retryable: result.retryable,
+    };
+  }
+  if (
+    includesError(result.errors, [
+      "RTX_RESPONSE_INVALID_JSON",
+      "RTX_RESPONSE_SCHEMA_INVALID",
+      "RTX_RESPONSE_ENVELOPE_INVALID",
+      "RTX_RESPONSE_FINISH_REASON_INVALID",
+      "RTX_RESPONSE_TRUNCATED",
+      "RTX_RESPONSE_FINISH_REASON_UNSUPPORTED",
+      "RTX_CANDIDATE_INVALID_JSON",
+    ])
+  ) {
+    return {
+      pass: 2,
+      stage: "parse",
+      failure_code: "pass_2_schema_invalid",
+      retryable: result.retryable,
+    };
+  }
+  if (result.errors.some((error) => error.includes("GROUNDED"))) {
+    return {
+      pass: 2,
+      stage: "grounding",
+      failure_code: "pass_2_grounding_invalid",
+      retryable: result.retryable,
+    };
+  }
+  return {
+    pass: 2,
+    stage: "contract",
+    failure_code: "model_output_parse_failed",
+    retryable: result.retryable,
+  };
+}
+
 export async function runFarmOsRtxNightTwoPass(input: {
   job: unknown;
   config: FarmOsRtxWorkerConfig;
   fetchImpl?: FetchLike;
   signal?: AbortSignal;
+  onEvent?: (event: FarmOsRtxTwoPassEvent) => void;
 }): Promise<FarmOsRtxNightTwoPassResult> {
   const analysisResult = await runFarmOsRtxNightAnalysis(input);
   if (analysisResult.status !== "analysis_ready") {
+    const failure = classifyFarmOsRtxPass1Failure(analysisResult);
+    emitTwoPassEvent(input.onEvent, "RTX_BRIDGE_PASS1_FAILED");
+    emitTwoPassEvent(input.onEvent, "RTX_BRIDGE_STRUCTURED_EMIT_FAILED");
     return {
       status: "night_analysis_failed",
       candidate: null,
@@ -1737,8 +1977,10 @@ export async function runFarmOsRtxNightTwoPass(input: {
       pass_1: analysisResult.diagnostics,
       pass_2: null,
       handoff_utf8_bytes: null,
+      failure,
     };
   }
+  emitTwoPassEvent(input.onEvent, "RTX_BRIDGE_PASS1_COMPLETED");
   const handoffUtf8Bytes = Buffer.byteLength(
     JSON.stringify(analysisResult.analysis),
     "utf8",
@@ -1752,8 +1994,12 @@ export async function runFarmOsRtxNightTwoPass(input: {
     fetchImpl: input.fetchImpl,
     analysisHandoff: analysisResult.analysis,
     signal: input.signal,
+    onEvent: input.onEvent,
   });
   if (emitResult.status !== "candidate_ready") {
+    const failure = classifyFarmOsRtxPass2Failure(emitResult);
+    emitTwoPassEvent(input.onEvent, "RTX_BRIDGE_PASS2_FAILED");
+    emitTwoPassEvent(input.onEvent, "RTX_BRIDGE_STRUCTURED_EMIT_FAILED");
     return {
       status: "structured_emit_failed",
       candidate: null,
@@ -1763,8 +2009,10 @@ export async function runFarmOsRtxNightTwoPass(input: {
       pass_1: analysisResult.diagnostics,
       pass_2: emitResult.diagnostics,
       handoff_utf8_bytes: handoffUtf8Bytes,
+      failure,
     };
   }
+  emitTwoPassEvent(input.onEvent, "RTX_BRIDGE_PASS2_COMPLETED");
   return {
     status: "candidate_ready",
     candidate: emitResult.candidate,
@@ -1774,6 +2022,7 @@ export async function runFarmOsRtxNightTwoPass(input: {
     pass_1: analysisResult.diagnostics,
     pass_2: emitResult.diagnostics,
     handoff_utf8_bytes: handoffUtf8Bytes,
+    failure: null,
   };
 }
 
@@ -1783,6 +2032,7 @@ export async function runFarmOsRtxRuntimeMode(input: {
   config: FarmOsRtxWorkerConfig;
   fetchImpl?: FetchLike;
   signal?: AbortSignal;
+  onEvent?: (event: FarmOsRtxTwoPassEvent) => void;
 }): Promise<
   | FarmOsRtxNightTwoPassResult
   | FarmOsRtxNightAnalysisResult

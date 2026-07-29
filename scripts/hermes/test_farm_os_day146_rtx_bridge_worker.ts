@@ -159,6 +159,7 @@ function candidateReady(
     pass_1: diagnostics(),
     pass_2: diagnostics(),
     handoff_utf8_bytes: 10,
+    failure: null,
   };
 }
 
@@ -179,6 +180,12 @@ function unavailable(
     pass_1: diagnostics(),
     pass_2: null,
     handoff_utf8_bytes: null,
+    failure: {
+      pass: 1,
+      stage: "request",
+      failure_code: "pass_1_request_failed",
+      retryable: true,
+    },
   };
 }
 
@@ -604,7 +611,13 @@ async function run(): Promise<void> {
   assert.equal(unavailableResult.status, "failure_submitted");
   assert.deepEqual(unavailablePort.calls, ["claim", "failure"]);
 
-  const timeoutPort = fakePort();
+  let submittedGranularFailure: string | null = null;
+  const timeoutPort = fakePort({
+    submitFailure: async (_lease, code) => {
+      submittedGranularFailure = code;
+      return "failure_recorded";
+    },
+  });
   const timeoutRuntime = new FarmOsRtxBridgeWorkerRuntime({
     client: timeoutPort,
     modelConfig,
@@ -616,8 +629,9 @@ async function run(): Promise<void> {
     timeoutResult.status === "failure_submitted"
       ? timeoutResult.failure_code
       : null,
-    "request_timeout",
+    "pass_1_request_failed",
   );
+  assert.equal(submittedGranularFailure, "pass_1_request_failed");
 
   const malformedPort = fakePort();
   const malformedCandidate = { ...candidate, job_id: "wrong-job" };

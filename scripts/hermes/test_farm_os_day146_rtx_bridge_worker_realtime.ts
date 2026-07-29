@@ -89,6 +89,7 @@ function candidateReady(): FarmOsRtxNightTwoPassResult {
     pass_1: diagnostics(),
     pass_2: diagnostics(),
     handoff_utf8_bytes: 10,
+    failure: null,
   };
 }
 

@@ -16,6 +16,7 @@ import {
   validateFarmOsRtxCandidateGrounding,
 } from "./farm_os_rtx_structuring_contract";
 import {
+  FARM_OS_RTX_TWO_PASS_EVENTS,
   type FarmOsRtxNightTwoPassResult,
   type FarmOsRtxWorkerConfig,
   runFarmOsRtxRuntimeMode,
@@ -33,6 +34,7 @@ export const FARM_OS_RTX_HEARTBEAT_DEFAULT_MAX_INTERVAL_MS = Math.floor(
   FARM_OS_RTX_BRIDGE_HEARTBEAT_EXTENSION_SECONDS * 1_000 / 2,
 );
 export const FARM_OS_RTX_BRIDGE_WORKER_EVENTS = [
+  ...FARM_OS_RTX_TWO_PASS_EVENTS,
   "RTX_BRIDGE_JOB_CLAIMED",
   "RTX_BRIDGE_HEARTBEAT_LOOP_STARTED",
   "RTX_BRIDGE_HEARTBEAT_DELAY_SCHEDULED",
@@ -188,16 +190,9 @@ function metrics(result: FarmOsRtxNightTwoPassResult): SafeMetrics {
 function failureCode(
   result: FarmOsRtxNightTwoPassResult,
 ): FarmOsRtxBridgeFailureRequest["failure_code"] {
-  if (result.status === "night_analysis_failed") {
-    return result.errors.some((value) =>
-        value === "RTX_HTTP_ERROR" || value === "RTX_REQUEST_FAILED"
-      )
-      ? "lm_studio_unavailable"
-      : result.errors.some((value) => value === "RTX_REQUEST_TIMEOUT")
-      ? "request_timeout"
-      : "analysis_failed";
-  }
-  return "structured_emit_failed";
+  return result.status === "candidate_ready"
+    ? "unexpected_worker_error"
+    : result.failure.failure_code;
 }
 
 export class FarmOsRtxBridgeWorkerRuntime {
@@ -222,6 +217,7 @@ export class FarmOsRtxBridgeWorkerRuntime {
           job: input.job,
           config: input.config,
           signal: input.signal,
+          onEvent: (event) => this.emit(event),
         }) as Promise<FarmOsRtxNightTwoPassResult>);
     this.sleep = dependencies.sleep ?? defaultSleep;
     this.now = dependencies.now ?? (() => new Date());

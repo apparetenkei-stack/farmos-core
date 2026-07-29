@@ -4,6 +4,8 @@ import { readFileSync } from "node:fs";
 
 import {
   assertFarmOsRtxLocalBaseUrl,
+  classifyFarmOsRtxPass1Failure,
+  classifyFarmOsRtxPass2Failure,
   convertFarmOsRtxModelOutputToCandidate,
   FARM_OS_RTX_CANDIDATE_MAX_UTF8_BYTES,
   FARM_OS_RTX_DEFAULT_BASE_URL,
@@ -54,6 +56,15 @@ const config: FarmOsRtxWorkerConfig = {
   requestTimeoutMs: 1_000,
   workerMode: FARM_OS_RTX_WORKER_MODE,
 };
+
+function twoPassFailureCode(
+  result: Awaited<ReturnType<typeof runFarmOsRtxNightTwoPass>>,
+): string {
+  if (result.status === "candidate_ready") {
+    throw new Error("EXPECTED_TWO_PASS_FAILURE");
+  }
+  return result.failure.failure_code;
+}
 
 function candidate(
   mutation: Record<string, unknown> = {},
@@ -653,13 +664,11 @@ const separateReasoning = await runFarmOsRtxWorker({
     reasoningContent: "must not enter Candidate",
   }),
 });
-assert.equal(separateReasoning.status, "candidate_ready");
+assert.equal(separateReasoning.status, "rejected");
 assert.equal(separateReasoning.diagnostics.reasoning_content_present, true);
-assert.equal(
-  JSON.stringify(separateReasoning.candidate).includes(
-    "must not enter Candidate",
-  ),
-  false,
+assert.equal(separateReasoning.candidate, null);
+assert.ok(
+  separateReasoning.errors.includes("RTX_MODEL_OUTPUT_REASONING_PRESENT"),
 );
 
 const markdownFence = await runFarmOsRtxWorker({
@@ -1048,8 +1057,8 @@ assert.ok(oversizedAnalysis.errors.includes("RTX_NIGHT_ANALYSIS_SIZE_EXCEEDED"))
 assert.equal(oversizedAnalysis.safety.candidate_saved, false);
 
 const passOneReasoningMarker = "fixture-pass-one-reasoning-must-not-forward";
-const passTwoReasoningMarker = "fixture-pass-two-reasoning-must-not-persist";
 let twoPassRequestCount = 0;
+const twoPassEvents: string[] = [];
 const twoPass = await runFarmOsRtxNightTwoPass({
   job,
   config,
@@ -1060,7 +1069,6 @@ const twoPass = await runFarmOsRtxNightTwoPass({
     },
     {
       content: JSON.stringify(modelOutput()),
-      reasoningContent: passTwoReasoningMarker,
     },
   ], (requestIndex, request, init) => {
     twoPassRequestCount += 1;
@@ -1100,20 +1108,26 @@ const twoPass = await runFarmOsRtxNightTwoPass({
       assert.equal(prompt.includes("quantity"), false);
     }
   }),
+  onEvent: (event) => twoPassEvents.push(event),
 });
 assert.equal(twoPass.status, "candidate_ready");
+assert.equal(twoPass.failure, null);
 assert.equal(twoPassRequestCount, 2);
 assert.equal(twoPass.candidate?.job_id, job.job_id);
 assert.equal(twoPass.pass_1.reasoning_content_present, true);
-assert.equal(twoPass.pass_2?.reasoning_content_present, true);
+assert.equal(twoPass.pass_2?.reasoning_content_present, false);
 assert.equal(
   JSON.stringify(twoPass.candidate).includes(passOneReasoningMarker),
   false,
 );
-assert.equal(
-  JSON.stringify(twoPass.candidate).includes(passTwoReasoningMarker),
-  false,
-);
+assert.deepEqual(twoPassEvents, [
+  "RTX_BRIDGE_PASS1_REQUEST_STARTED",
+  "RTX_BRIDGE_PASS1_RESPONSE_RECEIVED",
+  "RTX_BRIDGE_PASS1_COMPLETED",
+  "RTX_BRIDGE_PASS2_REQUEST_STARTED",
+  "RTX_BRIDGE_PASS2_RESPONSE_RECEIVED",
+  "RTX_BRIDGE_PASS2_COMPLETED",
+]);
 assert.equal(twoPass.safety.candidate_saved, false);
 assert.equal(twoPass.safety.fallback_model_used, false);
 assert.equal(twoPass.safety.active_projection_modified, false);
@@ -1134,6 +1148,7 @@ const passOneFailure = await runFarmOsRtxNightTwoPass({
   }),
 });
 assert.equal(passOneFailure.status, "night_analysis_failed");
+assert.equal(twoPassFailureCode(passOneFailure), "pass_1_schema_invalid");
 assert.equal(passOneFailureRequestCount, 1);
 assert.equal(passOneFailure.candidate, null);
 assert.equal(passOneFailure.pass_2, null);
@@ -1151,10 +1166,182 @@ const passTwoFailure = await runFarmOsRtxNightTwoPass({
   }),
 });
 assert.equal(passTwoFailure.status, "structured_emit_failed");
+assert.equal(
+  twoPassFailureCode(passTwoFailure),
+  "model_output_contract_mismatch",
+);
 assert.equal(passTwoFailureRequestCount, 2);
 assert.equal(passTwoFailure.candidate, null);
 assert.equal(passTwoFailure.safety.candidate_saved, false);
 assert.equal(passTwoFailure.safety.fallback_model_used, false);
+
+const passOneEmpty = await runFarmOsRtxNightTwoPass({
+  job,
+  config,
+  fetchImpl: completionSequence([{ content: "" }]),
+});
+assert.equal(passOneEmpty.status, "night_analysis_failed");
+assert.equal(twoPassFailureCode(passOneEmpty), "pass_1_response_empty");
+assert.equal(passOneEmpty.pass_2, null);
+
+const passOneGrounding = await runFarmOsRtxNightTwoPass({
+  job,
+  config,
+  fetchImpl: completionSequence([{
+    content: JSON.stringify(nightAnalysis({
+      analysis_summary: "元sourceに存在しない圃場名",
+    })),
+  }]),
+});
+assert.equal(passOneGrounding.status, "night_analysis_failed");
+assert.equal(
+  twoPassFailureCode(passOneGrounding),
+  "pass_1_grounding_invalid",
+);
+
+const passTwoEmptyReasoningEvents: string[] = [];
+const passTwoEmptyReasoning = await runFarmOsRtxNightTwoPass({
+  job,
+  config,
+  fetchImpl: completionSequence([
+    { content: JSON.stringify(nightAnalysis()) },
+    {
+      content: "",
+      reasoningContent: "reasoning must never be persisted",
+    },
+  ]),
+  onEvent: (event) => passTwoEmptyReasoningEvents.push(event),
+});
+assert.equal(passTwoEmptyReasoning.status, "structured_emit_failed");
+assert.equal(
+  twoPassFailureCode(passTwoEmptyReasoning),
+  "pass_2_response_empty",
+);
+assert.equal(passTwoEmptyReasoning.candidate, null);
+assert.equal(passTwoEmptyReasoning.pass_2?.reasoning_content_present, true);
+assert.ok(
+  passTwoEmptyReasoningEvents.includes("RTX_BRIDGE_PASS2_FAILED"),
+);
+assert.ok(
+  passTwoEmptyReasoningEvents.includes("RTX_BRIDGE_STRUCTURED_EMIT_FAILED"),
+);
+assert.equal(
+  JSON.stringify(passTwoEmptyReasoning).includes(
+    "reasoning must never be persisted",
+  ),
+  false,
+);
+
+const passTwoInvalidJson = await runFarmOsRtxNightTwoPass({
+  job,
+  config,
+  fetchImpl: completionSequence([
+    { content: JSON.stringify(nightAnalysis()) },
+    { content: "{" },
+  ]),
+});
+assert.equal(passTwoInvalidJson.status, "structured_emit_failed");
+assert.equal(
+  twoPassFailureCode(passTwoInvalidJson),
+  "pass_2_schema_invalid",
+);
+
+const twoPassUnsupportedFact = await runFarmOsRtxNightTwoPass({
+  job,
+  config,
+  fetchImpl: completionSequence([
+    { content: JSON.stringify(nightAnalysis()) },
+    {
+      content: JSON.stringify(modelOutput({
+        summary: "元sourceに存在しない圃場名",
+      })),
+    },
+  ]),
+});
+assert.equal(twoPassUnsupportedFact.status, "structured_emit_failed");
+assert.equal(
+  twoPassFailureCode(twoPassUnsupportedFact),
+  "model_output_unsupported_fact",
+);
+
+const passTwoReasoning = await runFarmOsRtxNightTwoPass({
+  job,
+  config,
+  fetchImpl: completionSequence([
+    { content: JSON.stringify(nightAnalysis()) },
+    {
+      content: JSON.stringify(modelOutput()),
+      reasoningContent: "reasoning must never be persisted",
+    },
+  ]),
+});
+assert.equal(passTwoReasoning.status, "structured_emit_failed");
+assert.equal(
+  twoPassFailureCode(passTwoReasoning),
+  "model_output_reasoning_present",
+);
+assert.equal(passTwoReasoning.candidate, null);
+assert.equal(
+  JSON.stringify(passTwoReasoning).includes(
+    "reasoning must never be persisted",
+  ),
+  false,
+);
+
+const passOneAbort = new AbortController();
+passOneAbort.abort();
+const passOneTimeout = await runFarmOsRtxNightAnalysis({
+  job,
+  config,
+  signal: passOneAbort.signal,
+  fetchImpl: (async (_url, init) => {
+    assert.equal(init?.signal?.aborted, true);
+    throw new DOMException("fixture abort", "AbortError");
+  }) as typeof fetch,
+});
+assert.equal(passOneTimeout.status, "night_analysis_failed");
+if (passOneTimeout.status !== "night_analysis_failed") {
+  throw new Error("PASS1_TIMEOUT_FIXTURE_INVALID");
+}
+assert.equal(
+  classifyFarmOsRtxPass1Failure(passOneTimeout).failure_code,
+  "pass_1_request_failed",
+);
+
+const passTwoAbort = new AbortController();
+passTwoAbort.abort();
+const passTwoTimeout = await runFarmOsRtxWorker({
+  job,
+  config,
+  analysisHandoff: nightAnalysis(),
+  signal: passTwoAbort.signal,
+  fetchImpl: (async (_url, init) => {
+    assert.equal(init?.signal?.aborted, true);
+    throw new DOMException("fixture abort", "AbortError");
+  }) as typeof fetch,
+});
+assert.notEqual(passTwoTimeout.status, "candidate_ready");
+if (passTwoTimeout.status === "candidate_ready") {
+  throw new Error("PASS2_TIMEOUT_FIXTURE_INVALID");
+}
+assert.equal(
+  classifyFarmOsRtxPass2Failure(passTwoTimeout).failure_code,
+  "pass_2_request_failed",
+);
+assert.equal(
+  classifyFarmOsRtxPass2Failure({
+    ...passTwoTimeout,
+    errors: ["CANDIDATE_SCHEMA_INVALID"],
+  }).failure_code,
+  "model_output_parse_failed",
+);
+assert.equal(
+  classifyFarmOsRtxPass2Failure({
+    ...passTwoTimeout,
+    errors: ["FIELD_STATE_NOT_GROUNDED"],
+  }).failure_code,
+  "pass_2_grounding_invalid",
+);
 
 const reasoningOnlyAnalysis = await runFarmOsRtxNightAnalysis({
   job,
