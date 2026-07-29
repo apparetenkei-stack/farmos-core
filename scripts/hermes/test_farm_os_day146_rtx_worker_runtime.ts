@@ -664,11 +664,13 @@ const separateReasoning = await runFarmOsRtxWorker({
     reasoningContent: "must not enter Candidate",
   }),
 });
-assert.equal(separateReasoning.status, "rejected");
+assert.equal(separateReasoning.status, "candidate_ready");
 assert.equal(separateReasoning.diagnostics.reasoning_content_present, true);
-assert.equal(separateReasoning.candidate, null);
-assert.ok(
-  separateReasoning.errors.includes("RTX_MODEL_OUTPUT_REASONING_PRESENT"),
+assert.equal(
+  JSON.stringify(separateReasoning.candidate).includes(
+    "must not enter Candidate",
+  ),
+  false,
 );
 
 const markdownFence = await runFarmOsRtxWorker({
@@ -1057,6 +1059,7 @@ assert.ok(oversizedAnalysis.errors.includes("RTX_NIGHT_ANALYSIS_SIZE_EXCEEDED"))
 assert.equal(oversizedAnalysis.safety.candidate_saved, false);
 
 const passOneReasoningMarker = "fixture-pass-one-reasoning-must-not-forward";
+const passTwoReasoningMarker = "fixture-pass-two-reasoning-must-not-persist";
 let twoPassRequestCount = 0;
 const twoPassEvents: string[] = [];
 const twoPass = await runFarmOsRtxNightTwoPass({
@@ -1069,6 +1072,7 @@ const twoPass = await runFarmOsRtxNightTwoPass({
     },
     {
       content: JSON.stringify(modelOutput()),
+      reasoningContent: passTwoReasoningMarker,
     },
   ], (requestIndex, request, init) => {
     twoPassRequestCount += 1;
@@ -1115,9 +1119,13 @@ assert.equal(twoPass.failure, null);
 assert.equal(twoPassRequestCount, 2);
 assert.equal(twoPass.candidate?.job_id, job.job_id);
 assert.equal(twoPass.pass_1.reasoning_content_present, true);
-assert.equal(twoPass.pass_2?.reasoning_content_present, false);
+assert.equal(twoPass.pass_2?.reasoning_content_present, true);
 assert.equal(
   JSON.stringify(twoPass.candidate).includes(passOneReasoningMarker),
+  false,
+);
+assert.equal(
+  JSON.stringify(twoPass.candidate).includes(passTwoReasoningMarker),
   false,
 );
 assert.deepEqual(twoPassEvents, [
@@ -1270,8 +1278,9 @@ const passTwoReasoning = await runFarmOsRtxNightTwoPass({
   fetchImpl: completionSequence([
     { content: JSON.stringify(nightAnalysis()) },
     {
-      content: JSON.stringify(modelOutput()),
-      reasoningContent: "reasoning must never be persisted",
+      content: JSON.stringify(modelOutput({
+        reasoning_content: "reasoning must never be persisted",
+      })),
     },
   ]),
 });

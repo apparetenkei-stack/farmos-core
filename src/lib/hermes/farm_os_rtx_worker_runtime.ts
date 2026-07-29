@@ -1115,6 +1115,36 @@ function classifyInvalidJsonContent(
   return "unknown";
 }
 
+const MODEL_OUTPUT_REASONING_KEYS = new Set([
+  "analysis",
+  "chain_of_thought",
+  "chainofthought",
+  "reasoning",
+  "reasoning_content",
+  "thought_process",
+  "thoughts",
+]);
+
+function modelOutputContainsReasoningKey(value: unknown): boolean {
+  const pending: unknown[] = [value];
+  let visited = 0;
+  while (pending.length > 0) {
+    const current = pending.pop();
+    visited += 1;
+    if (visited > 2_048) return true;
+    if (Array.isArray(current)) {
+      pending.push(...current);
+      continue;
+    }
+    if (!isRecord(current)) continue;
+    for (const [key, nested] of Object.entries(current)) {
+      if (MODEL_OUTPUT_REASONING_KEYS.has(key.toLowerCase())) return true;
+      pending.push(nested);
+    }
+  }
+  return false;
+}
+
 export async function runFarmOsRtxNightAnalysis(input: {
   job: unknown;
   config: FarmOsRtxWorkerConfig;
@@ -1676,16 +1706,6 @@ export async function runFarmOsRtxWorker(input: {
       diagnostics: withInvalidJsonReason(diagnostics, "empty_content"),
     };
   }
-  if (diagnostics.reasoning_content_present) {
-    return {
-      status: "rejected",
-      candidate: null,
-      retryable: false,
-      errors: ["RTX_MODEL_OUTPUT_REASONING_PRESENT"],
-      safety: SAFETY,
-      diagnostics,
-    };
-  }
   if (Buffer.byteLength(content, "utf8") > FARM_OS_RTX_CANDIDATE_MAX_UTF8_BYTES) {
     return {
       status: "rejected",
@@ -1707,6 +1727,19 @@ export async function runFarmOsRtxWorker(input: {
       candidate: null,
       retryable: false,
       errors: [`RTX_CANDIDATE_INVALID_JSON:${reason}`],
+      safety: SAFETY,
+      diagnostics,
+    };
+  }
+  if (
+    diagnostics.think_tag_present ||
+    modelOutputContainsReasoningKey(modelOutputValue)
+  ) {
+    return {
+      status: "rejected",
+      candidate: null,
+      retryable: false,
+      errors: ["RTX_MODEL_OUTPUT_REASONING_PRESENT"],
       safety: SAFETY,
       diagnostics,
     };
@@ -1887,7 +1920,12 @@ export function classifyFarmOsRtxPass2Failure(
       retryable: result.retryable,
     };
   }
-  if (includesError(result.errors, ["RTX_MODEL_OUTPUT_REASONING_PRESENT"])) {
+  if (
+    includesError(result.errors, [
+      "RTX_MODEL_OUTPUT_REASONING_PRESENT",
+      "RTX_CANDIDATE_INVALID_JSON:think_block_prefix",
+    ])
+  ) {
     return {
       pass: 2,
       stage: "safety",

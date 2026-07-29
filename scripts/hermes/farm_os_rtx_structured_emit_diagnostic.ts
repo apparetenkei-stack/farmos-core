@@ -54,6 +54,7 @@ async function main(): Promise<void> {
         content_length: result.pass_2.content_length,
         content_non_empty: (result.pass_2.content_length ?? 0) > 0,
         reasoning_content_present: result.pass_2.reasoning_content_present,
+        reasoning_discarded: result.pass_2.reasoning_content_present,
         parser_valid: pass2Parsed,
         exact_contract_valid: pass2Parsed,
         grounding_valid: pass2Valid,
