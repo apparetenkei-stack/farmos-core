@@ -222,6 +222,13 @@ function fakePort(input: {
   };
 }
 
+function waitUntilAbort(signal?: AbortSignal): Promise<void> {
+  return new Promise((resolve) => {
+    if (signal?.aborted) return resolve();
+    signal?.addEventListener("abort", () => resolve(), { once: true });
+  });
+}
+
 async function run(): Promise<void> {
   const initialHeartbeatDelay = computeFarmOsRtxHeartbeatDelayMs({
     leaseExpiresAt: "2026-07-29T00:05:00.000Z",
@@ -434,7 +441,6 @@ async function run(): Promise<void> {
     client: successPort,
     modelConfig,
     modelRunner: async () => candidateReady(),
-    sleep: async () => undefined,
     now: () => now,
   });
   assert.deepEqual(await successRuntime.runOnce(), {
@@ -453,7 +459,6 @@ async function run(): Promise<void> {
       modelRunner: async () => {
         throw new Error("MODEL_MUST_NOT_RUN_WITHOUT_LEASE");
       },
-      sleep: async () => undefined,
       now: () => now,
     }).runOnce(),
     { status: "no_jobs" },
@@ -464,7 +469,6 @@ async function run(): Promise<void> {
     client: unavailablePort,
     modelConfig,
     modelRunner: async () => unavailable(),
-    sleep: async () => undefined,
     now: () => now,
   });
   const unavailableResult = await unavailableRuntime.runOnce();
@@ -476,7 +480,6 @@ async function run(): Promise<void> {
     client: timeoutPort,
     modelConfig,
     modelRunner: async () => unavailable("RTX_REQUEST_TIMEOUT"),
-    sleep: async () => undefined,
     now: () => now,
   });
   const timeoutResult = await timeoutRuntime.runOnce();
@@ -494,7 +497,6 @@ async function run(): Promise<void> {
     modelConfig,
     modelRunner: async () =>
       candidateReady(malformedCandidate as typeof candidate),
-    sleep: async () => undefined,
     now: () => now,
   });
   const malformedResult = await malformedRuntime.runOnce();
@@ -510,7 +512,6 @@ async function run(): Promise<void> {
         ...candidate,
         unexpected_model_field: true,
       } as unknown as typeof candidate),
-    sleep: async () => undefined,
     now: () => now,
   });
   assert.equal(
@@ -530,7 +531,6 @@ async function run(): Promise<void> {
       client: expiredPort,
       modelConfig,
       modelRunner: async () => candidateReady(),
-      sleep: async () => undefined,
       now: () => now,
     }).runOnce(),
     "BRIDGE_RESPONSE_INVALID",
@@ -560,6 +560,7 @@ async function run(): Promise<void> {
       };
     },
   });
+  const heartbeatEvents: string[] = [];
   const heartbeatRuntime = new FarmOsRtxBridgeWorkerRuntime({
     client: heartbeatPort,
     modelConfig,
@@ -567,13 +568,14 @@ async function run(): Promise<void> {
       new Promise((resolve) => {
         resolveWork = resolve;
       }),
-    sleep: (milliseconds) => {
-      if (heartbeatCount >= 2) return new Promise(() => undefined);
+    sleep: (milliseconds, signal) => {
+      if (heartbeatCount >= 2) return waitUntilAbort(signal);
       heartbeatSleeps.push(milliseconds);
       virtualNow = new Date(virtualNow.getTime() + milliseconds);
       return Promise.resolve();
     },
     now: () => virtualNow,
+    onEvent: (event) => heartbeatEvents.push(event),
   });
   assert.equal((await heartbeatRuntime.runOnce()).status, "candidate_submitted");
   assert.deepEqual(heartbeatPort.calls, [
@@ -583,6 +585,14 @@ async function run(): Promise<void> {
     "candidate",
   ]);
   assert.deepEqual(heartbeatSleeps, [100_000, 200_000]);
+  assert.deepEqual(heartbeatEvents, [
+    "RTX_BRIDGE_JOB_CLAIMED",
+    "RTX_BRIDGE_HEARTBEAT_LOOP_STARTED",
+    "RTX_BRIDGE_HEARTBEAT_ACCEPTED",
+    "RTX_BRIDGE_HEARTBEAT_ACCEPTED",
+    "RTX_BRIDGE_INFERENCE_COMPLETED",
+    "RTX_BRIDGE_CANDIDATE_SUBMITTED",
+  ]);
 
   const heartbeatFailurePort = fakePort({
     heartbeat: async () => {
@@ -641,7 +651,7 @@ async function run(): Promise<void> {
         completionNow = new Date("2026-07-29T00:05:01.000Z");
         return candidateReady();
       },
-      sleep: () => new Promise(() => undefined),
+      sleep: (_milliseconds, signal) => waitUntilAbort(signal),
       now: () => completionNow,
     }).runOnce(),
     "BRIDGE_OPERATION_REJECTED",
@@ -666,12 +676,32 @@ async function run(): Promise<void> {
         completionNow = new Date("2026-07-29T00:05:01.000Z");
         return unavailable();
       },
-      sleep: () => new Promise(() => undefined),
+      sleep: (_milliseconds, signal) => waitUntilAbort(signal),
       now: () => completionNow,
     }).runOnce(),
     "BRIDGE_OPERATION_REJECTED",
   );
   assert.deepEqual(expiredFailurePort.calls, ["claim"]);
+
+  const synchronousFailurePort = fakePort();
+  const synchronousFailureEvents: string[] = [];
+  const synchronousFailureResult = await new FarmOsRtxBridgeWorkerRuntime({
+    client: synchronousFailurePort,
+    modelConfig,
+    modelRunner: () => {
+      throw new Error("SYNCHRONOUS_MODEL_FAILURE");
+    },
+    now: () => now,
+    onEvent: (event) => synchronousFailureEvents.push(event),
+  }).runOnce();
+  assert.equal(synchronousFailureResult.status, "failure_submitted");
+  assert.deepEqual(synchronousFailurePort.calls, ["claim", "failure"]);
+  assert.ok(
+    synchronousFailureEvents.includes("RTX_BRIDGE_HEARTBEAT_LOOP_STARTED"),
+  );
+  assert.ok(
+    synchronousFailureEvents.includes("RTX_BRIDGE_INFERENCE_FAILED"),
+  );
 
   let attempts = 0;
   const backoffSleeps: number[] = [];
@@ -726,6 +756,9 @@ async function run(): Promise<void> {
       heartbeat_safety_margin: true,
       heartbeat_recalculated_after_extension: true,
       multiple_heartbeats_during_inference: true,
+      heartbeat_task_independent: true,
+      safe_events_only: true,
+      synchronous_inference_failure_stops_heartbeat: true,
       near_expiry_fail_closed: true,
       expired_submission_zero: true,
       candidate_and_failure_submission: true,

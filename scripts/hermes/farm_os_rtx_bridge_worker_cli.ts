@@ -16,6 +16,7 @@ async function main(): Promise<void> {
   const runtime = new FarmOsRtxBridgeWorkerRuntime({
     client,
     modelConfig,
+    onEvent: (event) => process.stdout.write(`${event}\n`),
   });
   const controller = new AbortController();
   const stop = () => controller.abort();

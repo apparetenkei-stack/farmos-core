@@ -32,10 +32,24 @@ export const FARM_OS_RTX_HEARTBEAT_MINIMUM_DELAY_MS = 1_000;
 export const FARM_OS_RTX_HEARTBEAT_DEFAULT_MAX_INTERVAL_MS = Math.floor(
   FARM_OS_RTX_BRIDGE_HEARTBEAT_EXTENSION_SECONDS * 1_000 / 2,
 );
+export const FARM_OS_RTX_BRIDGE_WORKER_EVENTS = [
+  "RTX_BRIDGE_JOB_CLAIMED",
+  "RTX_BRIDGE_HEARTBEAT_LOOP_STARTED",
+  "RTX_BRIDGE_HEARTBEAT_ACCEPTED",
+  "RTX_BRIDGE_INFERENCE_COMPLETED",
+  "RTX_BRIDGE_CANDIDATE_SUBMITTED",
+  "RTX_BRIDGE_HEARTBEAT_LOOP_FAILED",
+  "RTX_BRIDGE_INFERENCE_FAILED",
+  "RTX_BRIDGE_LEASE_EXPIRED",
+  "RTX_BRIDGE_OPERATION_REJECTED",
+] as const;
+export type FarmOsRtxBridgeWorkerEvent =
+  typeof FARM_OS_RTX_BRIDGE_WORKER_EVENTS[number];
 
 type ModelRunner = (input: {
   job: FarmOsRtxBridgeLease["job"];
   config: FarmOsRtxWorkerConfig;
+  signal?: AbortSignal;
 }) => Promise<FarmOsRtxNightTwoPassResult>;
 type Sleep = (milliseconds: number, signal?: AbortSignal) => Promise<void>;
 type Now = () => Date;
@@ -71,11 +85,19 @@ const EMPTY_METRICS: SafeMetrics = Object.freeze({
 function defaultSleep(milliseconds: number, signal?: AbortSignal): Promise<void> {
   return new Promise((resolve) => {
     if (signal?.aborted) return resolve();
-    const timeout = setTimeout(resolve, milliseconds);
-    signal?.addEventListener("abort", () => {
-      clearTimeout(timeout);
+    let settled = false;
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      signal?.removeEventListener("abort", abort);
       resolve();
-    }, { once: true });
+    };
+    const timeout = setTimeout(finish, milliseconds);
+    const abort = () => {
+      clearTimeout(timeout);
+      finish();
+    };
+    signal?.addEventListener("abort", abort, { once: true });
   });
 }
 
@@ -89,23 +111,28 @@ export function computeFarmOsRtxHeartbeatDelayMs(input: {
   leaseExpiresAt: string;
   now: Date;
   maximumIntervalMs?: number;
+  safetyMarginMs?: number;
 }): number | null {
   const expiry = Date.parse(input.leaseExpiresAt);
   const now = input.now.getTime();
   const maximumInterval = input.maximumIntervalMs ??
     FARM_OS_RTX_HEARTBEAT_DEFAULT_MAX_INTERVAL_MS;
+  const safetyMargin = input.safetyMarginMs ??
+    FARM_OS_RTX_HEARTBEAT_SAFETY_MARGIN_MS;
   if (
     !Number.isFinite(expiry) ||
     !Number.isFinite(now) ||
     !Number.isFinite(maximumInterval) ||
-    maximumInterval < FARM_OS_RTX_HEARTBEAT_MINIMUM_DELAY_MS
+    maximumInterval < FARM_OS_RTX_HEARTBEAT_MINIMUM_DELAY_MS ||
+    !Number.isFinite(safetyMargin) ||
+    safetyMargin < 0
   ) {
     return null;
   }
   const remaining = expiry - now;
   if (
     remaining <
-      FARM_OS_RTX_HEARTBEAT_SAFETY_MARGIN_MS +
+      safetyMargin +
         FARM_OS_RTX_HEARTBEAT_MINIMUM_DELAY_MS
   ) {
     return null;
@@ -113,7 +140,7 @@ export function computeFarmOsRtxHeartbeatDelayMs(input: {
   const delay = Math.min(
     Math.floor(maximumInterval),
     Math.floor(remaining / 3),
-    remaining - FARM_OS_RTX_HEARTBEAT_SAFETY_MARGIN_MS,
+    remaining - safetyMargin,
   );
   return delay >= FARM_OS_RTX_HEARTBEAT_MINIMUM_DELAY_MS ? delay : null;
 }
@@ -164,6 +191,8 @@ export class FarmOsRtxBridgeWorkerRuntime {
     sleep?: Sleep;
     now?: Now;
     heartbeatIntervalMs?: number;
+    heartbeatSafetyMarginMs?: number;
+    onEvent?: (event: FarmOsRtxBridgeWorkerEvent) => void;
   }) {
     this.modelRunner = dependencies.modelRunner ??
       ((input) =>
@@ -171,9 +200,51 @@ export class FarmOsRtxBridgeWorkerRuntime {
           mode: "night-two-pass",
           job: input.job,
           config: input.config,
+          signal: input.signal,
         }) as Promise<FarmOsRtxNightTwoPassResult>);
     this.sleep = dependencies.sleep ?? defaultSleep;
     this.now = dependencies.now ?? (() => new Date());
+  }
+
+  private emit(event: FarmOsRtxBridgeWorkerEvent): void {
+    try {
+      this.dependencies.onEvent?.(event);
+    } catch {
+      // Diagnostics cannot change worker behavior.
+    }
+  }
+
+  private async runHeartbeatLoop(
+    initialLease: FarmOsRtxBridgeLease,
+    signal: AbortSignal,
+  ): Promise<FarmOsRtxBridgeLease> {
+    let lease = initialLease;
+    this.emit("RTX_BRIDGE_HEARTBEAT_LOOP_STARTED");
+    while (!signal.aborted) {
+      const heartbeatDelay = computeFarmOsRtxHeartbeatDelayMs({
+        leaseExpiresAt: lease.leaseExpiresAt,
+        now: this.now(),
+        maximumIntervalMs: this.dependencies.heartbeatIntervalMs,
+        safetyMarginMs: this.dependencies.heartbeatSafetyMarginMs,
+      });
+      if (heartbeatDelay === null) {
+        this.emit("RTX_BRIDGE_LEASE_EXPIRED");
+        throw new FarmOsRtxBridgeClientError("BRIDGE_OPERATION_REJECTED");
+      }
+      await this.sleep(heartbeatDelay, signal);
+      if (signal.aborted) return lease;
+      if (!leaseValid(lease, this.now())) {
+        this.emit("RTX_BRIDGE_LEASE_EXPIRED");
+        throw new FarmOsRtxBridgeClientError("BRIDGE_OPERATION_REJECTED");
+      }
+      lease = await this.dependencies.client.heartbeat(lease);
+      if (!leaseValid(lease, this.now())) {
+        this.emit("RTX_BRIDGE_LEASE_EXPIRED");
+        throw new FarmOsRtxBridgeClientError("BRIDGE_OPERATION_REJECTED");
+      }
+      this.emit("RTX_BRIDGE_HEARTBEAT_ACCEPTED");
+    }
+    return lease;
   }
 
   async runOnce(signal?: AbortSignal): Promise<FarmOsRtxBridgeWorkerRuntimeResult> {
@@ -181,6 +252,7 @@ export class FarmOsRtxBridgeWorkerRuntime {
     const claimed = await this.dependencies.client.claim();
     if (claimed.result === "no_jobs") return { status: "no_jobs" };
     let lease = claimed.lease;
+    this.emit("RTX_BRIDGE_JOB_CLAIMED");
     if (!leaseValid(lease, this.now())) {
       throw new FarmOsRtxBridgeClientError("BRIDGE_RESPONSE_INVALID");
     }
@@ -189,77 +261,103 @@ export class FarmOsRtxBridgeWorkerRuntime {
         leaseExpiresAt: lease.leaseExpiresAt,
         now: this.now(),
         maximumIntervalMs: this.dependencies.heartbeatIntervalMs,
+        safetyMarginMs: this.dependencies.heartbeatSafetyMarginMs,
       }) === null
     ) {
+      this.emit("RTX_BRIDGE_LEASE_EXPIRED");
       throw new FarmOsRtxBridgeClientError("BRIDGE_OPERATION_REJECTED");
     }
-    const work = this.modelRunner({
-      job: lease.job,
-      config: this.dependencies.modelConfig,
-    });
-    const completion = work.then(
-      (value) => ({ completed: true as const, value }),
-      () => ({ completed: true as const, value: null }),
+    const heartbeatController = new AbortController();
+    const inferenceController = new AbortController();
+    const abortBoth = () => {
+      heartbeatController.abort();
+      inferenceController.abort();
+    };
+    signal?.addEventListener("abort", abortBoth, { once: true });
+    const heartbeatTask = this.runHeartbeatLoop(
+      lease,
+      heartbeatController.signal,
     );
-    let result: FarmOsRtxNightTwoPassResult | null = null;
-    while (result === null) {
-      const heartbeatDelay = computeFarmOsRtxHeartbeatDelayMs({
-        leaseExpiresAt: lease.leaseExpiresAt,
-        now: this.now(),
-        maximumIntervalMs: this.dependencies.heartbeatIntervalMs,
-      });
-      if (heartbeatDelay === null) {
-        work.catch(() => undefined);
-        throw new FarmOsRtxBridgeClientError("BRIDGE_OPERATION_REJECTED");
-      }
-      const next = await Promise.race([
-        completion,
-        this.sleep(heartbeatDelay, signal).then(() => ({
-          completed: false as const,
-          value: null,
-        })),
-      ]);
-      if (next.completed) {
-        if (next.value === null) {
-          if (!leaseValid(lease, this.now())) {
-            throw new FarmOsRtxBridgeClientError("BRIDGE_OPERATION_REJECTED");
-          }
-          await this.dependencies.client.submitFailure(
-            lease,
-            "unexpected_worker_error",
-            true,
-            EMPTY_METRICS,
-          );
-          return {
-            status: "failure_submitted",
-            job_id: lease.job.job_id,
-            failure_code: "unexpected_worker_error",
-          };
-        }
-        result = next.value;
-        break;
-      }
-      if (signal?.aborted) {
-        work.catch(() => undefined);
-        if (leaseValid(lease, this.now())) {
-          await this.dependencies.client.submitFailure(
-            lease,
-            "worker_unavailable",
-            true,
-            EMPTY_METRICS,
-          );
-        }
-        return { status: "stopped" };
-      }
-      if (!leaseValid(lease, this.now())) {
-        throw new FarmOsRtxBridgeClientError("BRIDGE_OPERATION_REJECTED");
-      }
-      lease = await this.dependencies.client.heartbeat(lease);
-      if (!leaseValid(lease, this.now())) {
-        throw new FarmOsRtxBridgeClientError("BRIDGE_OPERATION_REJECTED");
-      }
+    const heartbeatOutcome = heartbeatTask.then(
+      (value) => ({ kind: "heartbeat_stopped" as const, lease: value }),
+      (error: unknown) => ({ kind: "heartbeat_failed" as const, error }),
+    );
+    const inferenceTask = Promise.resolve().then(() =>
+      this.modelRunner({
+        job: lease.job,
+        config: this.dependencies.modelConfig,
+        signal: inferenceController.signal,
+      })
+    );
+    const inferenceOutcome = inferenceTask.then(
+      (value) => ({ kind: "inference_completed" as const, value }),
+      (error: unknown) => ({ kind: "inference_failed" as const, error }),
+    );
+    const outcome = await Promise.race([heartbeatOutcome, inferenceOutcome]);
+    if (outcome.kind === "heartbeat_failed") {
+      inferenceController.abort();
+      inferenceTask.catch(() => undefined);
+      this.emit("RTX_BRIDGE_HEARTBEAT_LOOP_FAILED");
+      this.emit("RTX_BRIDGE_OPERATION_REJECTED");
+      signal?.removeEventListener("abort", abortBoth);
+      throw outcome.error instanceof FarmOsRtxBridgeClientError
+        ? outcome.error
+        : new FarmOsRtxBridgeClientError("BRIDGE_OPERATION_REJECTED");
     }
+    if (outcome.kind === "heartbeat_stopped") {
+      inferenceController.abort();
+      inferenceTask.catch(() => undefined);
+      lease = outcome.lease;
+      signal?.removeEventListener("abort", abortBoth);
+      if (leaseValid(lease, this.now())) {
+        await this.dependencies.client.submitFailure(
+          lease,
+          "worker_unavailable",
+          true,
+          EMPTY_METRICS,
+        );
+      }
+      return { status: "stopped" };
+    }
+    heartbeatController.abort();
+    const heartbeatResult = await heartbeatOutcome;
+    signal?.removeEventListener("abort", abortBoth);
+    if (heartbeatResult.kind === "heartbeat_failed") {
+      inferenceController.abort();
+      this.emit("RTX_BRIDGE_HEARTBEAT_LOOP_FAILED");
+      this.emit("RTX_BRIDGE_OPERATION_REJECTED");
+      throw heartbeatResult.error instanceof FarmOsRtxBridgeClientError
+        ? heartbeatResult.error
+        : new FarmOsRtxBridgeClientError("BRIDGE_OPERATION_REJECTED");
+    }
+    lease = heartbeatResult.lease;
+    if (outcome.kind === "inference_failed") {
+      this.emit("RTX_BRIDGE_INFERENCE_FAILED");
+      if (!leaseValid(lease, this.now())) {
+        this.emit("RTX_BRIDGE_LEASE_EXPIRED");
+        throw new FarmOsRtxBridgeClientError("BRIDGE_OPERATION_REJECTED");
+      }
+      await this.dependencies.client.submitFailure(
+        lease,
+        "unexpected_worker_error",
+        true,
+        EMPTY_METRICS,
+      );
+      return {
+        status: "failure_submitted",
+        job_id: lease.job.job_id,
+        failure_code: "unexpected_worker_error",
+      };
+    }
+    const result = outcome.value;
+    this.emit(
+      result.status === "candidate_ready"
+        ? "RTX_BRIDGE_INFERENCE_COMPLETED"
+        : "RTX_BRIDGE_INFERENCE_FAILED",
+    );
+    if (signal?.aborted) return { status: "stopped" };
     if (!leaseValid(lease, this.now())) {
+      this.emit("RTX_BRIDGE_LEASE_EXPIRED");
       throw new FarmOsRtxBridgeClientError("BRIDGE_OPERATION_REJECTED");
     }
     const safeMetrics = metrics(result);
@@ -313,6 +411,7 @@ export class FarmOsRtxBridgeWorkerRuntime {
       grounded.value,
       safeMetrics,
     );
+    this.emit("RTX_BRIDGE_CANDIDATE_SUBMITTED");
     return { status: "candidate_submitted", job_id: lease.job.job_id };
   }
 

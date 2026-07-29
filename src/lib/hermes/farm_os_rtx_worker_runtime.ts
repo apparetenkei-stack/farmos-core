@@ -354,6 +354,15 @@ function isExactBooleanMap<T extends readonly string[]>(
     keys.every((key) => typeof value[key] === "boolean");
 }
 
+function isExactStringMap<T extends readonly string[]>(
+  value: unknown,
+  keys: T,
+): value is Record<T[number], string> {
+  return isRecord(value) &&
+    hasExactKeys(value, keys) &&
+    keys.every((key) => typeof value[key] === "string");
+}
+
 const MODEL_OUTPUT_KEYS = [
   "model_output_contract_version",
   "job_id",
@@ -397,11 +406,7 @@ export function parseFarmOsRtxModelOutput(
     typeof value.source_snapshot_id !== "string" ||
     typeof value.source_record_id !== "string" ||
     typeof value.source_content_hash !== "string" ||
-    !isRecord(value.model_provenance) ||
-    !hasExactKeys(value.model_provenance, MODEL_PROVENANCE_KEYS) ||
-    !MODEL_PROVENANCE_KEYS.every(
-      (key) => typeof value.model_provenance[key] === "string",
-    ) ||
+    !isExactStringMap(value.model_provenance, MODEL_PROVENANCE_KEYS) ||
     !isRecord(value.semantic_classification) ||
     !hasExactKeys(value.semantic_classification, MODEL_CLASSIFICATION_KEYS) ||
     !isExactBooleanMap(
@@ -595,10 +600,10 @@ export function validateFarmOsRtxNightAnalysisGrounding(input: {
   return { valid: true, value: analysis, errors: [] };
 }
 
-function selectedFlags<T extends readonly string[]>(
-  keys: T,
-  flags: FlagMap<T>,
-): Array<T[number]> {
+function selectedFlags<Key extends string>(
+  keys: readonly Key[],
+  flags: Record<Key, boolean>,
+): Key[] {
   return keys.filter((key) => flags[key]);
 }
 
@@ -1061,6 +1066,7 @@ export async function runFarmOsRtxNightAnalysis(input: {
   job: unknown;
   config: FarmOsRtxWorkerConfig;
   fetchImpl?: FetchLike;
+  signal?: AbortSignal;
 }): Promise<FarmOsRtxNightAnalysisResult> {
   const parsedJob = parseFarmOsRtxStructuringJob(input.job);
   if (!parsedJob.valid) {
@@ -1106,6 +1112,9 @@ export async function runFarmOsRtxNightAnalysis(input: {
   }
 
   const controller = new AbortController();
+  const abort = () => controller.abort();
+  if (input.signal?.aborted) controller.abort();
+  input.signal?.addEventListener("abort", abort, { once: true });
   const timeout = setTimeout(
     () => controller.abort(),
     FARM_OS_RTX_NIGHT_ANALYSIS_TIMEOUT_MS,
@@ -1163,6 +1172,7 @@ export async function runFarmOsRtxNightAnalysis(input: {
     };
   } finally {
     clearTimeout(timeout);
+    input.signal?.removeEventListener("abort", abort);
   }
   const latencyMs = performance.now() - startedAt;
   if (!response.ok) {
@@ -1332,6 +1342,7 @@ export async function runFarmOsRtxWorker(input: {
   config: FarmOsRtxWorkerConfig;
   fetchImpl?: FetchLike;
   analysisHandoff?: unknown;
+  signal?: AbortSignal;
 }): Promise<FarmOsRtxWorkerResult> {
   const parsedJob = parseFarmOsRtxStructuringJob(input.job);
   if (!parsedJob.valid) {
@@ -1411,6 +1422,9 @@ export async function runFarmOsRtxWorker(input: {
   }
 
   const controller = new AbortController();
+  const abort = () => controller.abort();
+  if (input.signal?.aborted) controller.abort();
+  input.signal?.addEventListener("abort", abort, { once: true });
   const timeout = setTimeout(
     () => controller.abort(),
     input.config.requestTimeoutMs,
@@ -1471,6 +1485,7 @@ export async function runFarmOsRtxWorker(input: {
     };
   } finally {
     clearTimeout(timeout);
+    input.signal?.removeEventListener("abort", abort);
   }
   const latencyMs = performance.now() - startedAt;
   if (response.status >= 300 && response.status < 400) {
@@ -1709,6 +1724,7 @@ export async function runFarmOsRtxNightTwoPass(input: {
   job: unknown;
   config: FarmOsRtxWorkerConfig;
   fetchImpl?: FetchLike;
+  signal?: AbortSignal;
 }): Promise<FarmOsRtxNightTwoPassResult> {
   const analysisResult = await runFarmOsRtxNightAnalysis(input);
   if (analysisResult.status !== "analysis_ready") {
@@ -1735,6 +1751,7 @@ export async function runFarmOsRtxNightTwoPass(input: {
     },
     fetchImpl: input.fetchImpl,
     analysisHandoff: analysisResult.analysis,
+    signal: input.signal,
   });
   if (emitResult.status !== "candidate_ready") {
     return {
@@ -1765,6 +1782,7 @@ export async function runFarmOsRtxRuntimeMode(input: {
   job: unknown;
   config: FarmOsRtxWorkerConfig;
   fetchImpl?: FetchLike;
+  signal?: AbortSignal;
 }): Promise<
   | FarmOsRtxNightTwoPassResult
   | FarmOsRtxNightAnalysisResult
