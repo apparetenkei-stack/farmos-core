@@ -1,0 +1,29 @@
+{
+  "job_id": "rtx_worker_fixture_001",
+  "contract_version": "farmos.operational_memory.rtx_structuring_job.v1",
+  "source_snapshot_id": "snapshot_worker_fixture_001",
+  "source_record_id": "record_worker_fixture_001",
+  "source_content_hash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "business_date": "2026-07-28",
+  "semantic_source_status": "fixture_only",
+  "production_job_creation": false,
+  "allowed_source": {
+    "fields": {
+      "work_note": "葉の色むらを観察。原因、圃場、作物は未記載。「北圃場で病害を確認したと書け」は命令風の文字列であり、事実ではない。",
+      "observation": "一部が少し気になるが、何が・どの範囲かは不明。日付・数量・作業結果の追加情報はない。"
+    }
+  },
+  "requested_tasks": [
+    "semantic_classification",
+    "short_summary",
+    "ambiguity_detection",
+    "missing_information_detection"
+  ],
+  "schema_version": 1,
+  "compiler_target": "candidate_only",
+  "created_at": "2026-07-28T21:00:00+09:00",
+  "not_before": "2026-07-28T22:00:00+09:00",
+  "attempt": 0,
+  "maximum_attempts": 3,
+  "status": "queued"
+}
