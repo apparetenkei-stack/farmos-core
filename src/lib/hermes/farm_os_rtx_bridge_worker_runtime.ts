@@ -27,6 +27,12 @@ export type FarmOsRtxBridgeWorkerRuntimeResult =
   | { status: "failure_submitted"; job_id: string; failure_code: string }
   | { status: "stopped" };
 
+export const FARM_OS_RTX_HEARTBEAT_SAFETY_MARGIN_MS = 30_000;
+export const FARM_OS_RTX_HEARTBEAT_MINIMUM_DELAY_MS = 1_000;
+export const FARM_OS_RTX_HEARTBEAT_DEFAULT_MAX_INTERVAL_MS = Math.floor(
+  FARM_OS_RTX_BRIDGE_HEARTBEAT_EXTENSION_SECONDS * 1_000 / 2,
+);
+
 type ModelRunner = (input: {
   job: FarmOsRtxBridgeLease["job"];
   config: FarmOsRtxWorkerConfig;
@@ -77,6 +83,39 @@ function leaseValid(lease: FarmOsRtxBridgeLease, now: Date): boolean {
   return lease.workerId === FARM_OS_RTX_WORKER_ID &&
     Number.isFinite(Date.parse(lease.leaseExpiresAt)) &&
     now.getTime() < Date.parse(lease.leaseExpiresAt);
+}
+
+export function computeFarmOsRtxHeartbeatDelayMs(input: {
+  leaseExpiresAt: string;
+  now: Date;
+  maximumIntervalMs?: number;
+}): number | null {
+  const expiry = Date.parse(input.leaseExpiresAt);
+  const now = input.now.getTime();
+  const maximumInterval = input.maximumIntervalMs ??
+    FARM_OS_RTX_HEARTBEAT_DEFAULT_MAX_INTERVAL_MS;
+  if (
+    !Number.isFinite(expiry) ||
+    !Number.isFinite(now) ||
+    !Number.isFinite(maximumInterval) ||
+    maximumInterval < FARM_OS_RTX_HEARTBEAT_MINIMUM_DELAY_MS
+  ) {
+    return null;
+  }
+  const remaining = expiry - now;
+  if (
+    remaining <
+      FARM_OS_RTX_HEARTBEAT_SAFETY_MARGIN_MS +
+        FARM_OS_RTX_HEARTBEAT_MINIMUM_DELAY_MS
+  ) {
+    return null;
+  }
+  const delay = Math.min(
+    Math.floor(maximumInterval),
+    Math.floor(remaining / 3),
+    remaining - FARM_OS_RTX_HEARTBEAT_SAFETY_MARGIN_MS,
+  );
+  return delay >= FARM_OS_RTX_HEARTBEAT_MINIMUM_DELAY_MS ? delay : null;
 }
 
 function metrics(result: FarmOsRtxNightTwoPassResult): SafeMetrics {
@@ -145,10 +184,15 @@ export class FarmOsRtxBridgeWorkerRuntime {
     if (!leaseValid(lease, this.now())) {
       throw new FarmOsRtxBridgeClientError("BRIDGE_RESPONSE_INVALID");
     }
-    const heartbeatInterval = this.dependencies.heartbeatIntervalMs ??
-      Math.floor(
-        FARM_OS_RTX_BRIDGE_HEARTBEAT_EXTENSION_SECONDS * 1_000 / 2,
-      );
+    if (
+      computeFarmOsRtxHeartbeatDelayMs({
+        leaseExpiresAt: lease.leaseExpiresAt,
+        now: this.now(),
+        maximumIntervalMs: this.dependencies.heartbeatIntervalMs,
+      }) === null
+    ) {
+      throw new FarmOsRtxBridgeClientError("BRIDGE_OPERATION_REJECTED");
+    }
     const work = this.modelRunner({
       job: lease.job,
       config: this.dependencies.modelConfig,
@@ -159,15 +203,27 @@ export class FarmOsRtxBridgeWorkerRuntime {
     );
     let result: FarmOsRtxNightTwoPassResult | null = null;
     while (result === null) {
+      const heartbeatDelay = computeFarmOsRtxHeartbeatDelayMs({
+        leaseExpiresAt: lease.leaseExpiresAt,
+        now: this.now(),
+        maximumIntervalMs: this.dependencies.heartbeatIntervalMs,
+      });
+      if (heartbeatDelay === null) {
+        work.catch(() => undefined);
+        throw new FarmOsRtxBridgeClientError("BRIDGE_OPERATION_REJECTED");
+      }
       const next = await Promise.race([
         completion,
-        this.sleep(heartbeatInterval, signal).then(() => ({
+        this.sleep(heartbeatDelay, signal).then(() => ({
           completed: false as const,
           value: null,
         })),
       ]);
       if (next.completed) {
         if (next.value === null) {
+          if (!leaseValid(lease, this.now())) {
+            throw new FarmOsRtxBridgeClientError("BRIDGE_OPERATION_REJECTED");
+          }
           await this.dependencies.client.submitFailure(
             lease,
             "unexpected_worker_error",
@@ -199,6 +255,9 @@ export class FarmOsRtxBridgeWorkerRuntime {
         throw new FarmOsRtxBridgeClientError("BRIDGE_OPERATION_REJECTED");
       }
       lease = await this.dependencies.client.heartbeat(lease);
+      if (!leaseValid(lease, this.now())) {
+        throw new FarmOsRtxBridgeClientError("BRIDGE_OPERATION_REJECTED");
+      }
     }
     if (!leaseValid(lease, this.now())) {
       throw new FarmOsRtxBridgeClientError("BRIDGE_OPERATION_REJECTED");

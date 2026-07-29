@@ -14,6 +14,8 @@ import {
   type FarmOsRtxBridgeWorkerClientConfig,
 } from "../../src/lib/hermes/farm_os_rtx_bridge_worker_client";
 import {
+  computeFarmOsRtxHeartbeatDelayMs,
+  FARM_OS_RTX_HEARTBEAT_SAFETY_MARGIN_MS,
   FarmOsRtxBridgeWorkerRuntime,
   type FarmOsRtxBridgeWorkerClientPort,
 } from "../../src/lib/hermes/farm_os_rtx_bridge_worker_runtime";
@@ -221,6 +223,30 @@ function fakePort(input: {
 }
 
 async function run(): Promise<void> {
+  const initialHeartbeatDelay = computeFarmOsRtxHeartbeatDelayMs({
+    leaseExpiresAt: "2026-07-29T00:05:00.000Z",
+    now,
+  });
+  assert.equal(initialHeartbeatDelay, 100_000);
+  assert.ok(
+    300_000 - initialHeartbeatDelay >=
+      FARM_OS_RTX_HEARTBEAT_SAFETY_MARGIN_MS,
+  );
+  assert.equal(
+    computeFarmOsRtxHeartbeatDelayMs({
+      leaseExpiresAt: "2026-07-29T00:11:40.000Z",
+      now: new Date("2026-07-29T00:01:40.000Z"),
+    }),
+    200_000,
+  );
+  assert.equal(
+    computeFarmOsRtxHeartbeatDelayMs({
+      leaseExpiresAt: "2026-07-29T00:00:29.999Z",
+      now,
+    }),
+    null,
+  );
+
   const loaded = loadFarmOsRtxBridgeWorkerClientConfig({
     FARMOS_RTX_BRIDGE_URL: bridgeConfig.bridgeUrl,
     FARMOS_RTX_BRIDGE_HMAC_KEY_FILE: secretFile,
@@ -410,7 +436,6 @@ async function run(): Promise<void> {
     modelRunner: async () => candidateReady(),
     sleep: async () => undefined,
     now: () => now,
-    heartbeatIntervalMs: 1,
   });
   assert.deepEqual(await successRuntime.runOnce(), {
     status: "candidate_submitted",
@@ -511,14 +536,27 @@ async function run(): Promise<void> {
     "BRIDGE_RESPONSE_INVALID",
   );
 
+  let virtualNow = new Date("2026-07-29T00:00:00.000Z");
   let resolveWork!: (value: FarmOsRtxNightTwoPassResult) => void;
+  const heartbeatSleeps: number[] = [];
+  let heartbeatCount = 0;
   const heartbeatPort = fakePort({
+    claim: async () => {
+      heartbeatPort.calls.push("claim");
+      return {
+        result: "leased",
+        lease: lease({ leaseExpiresAt: "2026-07-29T00:05:00.000Z" }),
+      };
+    },
     heartbeat: async (value) => {
       heartbeatPort.calls.push("heartbeat");
-      resolveWork(candidateReady());
+      heartbeatCount += 1;
+      if (heartbeatCount === 2) resolveWork(candidateReady());
       return {
         ...value,
-        leaseExpiresAt: "2026-07-29T00:20:00.000Z",
+        leaseExpiresAt: new Date(
+          virtualNow.getTime() + 600_000,
+        ).toISOString(),
       };
     },
   });
@@ -529,12 +567,22 @@ async function run(): Promise<void> {
       new Promise((resolve) => {
         resolveWork = resolve;
       }),
-    sleep: async () => undefined,
-    now: () => now,
-    heartbeatIntervalMs: 1,
+    sleep: (milliseconds) => {
+      if (heartbeatCount >= 2) return new Promise(() => undefined);
+      heartbeatSleeps.push(milliseconds);
+      virtualNow = new Date(virtualNow.getTime() + milliseconds);
+      return Promise.resolve();
+    },
+    now: () => virtualNow,
   });
   assert.equal((await heartbeatRuntime.runOnce()).status, "candidate_submitted");
-  assert.deepEqual(heartbeatPort.calls, ["claim", "heartbeat", "candidate"]);
+  assert.deepEqual(heartbeatPort.calls, [
+    "claim",
+    "heartbeat",
+    "heartbeat",
+    "candidate",
+  ]);
+  assert.deepEqual(heartbeatSleeps, [100_000, 200_000]);
 
   const heartbeatFailurePort = fakePort({
     heartbeat: async () => {
@@ -548,10 +596,82 @@ async function run(): Promise<void> {
       modelRunner: () => new Promise(() => undefined),
       sleep: async () => undefined,
       now: () => now,
-      heartbeatIntervalMs: 1,
     }).runOnce(),
     "BRIDGE_OPERATION_REJECTED",
   );
+  assert.deepEqual(heartbeatFailurePort.calls, ["claim"]);
+
+  let nearExpiryModelStarted = false;
+  const nearExpiryPort = fakePort({
+    claim: async () => ({
+      result: "leased",
+      lease: lease({ leaseExpiresAt: "2026-07-29T00:00:29.999Z" }),
+    }),
+  });
+  await rejectsCode(
+    new FarmOsRtxBridgeWorkerRuntime({
+      client: nearExpiryPort,
+      modelConfig,
+      modelRunner: async () => {
+        nearExpiryModelStarted = true;
+        return candidateReady();
+      },
+      now: () => now,
+    }).runOnce(),
+    "BRIDGE_OPERATION_REJECTED",
+  );
+  assert.equal(nearExpiryModelStarted, false);
+  assert.deepEqual(nearExpiryPort.calls, []);
+
+  let completionNow = new Date("2026-07-29T00:00:00.000Z");
+  const expiredCandidatePort = fakePort({
+    claim: async () => {
+      expiredCandidatePort.calls.push("claim");
+      return {
+        result: "leased",
+        lease: lease({ leaseExpiresAt: "2026-07-29T00:05:00.000Z" }),
+      };
+    },
+  });
+  await rejectsCode(
+    new FarmOsRtxBridgeWorkerRuntime({
+      client: expiredCandidatePort,
+      modelConfig,
+      modelRunner: async () => {
+        completionNow = new Date("2026-07-29T00:05:01.000Z");
+        return candidateReady();
+      },
+      sleep: () => new Promise(() => undefined),
+      now: () => completionNow,
+    }).runOnce(),
+    "BRIDGE_OPERATION_REJECTED",
+  );
+  assert.deepEqual(expiredCandidatePort.calls, ["claim"]);
+
+  completionNow = new Date("2026-07-29T00:00:00.000Z");
+  const expiredFailurePort = fakePort({
+    claim: async () => {
+      expiredFailurePort.calls.push("claim");
+      return {
+        result: "leased",
+        lease: lease({ leaseExpiresAt: "2026-07-29T00:05:00.000Z" }),
+      };
+    },
+  });
+  await rejectsCode(
+    new FarmOsRtxBridgeWorkerRuntime({
+      client: expiredFailurePort,
+      modelConfig,
+      modelRunner: async () => {
+        completionNow = new Date("2026-07-29T00:05:01.000Z");
+        return unavailable();
+      },
+      sleep: () => new Promise(() => undefined),
+      now: () => completionNow,
+    }).runOnce(),
+    "BRIDGE_OPERATION_REJECTED",
+  );
+  assert.deepEqual(expiredFailurePort.calls, ["claim"]);
 
   let attempts = 0;
   const backoffSleeps: number[] = [];
@@ -586,7 +706,6 @@ async function run(): Promise<void> {
       stopController.abort();
     },
     now: () => now,
-    heartbeatIntervalMs: 1,
   }).runOnce(stopController.signal);
   assert.equal(stopped.status, "stopped");
   assert.deepEqual(stopPort.calls, ["claim", "failure"]);
@@ -604,6 +723,11 @@ async function run(): Promise<void> {
       claim_and_no_jobs: true,
       unauthorized_and_forbidden_stop: true,
       lease_and_heartbeat: true,
+      heartbeat_safety_margin: true,
+      heartbeat_recalculated_after_extension: true,
+      multiple_heartbeats_during_inference: true,
+      near_expiry_fail_closed: true,
+      expired_submission_zero: true,
       candidate_and_failure_submission: true,
       bounded_backoff: true,
       graceful_shutdown: true,
