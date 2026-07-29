@@ -42,6 +42,7 @@ export const FARM_OS_RTX_BRIDGE_WORKER_EVENTS = [
   "RTX_BRIDGE_HEARTBEAT_ACCEPTED",
   "RTX_BRIDGE_INFERENCE_COMPLETED",
   "RTX_BRIDGE_CANDIDATE_ELIGIBILITY_PASSED",
+  "RTX_BRIDGE_CANDIDATE_ELIGIBILITY_REJECTED",
   "RTX_BRIDGE_CANDIDATE_SUBMITTED",
   "RTX_BRIDGE_HEARTBEAT_LOOP_FAILED",
   "RTX_BRIDGE_INFERENCE_FAILED",
@@ -428,6 +429,20 @@ export class FarmOsRtxBridgeWorkerRuntime {
     if (!leaseValid(lease, this.now())) {
       this.emit("RTX_BRIDGE_LEASE_EXPIRED");
       throw new FarmOsRtxBridgeClientError("BRIDGE_OPERATION_REJECTED");
+    }
+    if (grounded.value.verification_state === "rejected") {
+      this.emit("RTX_BRIDGE_CANDIDATE_ELIGIBILITY_REJECTED");
+      await this.dependencies.client.submitFailure(
+        lease,
+        "candidate_rejected",
+        false,
+        safeMetrics,
+      );
+      return {
+        status: "failure_submitted",
+        job_id: lease.job.job_id,
+        failure_code: "candidate_rejected",
+      };
     }
     this.emit("RTX_BRIDGE_CANDIDATE_ELIGIBILITY_PASSED");
     await this.dependencies.client.submitCandidate(

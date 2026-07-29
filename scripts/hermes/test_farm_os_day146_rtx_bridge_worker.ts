@@ -245,6 +245,9 @@ async function run(): Promise<void> {
     leaseExpiresAt: "2026-07-29T00:05:00.000Z",
     now,
   });
+  if (initialHeartbeatDelay === null) {
+    throw new Error("INITIAL_HEARTBEAT_DELAY_MISSING");
+  }
   assert.equal(initialHeartbeatDelay, 100_000);
   assert.ok(
     300_000 - initialHeartbeatDelay >=
@@ -456,6 +459,12 @@ async function run(): Promise<void> {
     ),
     "failure_recorded",
   );
+  assert.deepEqual(candidateClientEvents, [
+    "RTX_BRIDGE_CANDIDATE_REQUEST_STARTED",
+    "RTX_BRIDGE_CANDIDATE_RESPONSE_RECEIVED",
+    "RTX_BRIDGE_FAILURE_REQUEST_STARTED",
+    "RTX_BRIDGE_FAILURE_RESPONSE_RECEIVED",
+  ]);
   const rejectedCandidateEvents: string[] = [];
   await rejectsCode(
     clientWith(async () =>
@@ -584,6 +593,145 @@ async function run(): Promise<void> {
     candidateRejectionEvents.includes("RTX_BRIDGE_CANDIDATE_SUBMITTED"),
     false,
   );
+
+  const reviewRequiredPort = fakePort();
+  const reviewRequiredResult = await new FarmOsRtxBridgeWorkerRuntime({
+    client: reviewRequiredPort,
+    modelConfig,
+    modelRunner: async () =>
+      candidateReady({
+        ...candidate,
+        verification_state: "review_required",
+      }),
+    sleep: (_milliseconds, signal) => waitUntilAbort(signal),
+    now: () => now,
+  }).runOnce();
+  assert.equal(reviewRequiredResult.status, "candidate_submitted");
+  assert.deepEqual(reviewRequiredPort.calls, ["claim", "candidate"]);
+
+  let rejectedFailureCode: string | null = null;
+  const verificationRejectedPort = fakePort({
+    submitFailure: async (_lease, code) => {
+      verificationRejectedPort.calls.push("failure");
+      rejectedFailureCode = code;
+      return "failure_recorded";
+    },
+  });
+  const verificationRejectedEvents: string[] = [];
+  const verificationRejectedResult = await new FarmOsRtxBridgeWorkerRuntime({
+    client: verificationRejectedPort,
+    modelConfig,
+    modelRunner: async () =>
+      candidateReady({
+        ...candidate,
+        verification_state: "rejected",
+      }),
+    sleep: (_milliseconds, signal) => waitUntilAbort(signal),
+    now: () => now,
+    onEvent: (event) => verificationRejectedEvents.push(event),
+  }).runOnce();
+  assert.equal(verificationRejectedResult.status, "failure_submitted");
+  assert.equal(rejectedFailureCode, "candidate_rejected");
+  assert.deepEqual(verificationRejectedPort.calls, ["claim", "failure"]);
+  assert.ok(
+    verificationRejectedEvents.includes(
+      "RTX_BRIDGE_CANDIDATE_ELIGIBILITY_REJECTED",
+    ),
+  );
+  assert.equal(
+    verificationRejectedEvents.includes(
+      "RTX_BRIDGE_CANDIDATE_ELIGIBILITY_PASSED",
+    ),
+    false,
+  );
+  assert.equal(
+    verificationRejectedEvents.includes("RTX_BRIDGE_CANDIDATE_SUBMITTED"),
+    false,
+  );
+
+  const rejectionBoundaryEvents: string[] = [];
+  let rejectionBoundaryCandidateRequests = 0;
+  let rejectionBoundaryFailureRequests = 0;
+  const rejectionBoundaryClient = clientWith(async (url) => {
+    const path = new URL(String(url)).pathname;
+    if (path === FARM_OS_RTX_BRIDGE_PATHS.claim) {
+      return response(claimBody());
+    }
+    if (path === FARM_OS_RTX_BRIDGE_PATHS.submit_failure) {
+      rejectionBoundaryFailureRequests += 1;
+      return response({
+        contract_version: FARM_OS_RTX_WORKER_BRIDGE_CONTRACT,
+        result: "failure_recorded",
+      });
+    }
+    rejectionBoundaryCandidateRequests += 1;
+    return response({
+      contract_version: FARM_OS_RTX_WORKER_BRIDGE_CONTRACT,
+      result: "accepted",
+    });
+  }, secretFile, (event) => rejectionBoundaryEvents.push(event));
+  const rejectionBoundaryResult = await new FarmOsRtxBridgeWorkerRuntime({
+    client: rejectionBoundaryClient,
+    modelConfig,
+    modelRunner: async () =>
+      candidateReady({
+        ...candidate,
+        verification_state: "rejected",
+      }),
+    sleep: (_milliseconds, signal) => waitUntilAbort(signal),
+    now: () => now,
+    onEvent: (event) => rejectionBoundaryEvents.push(event),
+  }).runOnce();
+  assert.equal(rejectionBoundaryResult.status, "failure_submitted");
+  assert.equal(rejectionBoundaryCandidateRequests, 0);
+  assert.equal(rejectionBoundaryFailureRequests, 1);
+  const rejectionSequence = [
+    "RTX_BRIDGE_INFERENCE_COMPLETED",
+    "RTX_BRIDGE_CANDIDATE_ELIGIBILITY_REJECTED",
+    "RTX_BRIDGE_FAILURE_REQUEST_STARTED",
+    "RTX_BRIDGE_FAILURE_RESPONSE_RECEIVED",
+  ];
+  assert.deepEqual(
+    rejectionBoundaryEvents.filter((event) =>
+      rejectionSequence.includes(event)
+    ),
+    rejectionSequence,
+  );
+
+  const missingVerificationStatePort = fakePort();
+  const {
+    verification_state: _removedVerificationState,
+    ...missingVerificationState
+  } = candidate;
+  const missingVerificationStateResult =
+    await new FarmOsRtxBridgeWorkerRuntime({
+      client: missingVerificationStatePort,
+      modelConfig,
+      modelRunner: async () =>
+        candidateReady(
+          missingVerificationState as unknown as typeof candidate,
+        ),
+      sleep: (_milliseconds, signal) => waitUntilAbort(signal),
+      now: () => now,
+    }).runOnce();
+  assert.equal(missingVerificationStateResult.status, "failure_submitted");
+  assert.deepEqual(missingVerificationStatePort.calls, ["claim", "failure"]);
+
+  const unknownVerificationStatePort = fakePort();
+  const unknownVerificationStateResult =
+    await new FarmOsRtxBridgeWorkerRuntime({
+      client: unknownVerificationStatePort,
+      modelConfig,
+      modelRunner: async () =>
+        candidateReady({
+          ...candidate,
+          verification_state: "unknown",
+        } as unknown as typeof candidate),
+      sleep: (_milliseconds, signal) => waitUntilAbort(signal),
+      now: () => now,
+    }).runOnce();
+  assert.equal(unknownVerificationStateResult.status, "failure_submitted");
+  assert.deepEqual(unknownVerificationStatePort.calls, ["claim", "failure"]);
 
   const emptyQueuePort = fakePort({
     claim: async () => ({ result: "no_jobs" }),
@@ -918,6 +1066,12 @@ async function run(): Promise<void> {
       near_expiry_fail_closed: true,
       expired_submission_zero: true,
       candidate_and_failure_submission: true,
+      verification_candidate_submitted: true,
+      verification_review_required_submitted: true,
+      verification_rejected_never_submitted: true,
+      verification_missing_fail_closed: true,
+      verification_unknown_fail_closed: true,
+      failure_request_events_safe: true,
       bounded_backoff: true,
       graceful_shutdown: true,
       production_queue_used: false,

@@ -83,6 +83,10 @@ export const FARM_OS_RTX_BRIDGE_CLIENT_EVENTS = [
   "RTX_BRIDGE_CANDIDATE_RESPONSE_RECEIVED",
   "RTX_BRIDGE_CANDIDATE_REQUEST_FAILED",
   "RTX_BRIDGE_CANDIDATE_RESPONSE_REJECTED",
+  "RTX_BRIDGE_FAILURE_REQUEST_STARTED",
+  "RTX_BRIDGE_FAILURE_RESPONSE_RECEIVED",
+  "RTX_BRIDGE_FAILURE_REQUEST_FAILED",
+  "RTX_BRIDGE_FAILURE_RESPONSE_REJECTED",
 ] as const;
 export type FarmOsRtxBridgeClientEvent =
   typeof FARM_OS_RTX_BRIDGE_CLIENT_EVENTS[number];
@@ -278,6 +282,15 @@ export class FarmOsRtxBridgeWorkerClient {
         : phase === "failed"
         ? "RTX_BRIDGE_CANDIDATE_REQUEST_FAILED"
         : "RTX_BRIDGE_CANDIDATE_RESPONSE_REJECTED";
+    }
+    if (operation === "submit_failure") {
+      return phase === "started"
+        ? "RTX_BRIDGE_FAILURE_REQUEST_STARTED"
+        : phase === "received"
+        ? "RTX_BRIDGE_FAILURE_RESPONSE_RECEIVED"
+        : phase === "failed"
+        ? "RTX_BRIDGE_FAILURE_REQUEST_FAILED"
+        : "RTX_BRIDGE_FAILURE_RESPONSE_REJECTED";
     }
     return null;
   }
