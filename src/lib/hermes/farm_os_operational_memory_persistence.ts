@@ -13,6 +13,11 @@ import {
   type FarmOsSourceSnapshot,
   type FarmOsSourceSnapshotState,
 } from "./farm_os_operational_memory_compiler";
+import {
+  materializeFarmOsProjectionStateHistory,
+  type FarmOsProjectionState,
+  type FarmOsProjectionStateMaterialization,
+} from "./farm_os_projection_state_contract";
 
 export type FarmOsDailyProjection = {
   projection_id: string;
@@ -30,7 +35,7 @@ export type FarmOsDailyProjection = {
 export type FarmOsProjectionStateEvent = {
   event_id: string;
   projection_id: string;
-  status: "active" | "superseded" | "failed";
+  status: FarmOsProjectionState;
   sequence: number;
   occurred_at: string;
 };
@@ -510,12 +515,25 @@ export function materializeFarmOsSnapshotStates(
 export function materializeFarmOsProjectionStates(
   state: FarmOsOperationalMemoryState,
 ): Array<FarmOsDailyProjection & {
-  status: FarmOsProjectionStateEvent["status"];
+  status: FarmOsProjectionState | null;
+  state_materialization: FarmOsProjectionStateMaterialization;
 }> {
-  return state.projections.map((projection) => ({
-    ...clone(projection),
-    status: projectionState(state, projection.projection_id) ?? "failed",
-  }));
+  return state.projections.map((projection) => {
+    const stateMaterialization = materializeFarmOsProjectionStateHistory(
+      state.projection_state_events
+        .filter((event) => event.projection_id === projection.projection_id)
+        .map((event) => ({
+          event_id: event.event_id,
+          status: event.status,
+          sequence: event.sequence,
+        })),
+    );
+    return {
+      ...clone(projection),
+      status: stateMaterialization.persisted_state,
+      state_materialization: stateMaterialization,
+    };
+  });
 }
 
 export function rebuildFarmOsDailyProjectionShadow(input: {
