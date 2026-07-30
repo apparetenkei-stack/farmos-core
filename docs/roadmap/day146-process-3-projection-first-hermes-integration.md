@@ -115,6 +115,23 @@ systems:
 
 Slack-specific behavior cannot define or override the runtime contract.
 
+## Deployment tenancy and authorization authority
+
+Production integration is governed by the user-approved
+[FarmOS Single-Installation Operational Memory Tenancy](../architecture/farm-os-single-installation-tenancy.md)
+Architecture Decision.
+
+The current deployment binds one FarmOS Core runtime to one farm scope and one
+dedicated Operational Memory database through server-owned configuration.
+Actor authorization remains separate from that binding. Request `farm_scope`
+is never authority: it must exactly match the bound scope after the actor is
+authorized.
+
+Projection-first production reads use an exact-date, bounded, SELECT-only
+adapter after binding verification. They must not use full-history
+`readState()` as a fallback. Missing or inconsistent binding, authorization,
+lineage, or scoped-read state fails closed without a business write.
+
 ## Request contract
 
 The exact request object has these keys and no others:

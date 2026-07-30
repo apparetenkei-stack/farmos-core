@@ -57,6 +57,9 @@ Day146:
 Process 3 is Mac-hosted and read-only. It does not reuse the night Candidate
 queue, modify active Projections, write farming-app data, create Proposals, or
 implement a daytime deep-analysis executor without separate authority.
+Its production integration uses the
+[FarmOS Single-Installation Operational Memory Tenancy](../architecture/farm-os-single-installation-tenancy.md)
+deployment and authorization boundary.
 Process 4 adds no new major feature and starts only after Process 1–3 completion
 gates pass.
 
