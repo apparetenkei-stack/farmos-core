@@ -156,6 +156,8 @@ prohibited.
 - Projection persistence and retrieval are deferred to Day146-D and Day146-E.
 - Hermes runtime integration and production blocked-error reproduction are
   deferred to Day146-F.
+- Day146-E/F are combined by the approved
+  [Process 3 Projection-first Hermes Read-only Runtime Integration authority](../roadmap/day146-process-3-projection-first-hermes-integration.md).
 
 ## Day146-C implementation handoff
 

@@ -16,6 +16,50 @@ FarmOS Core は Proposal、Knowledge、Policy、Audit、AI 推論、RAG、予測
 - Day200: Brand / Content
 - Day220: 統合安定稼働
 
+## Day146 — Operational Memory and RTX/Hermes Integration
+
+Day146 is managed as four fixed processes. The canonical Process 3 authority is
+[Projection-first Hermes Read-only Runtime Integration](day146-process-3-projection-first-hermes-integration.md).
+
+```yaml
+Day146:
+  process_1:
+    status: COMPLETE
+    name: RTX Bridge-connected Worker Client
+    evidence:
+      commit: 3398a9164fe9ca5aa1901a334c018b2fcf57b421
+      scope:
+        - Bridge client configuration and Secret-file loading
+        - authenticated claim, lease, heartbeat, Candidate, and failure client
+        - bounded polling, backoff, and graceful shutdown
+
+  process_2:
+    status: COMPLETE
+    name: RTX Worker／Bridge Candidate Pipeline
+    evidence:
+      - real-model inference and rejected fail-closed branch
+      - deterministic cross-machine Candidate acceptance contract
+      - append-only Candidate persistence with no automatic promotion
+
+  process_3:
+    status: AUTHORITY_APPROVED
+    name: Projection-first Hermes Read-only Runtime Integration
+    mapping:
+      - Day146-E
+      - Day146-F
+    implementation_started: false
+
+  process_4:
+    status: NOT_STARTED
+    name: Final Integrated Gate
+```
+
+Process 3 is Mac-hosted and read-only. It does not reuse the night Candidate
+queue, modify active Projections, write farming-app data, create Proposals, or
+implement a daytime deep-analysis executor without separate authority.
+Process 4 adds no new major feature and starts only after Process 1–3 completion
+gates pass.
+
 ## Production AI Runtime Platform
 
 Day96〜105 は Production AI Runtime Platform フェーズとする。運用 AI リクエストの共通契約を起点に、後続の Queue、Worker、監視、Model Router を安全境界ごとに段階導入する。
