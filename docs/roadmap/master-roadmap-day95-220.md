@@ -23,6 +23,8 @@ Day146 is managed as four fixed processes. The canonical Process 3 authority is
 
 ```yaml
 Day146:
+  status: COMPLETE
+
   process_1:
     status: COMPLETE
     name: RTX Bridge-connected Worker Client
@@ -42,16 +44,22 @@ Day146:
       - append-only Candidate persistence with no automatic promotion
 
   process_3:
-    status: AUTHORITY_APPROVED
+    status: COMPLETE
     name: Projection-first Hermes Read-only Runtime Integration
     mapping:
       - Day146-E
       - Day146-F
-    implementation_started: false
+    implementation_completed: true
+    persistent_configuration_applied: true
+    live_slack_verified: true
 
   process_4:
-    status: NOT_STARTED
+    status: COMPLETE
     name: Final Integrated Gate
+    final_gate: PASS
+    new_major_feature_implemented: false
+
+  next_day_ready: true
 ```
 
 Process 3 is Mac-hosted and read-only. It does not reuse the night Candidate
@@ -62,6 +70,9 @@ Its production integration uses the
 deployment and authorization boundary.
 Process 4 adds no new major feature and starts only after Process 1–3 completion
 gates pass.
+
+The canonical Day146 close evidence is recorded in
+[Day146 Final Integrated Gate Evidence](day146-final-integrated-gate-evidence.md).
 
 ## Production AI Runtime Platform
 

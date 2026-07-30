@@ -3,16 +3,22 @@
 ## Status and authority
 
 ```yaml
-status: APPROVED_FOR_IMPLEMENTATION_PLANNING
+status: COMPLETE
 authority: user-approved
-implementation_started: false
+implementation_completed: true
+persistent_configuration_applied: true
+live_slack_verified: true
+process_4_gate: PASS
 canonical_contract_id: farmos.hermes.projection_first_response.v1
 ```
 
-This document is the canonical authority for Day146 Process 3/4. It authorizes
-implementation planning only. It does not authorize runtime implementation,
-database operations, migrations, production access, Candidate mutation,
-Proposal creation, approval, Apply, Worker changes, or deployment.
+This document remains the canonical authority for Day146 Process 3/4. The
+implementation and separately approved deployment configuration completed
+within its read-only and fail-closed boundaries. Completion does not authorize
+database writes, migrations, Candidate mutation, Proposal creation, approval,
+Apply, Worker changes, or any broader runtime capability. The integrated close
+evidence is recorded in
+[Day146 Final Integrated Gate Evidence](day146-final-integrated-gate-evidence.md).
 
 ## Formal name and roadmap mapping
 
@@ -476,6 +482,15 @@ process_4_entry_gate:
 Process 4 integrates Process 1–3 evidence, performs end-to-end read-only and
 fail-closed checks, consolidates security evidence and runbooks, and makes the
 Day146 completion decision. It does not repair incomplete Process 3 work.
+
+The gate completed with the following result:
+
+```yaml
+process_4_result:
+  status: COMPLETE
+  final_gate: PASS
+  new_major_feature_implemented: false
+```
 
 ## Stop conditions
 

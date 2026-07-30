@@ -3,11 +3,11 @@
 ## Status and authority
 
 ```yaml
-status: APPROVED_FOR_DEPLOYMENT_CONFIGURATION
+status: ACTIVE
 authority: user-approved
-runtime_configuration_applied: false
-launchd_restarted: false
-live_slack_verified: false
+runtime_configuration_applied: true
+launchd_restarted: true
+live_slack_verified: true
 ```
 
 This document is the canonical deployment authority for the logical identity
@@ -109,9 +109,16 @@ runtime_configuration:
     source: server-owned deployment configuration
 ```
 
-This authority approves the values for a later Deployment Configuration Gate.
-It does not itself modify an environment file, LaunchAgent, wrapper, Secret,
-database, or running process.
+These values were applied by a separately approved Deployment Configuration
+Gate without changing an environment file, Secret, database, or identifier.
+The persistent runtime selects only the three approved PostgreSQL credential
+keys from the existing server-owned authority. Deployment completion evidence
+is recorded in
+[Day146 Final Integrated Gate Evidence](../roadmap/day146-final-integrated-gate-evidence.md).
+
+Same-label LaunchAgent replacement must follow the bounded quiescence and
+rollback procedure in the
+[Day146 Projection-first Deployment Runbook](../day146-projection-first-deployment-runbook.md).
 
 ## Rotation and change boundary
 
