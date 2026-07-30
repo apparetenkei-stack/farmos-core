@@ -4,25 +4,29 @@
 
 ```yaml
 day147_a_authority_documentation:
-  status: READY_FOR_FINAL_RE_REVIEW
+  status: READY_FOR_ROLLOUT_AUTHORITY_RE_REVIEW
   authority_resolution: accepted_by_product_owner
-  implementation_started: false
+  rollout_revision: two_phase_prepare_and_activate
+  implementation_started: true
+  current_a1_implementation_disposition: BLOCKED_IMPLEMENTATION_CONFLICT
+  current_a1_commit_authority: false
   repository_change_scope:
     - canonical authority documentation
     - minimal Master Roadmap reference
-  code_changed: false
-  sql_changed: false
-  migration_created: false
-  test_changed: false
-  database_operation_performed: false
-  runtime_operation_performed: false
-  worker_operation_performed: false
+  authority_revision_code_changed: false
+  authority_revision_sql_changed: false
+  authority_revision_migration_created: false
+  authority_revision_test_changed: false
+  authority_revision_database_operation_performed: false
+  authority_revision_runtime_operation_performed: false
+  authority_revision_worker_operation_performed: false
 ```
 
 This document is the canonical authority for Day147. It records the approved
-state model and the gates for future implementation. It does not start
-Day147-A implementation and does not authorize code, SQL, migration, test,
-database, Runtime, Worker, farming-application, or deployment changes.
+state model and the gates for implementation. This Authority revision changes
+documentation only. It does not authorize further code, SQL, migration, test,
+database, Runtime, Worker, farming-application, or deployment changes, and it
+does not authorize the current blocked A1 implementation for commit.
 
 ## 1. Formal name
 
@@ -86,6 +90,43 @@ this document. Existing behavior that does not yet implement this refined
 lifecycle is a future Day147-A implementation concern, not authority to bypass
 the Candidate boundary.
 
+### Legacy Day146 active-first history policy
+
+Day147 must not retroactively make a Projection history invalid when that
+history was valid under the formal Day146 contract. A legacy Day146
+active-first history is a Projection history whose first state event was
+created as `active` before Candidate-first enforcement was activated, in
+accordance with the originating Day146 contract.
+
+```yaml
+legacy_day146_projection_history:
+  definition: >
+    A Projection history whose first state event was generated as active under
+    the formal Day146 contract before Day147 Candidate-first activation.
+
+  validity:
+    valid_under_originating_contract: true
+    history_rewrite_required: false
+    backfill_required: false
+    synthetic_candidate_event_required: false
+    deletion_required: false
+
+  runtime_behavior:
+    existing_active_remains_selectable: true
+    may_receive_new_candidate_transition: false
+    may_be_reinterpreted_as_candidate: false
+
+  migration_behavior:
+    prepare_migration_must_not_reject_legacy_active_first_history: true
+    activation_migration_must_not_revalidate_legacy_history_as_candidate_first: true
+```
+
+The persisted first `active` event is the evidence that the Projection
+originated under the legacy Day146 contract. After Candidate-first enforcement
+is activated, the database prevents any new Projection from creating the same
+active-first shape. Recognizing a preserved Day146 history is not a fallback,
+state inference, synthesized event, or reinterpretation as a Candidate.
+
 ## 4. Day147-A／Day147-B split
 
 ```yaml
@@ -115,6 +156,47 @@ day147_b:
 ```
 
 Day147-B cannot begin until the Day147-B entry gate below is satisfied.
+
+Day147-A Persistence Evolution is implemented as the following ordered
+processes. Every process remains within Day147-A; this split does not start
+Day147-B or Day148.
+
+```yaml
+day147_a_processes:
+  A1_PREPARE:
+    name: Five-State Compatibility Foundation
+
+  A2:
+    name: TypeScript State Model and Transition Validator
+
+  A3:
+    name: Explicit Candidate Writer
+
+  A4:
+    name: Projection-first Candidate Exclusion
+
+  A1_ACTIVATE:
+    name: Candidate-first Enforcement Activation
+
+  A5:
+    name: Isolated PostgreSQL Integration and Regressions
+
+  A6:
+    name: Final Evidence and Close
+
+  required_order:
+    - A1_PREPARE
+    - A2
+    - A3
+    - A4
+    - A1_ACTIVATE
+    - A5
+    - A6
+```
+
+The process labels preserve the approved A1 ownership of database lifecycle
+authority while separating compatibility preparation from enforcement
+activation.
 
 ## 5. Canonical Projection states
 
@@ -210,6 +292,12 @@ forbidden_transitions:
   - every_unlisted_transition
 ```
 
+This strict transition matrix applies to new Projections created after
+`A1_ACTIVATE`. It does not retroactively invalidate or rewrite a legacy Day146
+active-first history. A legacy history may retain and expose its current
+`active` state under the originating contract, but it may not be reinterpreted
+as a Candidate or receive a synthetic Candidate transition.
+
 Creating a new Candidate has no effect on the existing active Projection:
 
 ```yaml
@@ -260,8 +348,10 @@ contents, timestamps, version order, or an existing active Projection.
 
 ## 8. Forward-only migration policy
 
-Any future Day147-A persistence change must be a new, forward-only migration.
-The Day146 migration file and its recorded history remain unchanged.
+Every Day147-A persistence change must be a new, forward-only migration. The
+Day146 migration file and its recorded history remain unchanged. Compatibility
+preparation and Candidate-first activation are separate migrations with
+separate sequences, IDs, checksums, verify SQL, and manifest entries.
 
 ```yaml
 forward_only_migration:
@@ -277,6 +367,7 @@ forward_only_migration:
   existing_history_rewrite: prohibited
   synthetic_backfill_event: prohibited
   missing_event_backfilled_as_failed: prohibited
+  prepare_and_activation_share_migration_id: prohibited
   production_apply: prohibited
   creation_or_apply_by_this_document: false
 ```
@@ -284,6 +375,267 @@ forward_only_migration:
 Migration creation, isolated-database application, schema/RLS/role changes, and
 Production DB application each remain separately gated. This document does not
 authorize any of them.
+
+### A1-PREPARE — Five-State Compatibility Foundation
+
+The prepare migration makes all five canonical state values representable
+without changing current Runtime behavior or rejecting the Day146 writer.
+
+```yaml
+a1_prepare:
+  purpose:
+    - expand the status CHECK to the exact five-state contract
+    - make candidate and rejected representable in the database
+    - preserve compatibility with the Day146 writer and existing histories
+    - prepare non-enforcing functions or metadata needed for later activation
+    - leave current Runtime behavior unchanged
+
+  prohibited:
+    - immediately reject missing_to_active
+    - enable an initial-candidate requirement for new Projections
+    - enable a trigger that rejects the current Day146 writer
+    - create any partial unique index
+    - change an existing active Projection
+    - backfill
+    - synthetic event
+    - history rewrite
+    - Runtime change
+
+  completion_state:
+    deployment_mode: compatibility_prepare
+    candidate_first_enforced: false
+    day146_writer_compatible: true
+
+a1_prepare_partial_unique_indexes:
+  created: false
+```
+
+Availability of five states after A1-PREPARE is not evidence that the
+Candidate-first lifecycle has been activated.
+
+### A2／A3／A4 compatibility implementation
+
+```yaml
+a2:
+  required_scope:
+    - TypeScript exact five-state contract
+    - invalid_state_history representation
+    - transition validator
+
+a3:
+  required_scope:
+    - persist every new Projection initially as candidate
+    - remove automatic active creation
+    - remove automatic supersede of the existing active Projection
+    - persist the Projection, lineage, and Candidate event atomically
+
+a4:
+  required_scope:
+    - candidate-only is not selected
+    - candidate plus active selects only active
+    - multiple candidates plus active selects only active
+    - Candidate lineage is not exposed as confirmed Projection lineage
+```
+
+### A1-ACTIVATE — Candidate-first Enforcement Activation
+
+A1-ACTIVATE is a new migration introduced only after the compatible Candidate
+writer and Candidate-excluding selector are complete. It is not a rewrite or
+replacement of A1-PREPARE.
+
+```yaml
+a1_activate:
+  migration_identity:
+    separate_from_prepare: true
+    separate_sequence: required
+    separate_checksum: required
+    separate_manifest_entry: required
+
+  scope:
+    - enforce missing_to_candidate for new Projections
+    - enforce the exact transition matrix
+    - enable the deferred initial Candidate constraint
+    - add all Candidate-first partial unique indexes
+    - leave legacy Day146 active-first histories unchanged
+    - constrain only Projections created after activation to Candidate-first
+
+  activation_entry_gate:
+    - A1-PREPARE COMPLETE
+    - A2 COMPLETE
+    - A3 compatible Candidate writer implemented
+    - A3 targeted tests PASS
+    - missing_to_active writer path removed PROVEN
+    - A4 Candidate exclusion tests PASS
+    - isolated non-production Candidate persistence PASS
+    - no unresolved P1
+    - no unresolved P2
+    - explicit human activation authorization
+
+  ordering:
+    apply_before_a3: prohibited
+    startup_auto_apply: prohibited
+    human_operator_gate: required
+
+a1_activate_partial_unique_indexes:
+  - initial candidate uniqueness index
+  - candidate terminal resolution uniqueness index
+  - active superseded uniqueness index
+```
+
+No partial unique index is created by A1-PREPARE. Every partial unique index
+for initial Candidate uniqueness, Candidate terminal resolution uniqueness, or
+active superseded uniqueness is introduced only by the A1-ACTIVATE migration.
+
+### Activation Repository introduction gate
+
+The complete Activation Entry Gate is a prerequisite for introducing any
+activation artifact into the repository or manifest.
+
+```yaml
+activation_repository_introduction_gate:
+  required_condition:
+    activation_entry_gate_status: PASS
+
+  prohibited_before_pass:
+    - activation migration SQL file creation
+    - activation verify SQL file creation
+    - activation migration manifest entry creation
+    - activation checksum registration
+    - activation migration staging
+    - activation migration commit
+    - activation migration push
+    - activation migration apply
+
+  allowed_before_pass:
+    - read-only design analysis
+    - Authority documentation
+    - non-executable implementation planning
+```
+
+A3 or A4 becoming `COMPLETE` by itself does not authorize introduction of the
+activation migration into the repository or manifest. Only after every
+condition in `activation_entry_gate` has passed may the A1-ACTIVATE migration
+SQL file, verify SQL, and manifest entry be created for the first time as a
+separate commit candidate.
+
+### Mechanical deployment guard
+
+Git and manifest staging are the mechanical deployment guard for this rollout.
+No new database capability marker or Production deployment system is required
+or authorized.
+
+```yaml
+mechanical_deployment_guard:
+  prepare_migration_and_activation_migration_use_distinct_ids: true
+  activation_manifest_registration_before_a3_complete: prohibited
+  activation_manifest_registration_before_a4_complete: prohibited
+  activation_entry_added_in_separate_post_a3_a4_commit: required
+  prepare_migration_alone_preserves_day146_writer: required
+  activation_requires_authenticated_human_operator: true
+  startup_auto_apply: prohibited
+
+  repository_phases:
+    A1_PREPARE_commit:
+      repository_contains:
+        - prepare migration
+      manifest_contains:
+        - prepare migration
+      manifest_excludes:
+        - activation migration
+
+    A2_A3_A4_commits:
+      candidate_compatible_code_and_tests_complete: required
+
+    Activation_Entry_Gate:
+      activation_entry_gate_status: PASS
+      activation_artifact_creation_before_pass: prohibited
+      activation_manifest_registration_before_pass: prohibited
+
+    A1_ACTIVATE_commit:
+      activation_entry_gate_status: PASS
+      activation_migration_first_introduced_to_repository: true
+      activation_migration_first_registered_in_manifest: true
+```
+
+Before the complete Activation Entry Gate passes, neither the activation SQL,
+verify SQL, checksum registration, nor manifest entry may exist in the
+repository. `startup_auto_apply: false` and authenticated-human-operator
+restrictions remain mandatory, but neither one is a Repository-introduction
+guard.
+
+### Current blocked A1 disposition
+
+The current uncommitted A1 SQL combines compatibility preparation with strict
+activation and must not be committed as A1-PREPARE.
+
+```yaml
+current_a1_disposition:
+  commit_as_is: prohibited
+  strict_activation_content_present: true
+
+  five_state_check_portion:
+    candidate_for_prepare: true
+
+  transition_trigger:
+    defer_to_activation: true
+
+  initial_candidate_constraint:
+    defer_to_activation: true
+
+  all_partial_unique_indexes:
+    defer_to_activation: true
+
+  prepare_manifest:
+    prepare_migration_only: true
+
+  static_tests: reconstruct_for_prepare_contract
+```
+
+All partial unique indexes in the current strict A1 implementation must be
+removed from A1-PREPARE and deferred as A1-ACTIVATE candidates.
+
+### SQL and test remediation requirements
+
+Future prepare and activation SQL and their static verification must satisfy
+the following requirements:
+
+```yaml
+p2_remediation_requirements:
+  schema_preflight:
+    - status column exists
+    - status column attnotnull is true
+
+  verify_indexes:
+    - exact index name
+    - exact target table
+    - indisunique
+    - indisvalid
+    - exact key column
+    - normalized exact predicate
+
+  verify_triggers:
+    - exact trigger name
+    - exact relation
+    - enabled state
+    - exact timing
+    - exact event mask
+    - exact function binding
+
+  static_tests:
+    - expected transition matrix is defined independently
+    - actual allowed transitions are extracted and exact-set compared
+    - every extra transition fails the test
+    - every partial unique index key and predicate is independently verified
+    - an independent single-entry manifest fixture is verified
+    - an independent multi-entry manifest fixture is verified
+
+  postgres_deparser_compatibility:
+    - pg_get_constraintdef output is verified against the isolated PostgreSQL version
+```
+
+Static source matching alone does not resolve PostgreSQL deparser-version
+compatibility. The actual normalized `pg_get_constraintdef` output must be
+verified in the authorized isolated PostgreSQL integration gate.
 
 ## 9. Active selector boundary
 
@@ -393,6 +745,34 @@ day147_a_definition_of_done:
     - canonical Authority approved
     - Candidate promotion implementation count is zero
 
+  process_completion:
+    - A1-PREPARE COMPLETE
+    - A2 COMPLETE
+    - A3 COMPLETE
+    - A4 COMPLETE
+    - A1-ACTIVATE COMPLETE
+    - A5 COMPLETE
+    - A6 COMPLETE
+
+  day147_a_final_review_gate:
+    unresolved_p1: 0
+    unresolved_p2: 0
+    final_semantic_review: PASS
+
+  prepare_evidence:
+    - five-state CHECK available
+    - legacy Day146 histories preserved
+    - Day146 writer compatibility preserved
+    - no Candidate-first enforcement enabled by A1-PREPARE
+
+  activation_evidence:
+    - missing_to_candidate enforced for new Projections
+    - missing_to_active rejected for new Projections
+    - initial Candidate guard enabled
+    - exact transition matrix enabled
+    - legacy Day146 history unchanged
+    - PostgreSQL-backed selector exclusion PASS
+
   state_contract:
     - candidate state SQL contract implemented
     - candidate state TypeScript contract implemented
@@ -432,7 +812,11 @@ day147_a_definition_of_done:
 
   isolated_postgres_integration:
     - isolated PostgreSQL integration PASS
-    - forward-only migration applied in isolated non-production PostgreSQL
+    - prepare migration applied in isolated non-production PostgreSQL
+    - activation migration applied in isolated non-production PostgreSQL
+    - prepare migration preserves the Day146 writer
+    - activation follows compatible Candidate writer evidence
+    - legacy Day146 active-first history remains valid and selectable
     - candidate state persistence verified
     - allowed transitions verified
     - forbidden transitions verified
@@ -460,6 +844,13 @@ day147_a_definition_of_done:
     - Production operations zero as defined below
     - Production operations zero
 ```
+
+Day147-A is not `COMPLETE` unless A1-PREPARE, A2, A3, A4, A1-ACTIVATE,
+A5, and A6 are complete and the final unresolved P1 and P2 counts are both
+zero. A zero finding count at the Activation Entry Gate is not sufficient: if
+A5 integration, regression testing, or the A6 Final Evidence Review discovers
+a new P1 or P2, Day147-A remains incomplete until that finding is resolved and
+the final semantic review passes.
 
 The following aggregate expressions are not substitutes for the individual
 evidence above:
@@ -495,8 +886,22 @@ Promotion implementation is not part of Day147-A.
 
 ```yaml
 day147_b_entry_gate:
+  required_process_evidence:
+    - A1-PREPARE COMPLETE
+    - A2 COMPLETE
+    - A3 COMPLETE
+    - A4 COMPLETE
+    - A1-ACTIVATE COMPLETE
+    - A5 isolated PostgreSQL integration PASS
+    - A6 final evidence COMPLETE
+
   required_evidence:
     - Day147-A status COMPLETE
+    - Day147-A final semantic review PASS
+    - unresolved P1 zero
+    - unresolved P2 zero
+    - legacy Day146 histories preserved
+    - Candidate-first enforcement active for new Projections
     - candidate state SQL contract implemented
     - candidate state TypeScript contract implemented
     - candidate persisted explicitly
@@ -526,6 +931,13 @@ day147_b_entry_gate:
   gate_failure_result: DO_NOT_START_DAY147_B
 ```
 
+The transitive condition `Day147-A status COMPLETE` does not substitute for
+direct Process evidence at the Day147-B Entry Gate. Before Day147-B starts,
+`A5 isolated PostgreSQL integration PASS` and `A6 final evidence COMPLETE`
+must each be confirmed by name. A general isolated-integration result or final
+semantic-review result alone does not substitute for the corresponding Process
+completion evidence.
+
 Active selector Candidate exclusion is not satisfied by a design declaration
 alone. PostgreSQL-backed integration evidence is required for Candidate-only,
 Candidate-plus-active, and multiple-Candidate-plus-active datasets. Those
@@ -543,8 +955,8 @@ is absent from the Day147-A Definition of Done. `Day147-A status COMPLETE`
 therefore means that every technical evidence requirement in the Day147-B
 entry gate has already been satisfied.
 
-Authority documentation marked `READY_FOR_FINAL_RE_REVIEW` is not sufficient
-to open Day147-B.
+Authority documentation marked `READY_FOR_ROLLOUT_AUTHORITY_RE_REVIEW` is not
+sufficient to open Day147-B.
 
 ## 16. Day147 completion and Day148 entry gate
 

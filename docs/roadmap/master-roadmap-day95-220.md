@@ -86,9 +86,28 @@ day147:
 day147_b_entry_gate:
   - active selector candidate exclusion proven
   - isolated PostgreSQL integration PASS
+  - A5 isolated PostgreSQL integration PASS
+  - A6 final evidence COMPLETE
 
 day147_a_completion:
   - Day147-A DoD must satisfy every Day147-B technical entry requirement
+
+day147_a_rollout:
+  stages:
+    - Prepare compatibility migration
+    - TypeScript, writer, and selector compatibility
+    - Candidate-first activation migration
+    - Isolated PostgreSQL verification
+  activation_order:
+    candidate_first_activation_must_not_precede_compatible_candidate_writer: true
+  activation_repository_introduction:
+    complete_activation_entry_gate: PASS
+  completion_gate:
+    unresolved_p1: 0
+    unresolved_p2: 0
+  strict_partial_unique_indexes:
+    owner: A1-ACTIVATE
+    prohibited_in: A1-PREPARE
 
 day147_to_day148_gate:
   - Day147-A COMPLETE
