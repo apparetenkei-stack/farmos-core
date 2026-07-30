@@ -1,6 +1,5 @@
 import {
   createHermesSlackIntegration,
-  type HermesSlackFreshnessEvidence,
   type HermesSlackLogEvent,
   type HermesSlackSlashCommand,
 } from "../../src/lib/slack/hermes_slack_socket_mode";
@@ -8,17 +7,12 @@ import {
   createHermesSlackEphemeralPoster,
 } from "../../src/lib/slack/hermes_slack_ephemeral_transport";
 import {
-  runHermesApiChatMinimalBoundary,
-} from "../../src/app/api/hermes/chat/route";
+  createFarmOsProjectionFirstProductionService,
+  type FarmOsProjectionFirstProductionService,
+} from "../../src/lib/hermes/farm_os_projection_first_production_service";
 import {
-  readHermesFarmosReadonlyContext,
-} from "../hermes/llm_runtime/hermes_farmos_readonly_context";
-import {
-  readHermesOperationalContextIntegration,
-} from "../../src/lib/hermes/hermes_operational_context_integration";
-import {
-  readHermesOperationalReadonlySources,
-} from "../../src/lib/hermes/hermes_operational_readonly_client";
+  mapFarmOsProjectionFirstResponseToSlack,
+} from "../../src/lib/hermes/farm_os_projection_first_slack_adapter";
 import {
   createHermesRuntimeRequestId,
 } from "../hermes/llm_runtime/hermes_runtime_contract";
@@ -97,35 +91,26 @@ function wait(delayMs: number): Promise<void> {
 }
 
 async function run(): Promise<void> {
+  const production = {
+    service: null as FarmOsProjectionFirstProductionService | null,
+  };
   const integration = createHermesSlackIntegration({
-    invokeHermes: async (request) => {
-      let freshness: HermesSlackFreshnessEvidence | null = null;
-      const result = await runHermesApiChatMinimalBoundary({
-        body: request.body,
-        requestIdFactory: () => request.requestId,
-        readonlyContextReader: () =>
-          readHermesFarmosReadonlyContext({
-            readOperationalContext: () =>
-              readHermesOperationalContextIntegration({
-                readSources: async () => {
-                  const sources =
-                    await readHermesOperationalReadonlySources();
-                  freshness = {
-                    inventory_observed_at:
-                      sources.inventory.observed_at,
-                    work_log_observed_at:
-                      sources.work_log.observed_at,
-                    inventory_source_updated_at:
-                      sources.inventory.source_updated_at,
-                    work_log_source_updated_at:
-                      sources.work_log.source_updated_at,
-                  };
-                  return sources;
-                },
-              }),
-          }),
+    invokeProjectionFirst: async (request) => {
+      production.service ??=
+        createFarmOsProjectionFirstProductionService({
+          onEvent: (event) =>
+            structuredLog({
+              level: "info",
+              event,
+              request_id: null,
+              error_code: null,
+            }),
+        });
+      const response = await production.service.respondFromSlack({
+        query: request.query,
+        actor: request.actor,
       });
-      return { ...result, freshness };
+      return mapFarmOsProjectionFirstResponseToSlack(response);
     },
     postEphemeralResponse: createHermesSlackEphemeralPoster(),
     log: structuredLog,
@@ -276,6 +261,7 @@ async function run(): Promise<void> {
       );
     }
   }
+  await production.service?.close();
 }
 
 run().catch(() => {

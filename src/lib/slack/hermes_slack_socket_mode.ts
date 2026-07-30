@@ -65,6 +65,12 @@ export type HermesSlackCommandResult = {
     | "readonly_context_unavailable"
     | "stale_context_rejected"
     | "write_boundary_violation"
+    | "projection_missing"
+    | "projection_stale"
+    | "projection_unavailable"
+    | "clarification_required"
+    | "deep_analysis_unavailable"
+    | "guard_rejected"
     | "slack_response_failed";
   error_code: string | null;
   request_id: string;
@@ -97,6 +103,37 @@ type HermesInvoker = (request: {
   };
   requestId: string;
 }) => Promise<HermesApplicationResult>;
+
+export type HermesSlackProjectionFirstInvocation = {
+  query: string;
+  requestId: string;
+  workspace_id: string;
+  channel_id: string;
+  user_id: string;
+  actor: {
+    subject_id: string;
+    channel: "slack";
+    actor_authorized: true;
+    authorization_evidence_id: string;
+    authentication_method: "slack_allowlist";
+  };
+};
+
+export type HermesSlackProjectionFirstResult = {
+  status:
+    | "answered"
+    | "projection_missing"
+    | "projection_stale"
+    | "projection_unavailable"
+    | "clarification_required"
+    | "deep_analysis_unavailable"
+    | "guard_rejected";
+  text: string;
+};
+
+type ProjectionFirstInvoker = (
+  request: HermesSlackProjectionFirstInvocation,
+) => Promise<HermesSlackProjectionFirstResult>;
 
 type EphemeralResponder = (request: {
   channel: string;
@@ -438,9 +475,25 @@ function formatEphemeralResponse(input: {
   ].join("\n");
 }
 
+function formatProjectionFirstEphemeralResponse(input: {
+  text: string;
+  referencedAt: string;
+  appUrl: string;
+}): string {
+  return [
+    "Interactive Response（Slash Command実行者限定）",
+    `Hermes回答:\n${input.text}`,
+    "AIによる参考情報です。確定判断や業務実行ではありません。",
+    "農場データはread-only参照です。",
+    `参照時刻: ${input.referencedAt}`,
+    `営農アプリ: ${input.appUrl}`,
+  ].join("\n");
+}
+
 export function createHermesSlackIntegration(input: {
   env?: EnvMap;
-  invokeHermes: HermesInvoker;
+  invokeHermes?: HermesInvoker;
+  invokeProjectionFirst?: ProjectionFirstInvoker;
   postEphemeralResponse: EphemeralResponder;
   log?: (event: HermesSlackLogEvent) => void;
   requestIdFactory?: () => string;
@@ -548,6 +601,102 @@ export function createHermesSlackIntegration(input: {
       return makeResult({
         status: "invalid_input",
         errorCode,
+        requestId,
+        ephemeralResponseAttempted: true,
+      });
+    }
+
+    if (input.invokeProjectionFirst !== undefined) {
+      let projectionResult: HermesSlackProjectionFirstResult;
+      try {
+        projectionResult = await input.invokeProjectionFirst({
+          query: payload.text,
+          requestId,
+          workspace_id: payload.team_id,
+          channel_id: payload.channel_id,
+          user_id: payload.user_id,
+          actor: {
+            subject_id: payload.user_id,
+            channel: "slack",
+            actor_authorized: true,
+            authorization_evidence_id: requestId,
+            authentication_method: "slack_allowlist",
+          },
+        });
+      } catch {
+        projectionResult = {
+          status: "projection_unavailable",
+          text: "農場情報を安全に取得できませんでした。",
+        };
+      }
+      try {
+        await input.postEphemeralResponse({
+          channel: payload.channel_id,
+          user: payload.user_id,
+          botToken: config.botToken,
+          text: formatProjectionFirstEphemeralResponse({
+            text: projectionResult.text,
+            referencedAt: nowIso(),
+            appUrl: config.farmosAppUrl,
+          }),
+        });
+      } catch {
+        log({
+          level: "error",
+          event: "slack_ephemeral_response_failed",
+          request_id: requestId,
+          error_code: "slack_response_failed",
+        });
+        return makeResult({
+          status: "slack_response_failed",
+          errorCode: "slack_response_failed",
+          requestId,
+          hermesCalled: true,
+          ephemeralResponseAttempted: true,
+        });
+      }
+      log({
+        level: "info",
+        event: "FARMOS_PROJECTION_FIRST_SLACK_RESPONSE_READY",
+        request_id: requestId,
+        error_code: null,
+      });
+      return makeResult({
+        status: projectionResult.status === "answered"
+          ? "succeeded"
+          : projectionResult.status,
+        errorCode: projectionResult.status === "answered"
+          ? null
+          : projectionResult.status,
+        requestId,
+        hermesCalled: true,
+        ephemeralResponseAttempted: true,
+      });
+    }
+
+    if (input.invokeHermes === undefined) {
+      try {
+        await input.postEphemeralResponse({
+          channel: payload.channel_id,
+          user: payload.user_id,
+          botToken: config.botToken,
+          text: formatProjectionFirstEphemeralResponse({
+            text: "農場情報を安全に取得できませんでした。",
+            referencedAt: nowIso(),
+            appUrl: config.farmosAppUrl,
+          }),
+        });
+      } catch {
+        return makeResult({
+          status: "slack_response_failed",
+          errorCode: "slack_response_failed",
+          requestId,
+          ephemeralResponseAttempted: true,
+        });
+      }
+      return makeResult({
+        status: "projection_unavailable",
+        errorCode: "projection_unavailable",
         requestId,
         ephemeralResponseAttempted: true,
       });
