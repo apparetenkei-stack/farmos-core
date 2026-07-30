@@ -224,3 +224,18 @@ For every FarmOS Day task:
 8. Use the `farmos-efficient-execution` skill for implementation, review, debugging, testing, and Day handoff work.
 9. Do not advance to the next Day until the current Day completion gates pass.
 10. Resolve incomplete work as a supplement of the same Day unless the roadmap explicitly authorizes advancing.
+
+## Coordination Shadow Reference
+
+This repository uses the repository-owned `coordination.lock` only as a
+Shadow version pin to the approved Coordination commit.
+
+The lock is not a loader, approval, permission grant, automatic update
+mechanism, or production authority. Shadow adoption is not active adoption.
+
+Repository-local safety rules remain binding when they are stricter.
+Missing, unavailable, stale, or mismatched Coordination state must not
+expand authority. Fall back to read-only or proposal-only operation and
+report the mismatch.
+
+Do not modify the pinned Coordination reference automatically.

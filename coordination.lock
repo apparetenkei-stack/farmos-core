@@ -1,0 +1,10 @@
+{
+  "schema_version": "farmos.coordination-lock.v1",
+  "consumer_repository": "farmos-core",
+  "coordination_repository": "apparetenkei-stack/farmos-development-coordination",
+  "coordination_commit": "3e9103c46f627666b09dd3f742ea96de3481bdac",
+  "charter_version": "farmos.charter.v1",
+  "policy_set": "farmos.execution-policy.v1",
+  "contract_registry_version": "farmos.contract-registry.v1",
+  "adoption_status": "shadow"
+}
