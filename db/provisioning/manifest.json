@@ -12,6 +12,15 @@
       "apply_script": "db/migrations/202607260001_eligible_proposal_persistence.sql",
       "verification_script": "db/migrations/202607260001_eligible_proposal_persistence.verify.sql",
       "created_at": "2026-07-26T00:00:00.000Z"
+    },
+    {
+      "migration_id": "202607300001_daily_operational_projection_candidate_foundation",
+      "sequence": 202607300001,
+      "description": "Prepare exact five-state storage compatibility for Operational Memory projections",
+      "checksum": "sha256:350489282b921b879a9c4fab8280cfd38ff7432ed75cc70a905a7dabd45846bf",
+      "apply_script": "db/migrations/202607300001_daily_operational_projection_candidate_foundation.sql",
+      "verification_script": "db/migrations/202607300001_daily_operational_projection_candidate_foundation.verify.sql",
+      "created_at": "2026-07-30T00:00:00.000Z"
     }
   ]
 }

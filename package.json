@@ -115,6 +115,8 @@
     "test-farm-os-day145b-core-local-e2e": "tsx scripts/hermes/test_farm_os_day145b_core_local_e2e.ts",
     "test-farm-os-day145b-postgres-atomicity": "tsx scripts/hermes/test_farm_os_day145b_postgres_atomicity.ts",
     "run-farm-os-day145b-eligible-proposal-isolated-build": "tsx scripts/hermes/run_farm_os_day145b_eligible_proposal_isolated_build.ts",
+    "test-farm-os-day147a-migration-authority": "tsx scripts/hermes/test_farm_os_day147a_migration_authority.ts",
+    "typecheck-farm-os-day147a-migration-manifest": "tsc --ignoreConfig --noEmit --strict --skipLibCheck --target ES2022 --lib ES2022,DOM --types node --module ESNext --moduleResolution Bundler --esModuleInterop src/lib/hermes/farm_os_core_db_migration_manifest.ts",
     "run-farm-os-day135-isolated-build": "tsx scripts/hermes/run_farm_os_day135_isolated_build.ts",
     "run-farm-os-day135-final-gate": "tsx scripts/hermes/run_farm_os_day135_final_gate.ts",
     "run-hermes-runtime-operational-baseline": "tsx scripts/hermes/run_hermes_runtime_operational_baseline.ts",

@@ -1,10 +1,3 @@
-import {
-  hasExactFarmOsKeys,
-  isCanonicalFarmOsIso,
-  isFarmOsDigest,
-  isFarmOsRecord,
-} from "./farm_os_approved_proposal_contract";
-
 export const FARM_OS_CORE_DB_MANIFEST_VERSION =
   "farmos.core-db-provisioning-manifest.v1" as const;
 
@@ -56,6 +49,20 @@ const ENTRY_KEYS = [
   "verification_script",
   "created_at",
 ] as const;
+const isFarmOsRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value);
+const hasExactFarmOsKeys = (
+  value: Record<string, unknown>,
+  keys: readonly string[],
+): boolean =>
+  Object.keys(value).length === keys.length &&
+  keys.every((key) => Object.hasOwn(value, key));
+const isFarmOsDigest = (value: unknown): value is string =>
+  typeof value === "string" && /^sha256:[a-f0-9]{64}$/u.test(value);
+const isCanonicalFarmOsIso = (value: unknown): value is string =>
+  typeof value === "string" &&
+  Number.isFinite(Date.parse(value)) &&
+  new Date(Date.parse(value)).toISOString() === value;
 
 export function parseFarmOsCoreMigrationManifest(
   value: unknown,
@@ -72,21 +79,26 @@ export function parseFarmOsCoreMigrationManifest(
   let previous = 0;
   const ids = new Set<string>();
   for (const entry of value.migrations) {
+    if (!isFarmOsRecord(entry) || !hasExactFarmOsKeys(entry, ENTRY_KEYS)) {
+      return null;
+    }
+    const migrationId =
+      typeof entry.migration_id === "string" ? entry.migration_id : "";
+    const migrationBase = `db/migrations/${migrationId}`;
     if (
-      !isFarmOsRecord(entry) ||
-      !hasExactFarmOsKeys(entry, ENTRY_KEYS) ||
       typeof entry.migration_id !== "string" ||
       !/^\d{12}_[a-z0-9_]+$/u.test(entry.migration_id) ||
       !Number.isSafeInteger(entry.sequence) ||
+      entry.sequence !== Number(entry.migration_id.slice(0, 12)) ||
       (entry.sequence as number) <= previous ||
       typeof entry.description !== "string" ||
       entry.description.length < 1 ||
       entry.description.length > 500 ||
       !isFarmOsDigest(entry.checksum) ||
       typeof entry.apply_script !== "string" ||
-      !/^db\/migrations\/[a-z0-9_]+\.sql$/u.test(entry.apply_script) ||
+      entry.apply_script !== `${migrationBase}.sql` ||
       typeof entry.verification_script !== "string" ||
-      !/^db\/migrations\/[a-z0-9_]+\.verify\.sql$/u.test(entry.verification_script) ||
+      entry.verification_script !== `${migrationBase}.verify.sql` ||
       !isCanonicalFarmOsIso(entry.created_at) ||
       ids.has(entry.migration_id)
     ) return null;
