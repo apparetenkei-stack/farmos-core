@@ -74,6 +74,31 @@ gates pass.
 The canonical Day146 close evidence is recorded in
 [Day146 Final Integrated Gate Evidence](day146-final-integrated-gate-evidence.md).
 
+```yaml
+day147:
+  formal_name: Daily Operational Projection Candidate Foundation
+  processes:
+    - Day147-A Projection Candidate State Authority and Persistence Evolution
+    - Day147-B Deterministic Daily Operational Projection Generation
+  canonical_document:
+    docs/roadmap/day147-daily-operational-projection-candidate-foundation.md
+
+day147_b_entry_gate:
+  - active selector candidate exclusion proven
+  - isolated PostgreSQL integration PASS
+
+day147_a_completion:
+  - Day147-A DoD must satisfy every Day147-B technical entry requirement
+
+day147_to_day148_gate:
+  - Day147-A COMPLETE
+  - Day147-B COMPLETE
+  - Day147 completion evidence PASS
+  - no unresolved P1 or P2
+  - Git clean and synchronized
+  - Day148 canonical Authority defined
+```
+
 ## Production AI Runtime Platform
 
 Day96〜105 は Production AI Runtime Platform フェーズとする。運用 AI リクエストの共通契約を起点に、後続の Queue、Worker、監視、Model Router を安全境界ごとに段階導入する。
