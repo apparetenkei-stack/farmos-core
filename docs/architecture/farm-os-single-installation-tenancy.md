@@ -70,6 +70,22 @@ PROJECTION_FIRST_INSTALLATION_BINDING_UNAVAILABLE
 
 No farm or installation identifier may be hard-coded in source.
 
+The current Mac deployment's approved binding is defined by the canonical
+[FarmOS Mac Installation Identity](../deployment/farmos-core-mac-installation-identity.md)
+authority:
+
+```yaml
+current_deployment_binding:
+  installation_id: apparetenkei-farmos-core-mac-01
+  farm_scope: apparetenkei-primary-farm
+  timezone: Asia/Tokyo
+  canonical_authority:
+    - docs/deployment/farmos-core-mac-installation-identity.md
+```
+
+This records deployment identity only. Applying the values to environment or
+launchd configuration remains a separate gated operation.
+
 ## Authorization authority
 
 Actor authorization and installation binding are separate checks:

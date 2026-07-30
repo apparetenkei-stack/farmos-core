@@ -132,6 +132,19 @@ adapter after binding verification. They must not use full-history
 `readState()` as a fallback. Missing or inconsistent binding, authorization,
 lineage, or scoped-read state fails closed without a business write.
 
+The current Mac deployment binding is approved by the canonical
+[FarmOS Mac Installation Identity](../deployment/farmos-core-mac-installation-identity.md)
+authority:
+
+```yaml
+deployment_identity:
+  authority_status: APPROVED
+  configuration_status: NOT_APPLIED
+  installation_id: apparetenkei-farmos-core-mac-01
+  authorized_farm_scope: apparetenkei-primary-farm
+  business_timezone: Asia/Tokyo
+```
+
 ## Request contract
 
 The exact request object has these keys and no others:
