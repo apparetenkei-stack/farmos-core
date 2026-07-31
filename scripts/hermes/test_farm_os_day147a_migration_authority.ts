@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { readFileSync, readdirSync } from "node:fs";
+import { readFileSync } from "node:fs";
 
 import {
   parseFarmOsCoreMigrationManifest,
@@ -12,8 +12,12 @@ const MIGRATION_ID =
   "202607300001_daily_operational_projection_candidate_foundation";
 const MIGRATION_CHECKSUM =
   "sha256:350489282b921b879a9c4fab8280cfd38ff7432ed75cc70a905a7dabd45846bf";
+const VERIFY_CHECKSUM =
+  "sha256:183a3fff47bce5d9cbbf9675c21fd57e398f87fc7628e87ec93127d78c0c9edf";
 const APPLY_PATH = `db/migrations/${MIGRATION_ID}.sql`;
 const VERIFY_PATH = `db/migrations/${MIGRATION_ID}.verify.sql`;
+const ACTIVATION_ID =
+  "202607310001_daily_operational_projection_candidate_activation";
 const DAY146_SQL_PATH =
   "scripts/sql/day146_operational_memory_snapshot_persistence.sql";
 const DAY146_SQL_CHECKSUM =
@@ -100,21 +104,17 @@ const manifestRaw = JSON.parse(
 ) as unknown;
 const manifest = parseFarmOsCoreMigrationManifest(manifestRaw);
 assert.ok(manifest);
-assert.deepEqual(manifest, multiEntryFixture);
+const manifestPrepareEntries = manifest.migrations.filter(
+  (entry) => entry.migration_id === MIGRATION_ID,
+);
+assert.equal(manifestPrepareEntries.length, 1);
+assert.deepEqual(manifestPrepareEntries[0], prepareEntry);
+assert.equal(manifestPrepareEntries[0]?.apply_script, APPLY_PATH);
+assert.equal(manifestPrepareEntries[0]?.verification_script, VERIFY_PATH);
 assert.equal(manifest.startup_auto_apply, false);
 assert.equal(
   manifest.production_apply_authority,
   "authenticated_human_operator",
-);
-assert.deepEqual(
-  manifest.migrations.map((entry) => entry.sequence),
-  [202607260001, 202607300001],
-);
-assert.equal(
-  manifest.migrations.some((entry) =>
-    /(?:activate|activation)/u.test(entry.migration_id),
-  ),
-  false,
 );
 
 for (const entry of manifest.migrations) {
@@ -140,7 +140,18 @@ assert.deepEqual(
   pendingPlan.result === "ready"
     ? pendingPlan.pending.map((entry) => entry.migration_id)
     : [],
-  [MIGRATION_ID],
+  [MIGRATION_ID, ACTIVATION_ID],
+);
+const activationPendingPlan = planFarmOsCoreMigrations({
+  manifest: manifestRaw,
+  stored: [stored(existingEntry), stored(prepareEntry)],
+});
+assert.equal(activationPendingPlan.result, "ready");
+assert.deepEqual(
+  activationPendingPlan.result === "ready"
+    ? activationPendingPlan.pending.map((entry) => entry.migration_id)
+    : [],
+  [ACTIVATION_ID],
 );
 assert.equal(
   planFarmOsCoreMigrations({
@@ -222,6 +233,7 @@ const day146Sql = readFileSync(DAY146_SQL_PATH, "utf8");
 const existingMigrationSql = readFileSync(existingEntry.apply_script, "utf8");
 
 assert.equal(sha256(applySql), MIGRATION_CHECKSUM);
+assert.equal(sha256(verifySql), VERIFY_CHECKSUM);
 assert.equal(sha256(existingMigrationSql), EXISTING_MIGRATION_CHECKSUM);
 assert.equal(
   createHash("sha256").update(day146Sql).digest("hex"),
@@ -562,13 +574,6 @@ assert.doesNotMatch(
   `${applySql}\n${verifySql}`,
   /service_role|authorization|bearer|api[_-]?key|password|secret|production_/iu,
 );
-assert.equal(
-  readdirSync("db/migrations").some((file) =>
-    /daily_operational_projection.*(?:activate|activation)/u.test(file),
-  ),
-  false,
-);
-
 const packageDocument = JSON.parse(readFileSync("package.json", "utf8")) as {
   scripts: Record<string, string>;
 };
