@@ -72,7 +72,18 @@ function buildState(): FarmOsOperationalMemoryState {
     repository,
   });
   assert.equal(result.result, "success");
-  return repository.snapshot();
+  const state = repository.snapshot();
+  const projection = state.projections[0];
+  const candidateEvent = state.projection_state_events[0];
+  assert.ok(projection);
+  assert.ok(candidateEvent);
+  state.projection_state_events = [{
+    ...candidateEvent,
+    event_id: "legacy_day146_active_projection_state_1",
+    projection_id: projection.projection_id,
+    status: "active",
+  }];
+  return state;
 }
 
 function bundle(

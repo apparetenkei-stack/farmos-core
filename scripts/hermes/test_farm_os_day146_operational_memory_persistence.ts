@@ -102,7 +102,7 @@ const observedAt = "2026-07-28T15:00:00+09:00";
   );
   assert.deepEqual(
     materializeFarmOsProjectionStates(state).map((projection) => projection.status),
-    ["superseded", "active"],
+    ["candidate", "candidate"],
   );
   assert.equal(state.snapshots.length, 2);
   assert.equal(state.projections.length, 2);
@@ -187,11 +187,15 @@ const observedAt = "2026-07-28T15:00:00+09:00";
     result.outcomes[1]?.affected_business_dates,
     ["2026-07-28", "2026-07-29"],
   );
-  const activeDates = materializeFarmOsProjectionStates(repository.snapshot())
-    .filter((projection) => projection.status === "active")
+  const candidateDates = materializeFarmOsProjectionStates(repository.snapshot())
+    .filter((projection) => projection.status === "candidate")
     .map((projection) => projection.business_date)
     .sort();
-  assert.deepEqual(activeDates, ["2026-07-28", "2026-07-29"]);
+  assert.deepEqual(candidateDates, [
+    "2026-07-28",
+    "2026-07-28",
+    "2026-07-29",
+  ]);
 }
 
 {

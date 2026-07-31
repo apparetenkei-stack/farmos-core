@@ -119,6 +119,8 @@
     "typecheck-farm-os-day147a-migration-manifest": "tsc --ignoreConfig --noEmit --strict --skipLibCheck --target ES2022 --lib ES2022,DOM --types node --module ESNext --moduleResolution Bundler --esModuleInterop src/lib/hermes/farm_os_core_db_migration_manifest.ts",
     "test-farm-os-day147a2-projection-state-contract": "tsx scripts/hermes/test_farm_os_day147a2_projection_state_contract.ts",
     "typecheck-farm-os-day147a2-projection-state-contract": "tsx scripts/hermes/test_farm_os_day147a2_projection_state_contract.ts --typecheck",
+    "test-farm-os-day147a3-candidate-writer": "tsx scripts/hermes/test_farm_os_day147a3_candidate_writer.ts",
+    "typecheck-farm-os-day147a3-candidate-writer": "tsc --ignoreConfig --noEmit --strict --skipLibCheck --target ES2022 --lib ES2022,DOM --types node --module ESNext --moduleResolution Bundler --esModuleInterop src/lib/hermes/farm_os_operational_memory_persistence.ts src/lib/hermes/farm_os_operational_memory_postgres_repository.ts scripts/hermes/test_farm_os_day147a3_candidate_writer.ts",
     "run-farm-os-day135-isolated-build": "tsx scripts/hermes/run_farm_os_day135_isolated_build.ts",
     "run-farm-os-day135-final-gate": "tsx scripts/hermes/run_farm_os_day135_final_gate.ts",
     "run-hermes-runtime-operational-baseline": "tsx scripts/hermes/run_hermes_runtime_operational_baseline.ts",

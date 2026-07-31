@@ -286,35 +286,175 @@ function delta<T>(before: T[], after: T[]): T[] {
   return after.slice(before.length);
 }
 
-function identitySet(values: string[]): string[] {
-  return values.slice().sort((left, right) =>
-    left < right ? -1 : left > right ? 1 : 0
-  );
+function readbackMismatch(): never {
+  throw new Error("operational_memory_database_readback_mismatch");
+}
+
+function uniqueIndex<T>(
+  rows: readonly T[],
+  identity: (row: T) => string,
+): Map<string, T> {
+  const indexed = new Map<string, T>();
+  for (const row of rows) {
+    const key = identity(row);
+    if (indexed.has(key)) readbackMismatch();
+    indexed.set(key, row);
+  }
+  return indexed;
+}
+
+function verifyExactCollection<T>(
+  expected: readonly T[],
+  actual: readonly T[],
+  identity: (row: T) => string,
+  fieldsEqual: (expectedRow: T, actualRow: T) => boolean,
+): void {
+  const expectedByIdentity = uniqueIndex(expected, identity);
+  const actualByIdentity = uniqueIndex(actual, identity);
+  if (expectedByIdentity.size !== actualByIdentity.size) readbackMismatch();
+  for (const [key, expectedRow] of expectedByIdentity) {
+    const actualRow = actualByIdentity.get(key);
+    if (actualRow === undefined || !fieldsEqual(expectedRow, actualRow)) {
+      readbackMismatch();
+    }
+  }
+}
+
+function lineageIndex(
+  rows: readonly FarmOsProjectionLineage[],
+): Map<string, Map<string, FarmOsProjectionLineage>> {
+  const indexed = new Map<string, Map<string, FarmOsProjectionLineage>>();
+  for (const row of rows) {
+    let bySnapshot = indexed.get(row.projection_id);
+    if (bySnapshot === undefined) {
+      bySnapshot = new Map<string, FarmOsProjectionLineage>();
+      indexed.set(row.projection_id, bySnapshot);
+    }
+    if (bySnapshot.has(row.snapshot_id)) readbackMismatch();
+    bySnapshot.set(row.snapshot_id, row);
+  }
+  return indexed;
+}
+
+function verifyExactLineage(
+  expected: readonly FarmOsProjectionLineage[],
+  actual: readonly FarmOsProjectionLineage[],
+): void {
+  if (expected.length !== actual.length) readbackMismatch();
+  const expectedByIdentity = lineageIndex(expected);
+  const actualByIdentity = lineageIndex(actual);
+  if (expectedByIdentity.size !== actualByIdentity.size) readbackMismatch();
+  for (const [projectionId, expectedBySnapshot] of expectedByIdentity) {
+    const actualBySnapshot = actualByIdentity.get(projectionId);
+    if (
+      actualBySnapshot === undefined ||
+      expectedBySnapshot.size !== actualBySnapshot.size
+    ) {
+      readbackMismatch();
+    }
+    for (const [snapshotId, expectedRow] of expectedBySnapshot) {
+      const actualRow = actualBySnapshot.get(snapshotId);
+      if (
+        actualRow === undefined ||
+        expectedRow.projection_id !== actualRow.projection_id ||
+        expectedRow.snapshot_id !== actualRow.snapshot_id ||
+        expectedRow.source_record_id !== actualRow.source_record_id ||
+        expectedRow.source_content_hash !== actualRow.source_content_hash ||
+        expectedRow.relation !== actualRow.relation
+      ) {
+        readbackMismatch();
+      }
+    }
+  }
 }
 
 function verifyPersisted(
+  before: FarmOsOperationalMemoryState,
   expected: FarmOsOperationalMemoryState,
   actual: FarmOsOperationalMemoryState,
 ): void {
-  const identities = (state: FarmOsOperationalMemoryState) => ({
-    snapshots: identitySet(state.snapshots.map((row) => row.snapshot_id)),
-    snapshotEvents: identitySet(
-      state.snapshot_state_events.map((row) => row.event_id),
-    ),
-    projections: identitySet(state.projections.map((row) => row.projection_id)),
-    projectionEvents: identitySet(
-      state.projection_state_events.map((row) => row.event_id),
-    ),
-    lineage: identitySet(
-      state.lineage.map((row) => `${row.projection_id}:${row.snapshot_id}`),
-    ),
-    rejections: identitySet(state.rejections.map((row) => row.rejection_id)),
-    contentHashes: identitySet(
-      state.projections.map((row) => row.content_hash),
-    ),
-  });
-  if (JSON.stringify(identities(expected)) !== JSON.stringify(identities(actual))) {
-    throw new Error("operational_memory_database_readback_mismatch");
+  verifyExactCollection(
+    expected.snapshots,
+    actual.snapshots,
+    (row) => row.snapshot_id,
+    () => true,
+  );
+  verifyExactCollection(
+    expected.snapshot_state_events,
+    actual.snapshot_state_events,
+    (row) => row.event_id,
+    () => true,
+  );
+  verifyExactCollection(
+    expected.projections,
+    actual.projections,
+    (row) => row.projection_id,
+    (expectedRow, actualRow) =>
+      expectedRow.projection_id === actualRow.projection_id &&
+      expectedRow.projection_type === actualRow.projection_type &&
+      expectedRow.projection_version === actualRow.projection_version &&
+      expectedRow.business_date === actualRow.business_date &&
+      expectedRow.compiler_id === actualRow.compiler_id &&
+      expectedRow.compiler_version === actualRow.compiler_version &&
+      expectedRow.content_hash === actualRow.content_hash &&
+      iso(expectedRow.generated_at) === iso(actualRow.generated_at) &&
+      expectedRow.supersedes_projection_id ===
+        actualRow.supersedes_projection_id,
+  );
+  verifyExactCollection(
+    expected.projection_state_events,
+    actual.projection_state_events,
+    (row) => row.event_id,
+    (expectedRow, actualRow) =>
+      expectedRow.event_id === actualRow.event_id &&
+      expectedRow.projection_id === actualRow.projection_id &&
+      expectedRow.status === actualRow.status &&
+      expectedRow.sequence === actualRow.sequence &&
+      iso(expectedRow.occurred_at) === iso(actualRow.occurred_at),
+  );
+  verifyExactLineage(expected.lineage, actual.lineage);
+  verifyExactCollection(
+    expected.rejections,
+    actual.rejections,
+    (row) => row.rejection_id,
+    () => true,
+  );
+
+  const newProjections = delta(before.projections, expected.projections);
+  const newProjectionById = uniqueIndex(
+    newProjections,
+    (row) => row.projection_id,
+  );
+  if (
+    newProjections.some((row) => row.supersedes_projection_id !== null)
+  ) {
+    readbackMismatch();
+  }
+  const newProjectionEvents = delta(
+    before.projection_state_events,
+    expected.projection_state_events,
+  );
+  if (newProjectionEvents.length !== newProjections.length) {
+    readbackMismatch();
+  }
+  if (
+    newProjectionEvents.some((row) =>
+      row.status !== "candidate" ||
+      !newProjectionById.has(row.projection_id)
+    )
+  ) {
+    readbackMismatch();
+  }
+  const newLineage = delta(before.lineage, expected.lineage);
+  if (
+    newLineage.some((row) => !newProjectionById.has(row.projection_id)) ||
+    newProjections.some((projection) =>
+      !newLineage.some((row) =>
+        row.projection_id === projection.projection_id
+      )
+    )
+  ) {
+    readbackMismatch();
   }
 }
 
@@ -403,7 +543,7 @@ export class FarmOsOperationalMemoryPostgresRepository {
         }
       }
       const readback = await readState(client);
-      verifyPersisted(after, readback);
+      verifyPersisted(before, after, readback);
       await client.query("commit");
       transactionStarted = false;
       return withPersistenceEvidence(result, {

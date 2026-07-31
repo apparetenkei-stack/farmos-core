@@ -121,16 +121,6 @@ function snapshotState(
     .at(-1)?.state ?? null;
 }
 
-function projectionState(
-  state: FarmOsOperationalMemoryState,
-  projectionId: string,
-): FarmOsProjectionStateEvent["status"] | null {
-  return state.projection_state_events
-    .filter((event) => event.projection_id === projectionId)
-    .sort((left, right) => left.sequence - right.sequence)
-    .at(-1)?.status ?? null;
-}
-
 function appendSnapshotState(
   state: FarmOsOperationalMemoryState,
   snapshotId: string,
@@ -170,19 +160,6 @@ function latestSnapshotForSource(
   return state.snapshots
     .filter((snapshot) => snapshot.source_record_id === sourceRecordId)
     .sort((left, right) => left.ingestion_sequence - right.ingestion_sequence)
-    .at(-1) ?? null;
-}
-
-function activeProjectionForDate(
-  state: FarmOsOperationalMemoryState,
-  businessDate: string,
-): FarmOsDailyProjection | null {
-  return state.projections
-    .filter((projection) =>
-      projection.business_date === businessDate &&
-      projectionState(state, projection.projection_id) === "active"
-    )
-    .sort((left, right) => left.projection_version - right.projection_version)
     .at(-1) ?? null;
 }
 
@@ -269,7 +246,6 @@ function persistProjection(input: {
     snapshots: input.state.snapshots,
     snapshot_state_events: input.state.snapshot_state_events,
   });
-  const previous = activeProjectionForDate(input.state, input.business_date);
   const projectionVersion =
     Math.max(
       0,
@@ -277,14 +253,6 @@ function persistProjection(input: {
         .filter((projection) => projection.business_date === input.business_date)
         .map((projection) => projection.projection_version),
     ) + 1;
-  if (previous !== null) {
-    appendProjectionState(
-      input.state,
-      previous.projection_id,
-      "superseded",
-      input.generated_at,
-    );
-  }
   const projectionId =
     `daily_projection_${input.business_date}_${projectionVersion}_${compiled.content_hash.slice(0, 12)}`;
   input.state.projections.push({
@@ -297,9 +265,14 @@ function persistProjection(input: {
     content_hash: compiled.content_hash,
     content: compiled.content,
     generated_at: input.generated_at,
-    supersedes_projection_id: previous?.projection_id ?? null,
+    supersedes_projection_id: null,
   });
-  appendProjectionState(input.state, projectionId, "active", input.generated_at);
+  appendProjectionState(
+    input.state,
+    projectionId,
+    "candidate",
+    input.generated_at,
+  );
   if (input.repository.consumeFailure("lineage")) {
     throw new Error("lineage_write_failed");
   }
