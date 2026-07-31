@@ -20,6 +20,9 @@ import {
   isFarmOsProjectionFirstCalendarDate,
   isFarmOsProjectionFirstTimestamp,
 } from "./farm_os_projection_first_contract";
+import {
+  materializeFarmOsProjectionStateHistory,
+} from "./farm_os_projection_state_contract";
 
 export type FarmOsProjectionFirstScopedBundle = {
   farm_scope: string;
@@ -46,6 +49,16 @@ export type FarmOsProjectionFirstSelection =
     lineage: [];
     snapshots: [];
     failure_code: FarmOsProjectionFirstGuardFailureCode;
+  };
+
+export type FarmOsProjectionFirstActiveProjectionResolution =
+  | {
+    result: "selected";
+    projection_id: string;
+  }
+  | {
+    result: "projection_missing" | "projection_unavailable";
+    projection_id: null;
   };
 
 type JsonRecord = Record<string, unknown>;
@@ -253,9 +266,7 @@ function validProjectionEvent(
     ID_PATTERN.test(value.event_id) &&
     typeof value.projection_id === "string" &&
     ID_PATTERN.test(value.projection_id) &&
-    (value.status === "active" ||
-      value.status === "superseded" ||
-      value.status === "failed") &&
+    typeof value.status === "string" &&
     Number.isSafeInteger(value.sequence) &&
     Number(value.sequence) >= 1 &&
     isFarmOsProjectionFirstTimestamp(value.occurred_at);
@@ -275,18 +286,6 @@ function canonicalLineage(
       relation: value.relation,
     }))
     .sort((left, right) => left.snapshot_id.localeCompare(right.snapshot_id, "en")));
-}
-
-function latestProjectionState(
-  projectionId: string,
-  events: FarmOsProjectionStateEvent[],
-): FarmOsProjectionStateEvent["status"] | null {
-  const matching = events.filter((event) => event.projection_id === projectionId);
-  if (new Set(matching.map((event) => event.sequence)).size !== matching.length) {
-    return null;
-  }
-  return matching.sort((left, right) => left.sequence - right.sequence)
-    .at(-1)?.status ?? null;
 }
 
 function latestSnapshotState(
@@ -312,6 +311,60 @@ function unavailable(
     snapshots: [],
     failure_code: failureCode,
   };
+}
+
+export function resolveFarmOsProjectionFirstActiveProjection(input: {
+  business_date: string;
+  projections: readonly Pick<
+    FarmOsDailyProjection,
+    "projection_id" | "business_date"
+  >[];
+  projection_state_events: readonly FarmOsProjectionStateEvent[];
+}): FarmOsProjectionFirstActiveProjectionResolution {
+  const exactDate = input.projections.filter((projection) =>
+    projection.business_date === input.business_date
+  );
+  if (exactDate.length === 0) {
+    return { result: "projection_missing", projection_id: null };
+  }
+
+  const projectionIds = new Set(
+    exactDate.map((projection) => projection.projection_id),
+  );
+  const relevantEvents = input.projection_state_events.filter((event) =>
+    projectionIds.has(event.projection_id)
+  );
+  if (
+    new Set(relevantEvents.map((event) => event.event_id)).size !==
+      relevantEvents.length
+  ) {
+    return { result: "projection_unavailable", projection_id: null };
+  }
+
+  const activeProjectionIds: string[] = [];
+  for (const projection of exactDate) {
+    const materialization = materializeFarmOsProjectionStateHistory(
+      relevantEvents
+        .filter((event) => event.projection_id === projection.projection_id)
+        .map((event) => ({
+          event_id: event.event_id,
+          status: event.status,
+          sequence: event.sequence,
+        })),
+    );
+    if (materialization.result === "invalid_state_history") {
+      return { result: "projection_unavailable", projection_id: null };
+    }
+    if (materialization.persisted_state === "active") {
+      activeProjectionIds.push(projection.projection_id);
+    }
+  }
+
+  return activeProjectionIds.length === 0
+    ? { result: "projection_missing", projection_id: null }
+    : activeProjectionIds.length === 1
+    ? { result: "selected", projection_id: activeProjectionIds[0]! }
+    : { result: "projection_unavailable", projection_id: null };
 }
 
 export function selectFarmOsProjectionFirstProjection(input: {
@@ -342,8 +395,6 @@ export function selectFarmOsProjectionFirstProjection(input: {
     snapshotIds.size !== input.bundle.snapshots.length ||
     new Set(input.bundle.projection_state_events.map((event) => event.event_id))
         .size !== input.bundle.projection_state_events.length ||
-    new Set(input.bundle.projection_state_events.map((event) => event.sequence))
-        .size !== input.bundle.projection_state_events.length ||
     input.bundle.projection_state_events.some((event) =>
       !projectionIds.has(event.projection_id)
     ) ||
@@ -369,21 +420,26 @@ export function selectFarmOsProjectionFirstProjection(input: {
       failure_code: "projection_not_found",
     };
   }
-  const active = exactDate.filter((projection) =>
-    latestProjectionState(
-      projection.projection_id,
-      input.bundle.projection_state_events,
-    ) === "active"
-  );
-  if (active.length !== 1) {
-    return unavailable(
-      null,
-      active.length > 1
-        ? "projection_contract_invalid"
-        : "projection_lineage_invalid",
-    );
+  const resolution = resolveFarmOsProjectionFirstActiveProjection({
+    business_date: input.business_date,
+    projections: exactDate,
+    projection_state_events: input.bundle.projection_state_events,
+  });
+  if (resolution.result === "projection_unavailable") {
+    return unavailable(null, "projection_contract_invalid");
   }
-  const projection = active[0]!;
+  if (resolution.result === "projection_missing") {
+    return {
+      result: "projection_missing",
+      projection: null,
+      lineage: [],
+      snapshots: [],
+      failure_code: "projection_not_found",
+    };
+  }
+  const projection = exactDate.find((candidate) =>
+    candidate.projection_id === resolution.projection_id
+  )!;
   if (
     projection.compiler_id !== FARM_OS_OPERATIONAL_MEMORY_COMPILER_ID ||
     projection.compiler_version !== FARM_OS_OPERATIONAL_MEMORY_COMPILER_VERSION

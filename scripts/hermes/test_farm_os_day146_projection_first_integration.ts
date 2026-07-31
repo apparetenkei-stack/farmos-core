@@ -45,12 +45,24 @@ const before = operationalMemory.snapshot();
 let exactDateReadCount = 0;
 let lineageReadCount = 0;
 
+function day146LegacyActiveFixture() {
+  const state = operationalMemory.snapshot();
+  assert.equal(state.projections.length, 1);
+  assert.equal(state.projection_state_events.length, 1);
+  assert.equal(state.projection_state_events[0]?.status, "candidate");
+  state.projection_state_events = state.projection_state_events.map((event) => ({
+    ...event,
+    status: "active",
+  }));
+  return state;
+}
+
 const readPort: FarmOsProjectionFirstReadPort = {
   readProjectionBundle: async ({ authorized_scope: scope, business_date }) => {
     exactDateReadCount += 1;
     assert.equal(scope.farm_scope, "farm_fixture_01");
     assert.equal(business_date, "2026-07-28");
-    const state = operationalMemory.snapshot();
+    const state = day146LegacyActiveFixture();
     return {
       farm_scope: scope.farm_scope,
       business_date,

@@ -26,6 +26,9 @@ import type {
 import type {
   FarmOsProjectionFirstScopedBundle,
 } from "./farm_os_projection_first_selector";
+import {
+  resolveFarmOsProjectionFirstActiveProjection,
+} from "./farm_os_projection_first_selector";
 import type {
   FarmOsProjectionFirstInstallationBinding,
 } from "./farm_os_projection_first_installation_binding";
@@ -189,20 +192,6 @@ function snapshotEvents(
   }));
 }
 
-function latestProjectionStatus(
-  projectionId: string,
-  events: FarmOsProjectionStateEvent[],
-): FarmOsProjectionStateEvent["status"] | null {
-  const matching = events.filter((event) =>
-    event.projection_id === projectionId
-  );
-  if (new Set(matching.map((event) => event.sequence)).size !== matching.length) {
-    throw new Error(FARM_OS_PROJECTION_FIRST_SCOPED_READ_ERROR);
-  }
-  return matching.sort((left, right) => left.sequence - right.sequence)
-    .at(-1)?.status ?? null;
-}
-
 function identitySet(values: string[]): Set<string> {
   const result = new Set(values);
   if (result.size !== values.length) {
@@ -309,22 +298,19 @@ export class FarmOsProjectionFirstPostgresReadAdapter
       const selectedProjectionEvents = projectionEvents(
         projectionEventResult.rows,
       );
-      const activeIds = selectedProjections
-        .filter((projection) =>
-          latestProjectionStatus(
-            projection.projection_id,
-            selectedProjectionEvents,
-          ) === "active"
-        )
-        .map((projection) => projection.projection_id);
+      const activeResolution = resolveFarmOsProjectionFirstActiveProjection({
+        business_date: input.business_date,
+        projections: selectedProjections,
+        projection_state_events: selectedProjectionEvents,
+      });
 
       let selectedLineage: FarmOsProjectionLineage[] = [];
       let selectedSnapshots: FarmOsSourceSnapshot[] = [];
       let selectedSnapshotEvents: FarmOsSnapshotStateEvent[] = [];
-      if (activeIds.length === 1) {
+      if (activeResolution.result === "selected") {
         const lineageResult = await client.query<FarmOsProjectionLineage>(
           FARM_OS_PROJECTION_FIRST_SCOPED_READ_SQL.lineage,
-          [activeIds[0]],
+          [activeResolution.projection_id],
         );
         if (
           lineageResult.rows.length >

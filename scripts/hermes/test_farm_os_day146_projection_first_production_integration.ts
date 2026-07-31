@@ -80,7 +80,15 @@ function buildState(): FarmOsOperationalMemoryState {
     repository,
   });
   assert.equal(result.result, "success");
-  return repository.snapshot();
+  const state = repository.snapshot();
+  assert.equal(state.projections.length, 1);
+  assert.equal(state.projection_state_events.length, 1);
+  assert.equal(state.projection_state_events[0]?.status, "candidate");
+  state.projection_state_events = state.projection_state_events.map((event) => ({
+    ...event,
+    status: "active",
+  }));
+  return state;
 }
 
 function rowState(state: FarmOsOperationalMemoryState) {
