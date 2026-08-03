@@ -23,6 +23,7 @@ import {
 import {
   materializeFarmOsProjectionStateHistory,
 } from "./farm_os_projection_state_contract";
+import { isDeepStrictEqual } from "node:util";
 
 export type FarmOsProjectionFirstScopedBundle = {
   farm_scope: string;
@@ -552,7 +553,7 @@ export function selectFarmOsProjectionFirstProjection(input: {
   });
   if (
     rebuilt.content_hash !== projection.content_hash ||
-    JSON.stringify(rebuilt.content) !== JSON.stringify(projection.content) ||
+    !isDeepStrictEqual(rebuilt.content, projection.content) ||
     canonicalLineage(rebuilt.lineage) !== canonicalLineage(lineage)
   ) {
     return {

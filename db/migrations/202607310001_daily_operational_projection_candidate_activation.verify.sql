@@ -61,7 +61,7 @@ begin
       '202607310001_daily_operational_projection_candidate_activation'
       and history.sequence = 202607310001
       and history.checksum =
-        'sha256:ab88f3c33d4befc340e75a105f5c76ee0ba590aa8c65043e863dded6c352774a'
+        'sha256:e55b7b2c33d432b37d9733d599f8ed4dd7de99a82fb64c5f90158dae7addbbc2'
   ) then
     raise exception
       'daily_operational_projection_candidate_activation_verification_failed';
@@ -278,7 +278,7 @@ begin
     ) = 0
     or pg_catalog.strpos(
       compact_transition_definition,
-      'other_projection.projection_type=projection_type'
+      'other_projection.projection_type=current_projection_type'
     ) = 0
     or pg_catalog.strpos(
       compact_transition_definition,

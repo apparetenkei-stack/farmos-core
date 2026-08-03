@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "execution_nonce": "813faed4c9ee",
+  "evidence_relative_path": "evidence.json",
+  "evidence_sha256": "21f29d2655db666852e7e1af183aaeb24336b7d1e2b7f417540eca41f301243b",
+  "evidence_schema_version": 7,
+  "result": "PASS",
+  "execution_phase": "COMPLETE",
+  "receipt_status": "COMMITTED",
+  "durability_complete": true,
+  "success_claimed": true
+}

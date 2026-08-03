@@ -109,13 +109,13 @@ set search_path = pg_catalog
 as $day147_a1_activate_transition$
 declare
   projection_business_date date;
-  projection_type text;
+  current_projection_type text;
   previous_status text;
   previous_sequence bigint;
   allowed_transition boolean := false;
 begin
   select projection.business_date, projection.projection_type
-  into projection_business_date, projection_type
+  into projection_business_date, current_projection_type
   from ai.operational_memory_daily_projections as projection
   where projection.projection_id = new.projection_id;
 
@@ -131,7 +131,7 @@ begin
   perform pg_catalog.pg_advisory_xact_lock(
     (projection_business_date - date '2000-01-01')::integer,
     pg_catalog.hashtext(
-      'farmos:a1:projection-scope:' || projection_type
+      'farmos:a1:projection-scope:' || current_projection_type
     )
   );
 
@@ -185,7 +185,7 @@ begin
         limit 1
       ) as latest_state on true
       where other_projection.business_date = projection_business_date
-        and other_projection.projection_type = projection_type
+        and other_projection.projection_type = current_projection_type
         and other_projection.projection_id <> new.projection_id
         and latest_state.status = 'active'
     )

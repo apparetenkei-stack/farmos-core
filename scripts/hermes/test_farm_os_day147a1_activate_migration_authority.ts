@@ -15,7 +15,7 @@ const PREPARE_CHECKSUM =
 const ACTIVATION_ID =
   "202607310001_daily_operational_projection_candidate_activation";
 const ACTIVATION_CHECKSUM =
-  "sha256:ab88f3c33d4befc340e75a105f5c76ee0ba590aa8c65043e863dded6c352774a";
+  "sha256:e55b7b2c33d432b37d9733d599f8ed4dd7de99a82fb64c5f90158dae7addbbc2";
 const APPLY_PATH = `db/migrations/${ACTIVATION_ID}.sql`;
 const VERIFY_PATH = `db/migrations/${ACTIVATION_ID}.verify.sql`;
 const DAY146_SQL_PATH =
@@ -156,6 +156,8 @@ const EXPECTED_TRANSITIONS = new Set([
 ]);
 
 const validateTransitionSemantics = (body: string): void => {
+  assert.match(body, /current_projection_type text;/u);
+  assert.doesNotMatch(body, /(?<!\.)\bprojection_type\b/u);
   assert.match(body, /allowed_transition boolean := false;/u);
   const actualTransitions = new Set<string>();
   const initialTransition = body.match(
@@ -238,6 +240,10 @@ const validateTransitionSemantics = (body: string): void => {
     /select projection\.business_date, projection\.projection_type[\s\S]*?where projection\.projection_id = new\.projection_id;/u,
   );
   assert.ok(bindingStatement);
+  assert.match(
+    bindingStatement[0],
+    /into projection_business_date, current_projection_type/u,
+  );
   assert.ok(
     bindingPosition + bindingStatement[0].length <= lockPosition,
     "Projection binding query and lock must be separate ordered statements",
@@ -264,7 +270,7 @@ const validateTransitionSemantics = (body: string): void => {
     /projection_business_date - date '2000-01-01'/u,
   );
   assert.match(lockStatement[1]!, /pg_catalog\.hashtext/u);
-  assert.match(lockStatement[1]!, /projection_type/u);
+  assert.match(lockStatement[1]!, /current_projection_type/u);
   assert.doesNotMatch(
     lockStatement[1]!,
     /projection_id|projection_content|content_hash|payload|source_/u,
@@ -300,7 +306,7 @@ const validateTransitionSemantics = (body: string): void => {
   );
   assert.match(
     activeConflictBlock,
-    /other_projection\.projection_type = projection_type/u,
+    /other_projection\.projection_type = current_projection_type/u,
   );
   assert.match(
     activeConflictBlock,
@@ -514,7 +520,7 @@ assertRejectedMutation(
   (source) =>
     replaceExactly(
       source,
-      "        and other_projection.projection_type = projection_type\n",
+      "        and other_projection.projection_type = current_projection_type\n",
       "",
     ),
   validateTransitionSemantics,

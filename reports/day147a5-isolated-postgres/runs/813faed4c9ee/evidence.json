@@ -1,0 +1,860 @@
+{
+  "schema_version": 7,
+  "execution_nonce": "813faed4c9ee",
+  "day": "147-A",
+  "process": "A5",
+  "result": "PASS",
+  "phase_reached": "COMPLETE",
+  "execution_phase": "COMPLETE",
+  "evidence_phase": "FINALIZED",
+  "evidence_status": "VALID",
+  "durability_complete": true,
+  "success_claimed": true,
+  "receipt_required": true,
+  "receipt_relative_path": "receipt.json",
+  "artifact": {
+    "artifact_written": true,
+    "artifact_valid": true
+  },
+  "readiness": {
+    "status": "READY",
+    "attempts": 1,
+    "elapsed_ms": 688,
+    "first_failure_class": null,
+    "last_failure_class": null,
+    "retryable_failure_count": 0,
+    "non_retryable_failure_count": 0,
+    "timeout_reached": false,
+    "container_exit_detected": false,
+    "container_state": "RUNNING",
+    "container_exit_code": 0,
+    "container_restarting": false,
+    "container_oom_killed": false,
+    "startup_elapsed_ms": 688,
+    "readiness_attempts_before_exit": 0,
+    "failure_origin": null
+  },
+  "checksums": {
+    "day146": "017c69c6cbfcf8efbe2cd042c32cfb88a848b6f48d65f23189f47dc22e6cefdc",
+    "prepare_apply": "350489282b921b879a9c4fab8280cfd38ff7432ed75cc70a905a7dabd45846bf",
+    "prepare_verify": "183a3fff47bce5d9cbbf9675c21fd57e398f87fc7628e87ec93127d78c0c9edf",
+    "activation_apply": "e55b7b2c33d432b37d9733d599f8ed4dd7de99a82fb64c5f90158dae7addbbc2",
+    "activation_verify": "2b7108045ab34e5790b6d6381f9e6d2ca2399380a5dc05a9b80d7cf8af337b89"
+  },
+  "postgres_version": "17.10 (Debian 17.10-1.pgdg13+1)",
+  "image": "postgres:17",
+  "image_digest": "sha256:5c855ad7b85e68e48a62f34662853f38b57c1c1d80f3a927ab58034fd6d31c5e",
+  "connection_metadata": {
+    "topology": "DOCKER_USER_DEFINED_NETWORK",
+    "transport": "TCP",
+    "host": null,
+    "mapped_port": null,
+    "container_port": 5432,
+    "network_alias": "postgres",
+    "network_nonce_bound": true,
+    "local_only_validated": true,
+    "remote_endpoint_rejected": true
+  },
+  "role_matrix": {
+    "migration_owner": {
+      "name": "day147a5_migration_owner",
+      "preexisting": true,
+      "login": true,
+      "superuser": true,
+      "inherit": false,
+      "bypassrls": false,
+      "purpose": "isolated migration and fixture provisioning only",
+      "schema_usage": [
+        "ai"
+      ],
+      "table_select": [],
+      "table_insert": [],
+      "table_update": [],
+      "table_delete": [],
+      "function_execute": [],
+      "trigger_function_execute": false
+    },
+    "bundle_runtime_fixture": {
+      "name": "day147a5_bundle_runtime_fixture",
+      "preexisting": false,
+      "login": true,
+      "superuser": false,
+      "inherit": false,
+      "bypassrls": false,
+      "purpose": "isolated bundle caller; not production authority",
+      "schema_usage": [
+        "ai"
+      ],
+      "table_select": [
+        "operational_memory_source_snapshots",
+        "operational_memory_snapshot_state_events",
+        "operational_memory_daily_projections",
+        "operational_memory_projection_state_events",
+        "operational_memory_projection_lineage",
+        "operational_memory_ingestion_rejections"
+      ],
+      "table_insert": [
+        "operational_memory_source_snapshots",
+        "operational_memory_snapshot_state_events",
+        "operational_memory_daily_projections",
+        "operational_memory_projection_state_events",
+        "operational_memory_projection_lineage",
+        "operational_memory_ingestion_rejections"
+      ],
+      "table_update": [],
+      "table_delete": [],
+      "function_execute": [
+        "ai.persist_operational_memory_bundle"
+      ],
+      "trigger_function_execute": false
+    },
+    "anon": {
+      "name": "anon",
+      "preexisting": false,
+      "login": false,
+      "superuser": false,
+      "inherit": false,
+      "bypassrls": false,
+      "purpose": "privilege denial assertion",
+      "schema_usage": [
+        "ai"
+      ],
+      "table_select": [],
+      "table_insert": [],
+      "table_update": [],
+      "table_delete": [],
+      "function_execute": [],
+      "trigger_function_execute": false
+    },
+    "authenticated": {
+      "name": "authenticated",
+      "preexisting": false,
+      "login": false,
+      "superuser": false,
+      "inherit": false,
+      "bypassrls": false,
+      "purpose": "privilege denial assertion",
+      "schema_usage": [
+        "ai"
+      ],
+      "table_select": [],
+      "table_insert": [],
+      "table_update": [],
+      "table_delete": [],
+      "function_execute": [],
+      "trigger_function_execute": false
+    },
+    "attacker": {
+      "name": "day147a5_attacker",
+      "preexisting": false,
+      "login": true,
+      "superuser": false,
+      "inherit": false,
+      "bypassrls": false,
+      "purpose": "direct SQL denial assertion",
+      "schema_usage": [
+        "ai"
+      ],
+      "table_select": [],
+      "table_insert": [],
+      "table_update": [],
+      "table_delete": [],
+      "function_execute": [],
+      "trigger_function_execute": false
+    },
+    "verification": {
+      "name": "day147a5_verification",
+      "preexisting": false,
+      "login": true,
+      "superuser": false,
+      "inherit": false,
+      "bypassrls": false,
+      "purpose": "read-only catalog and relation assertions",
+      "schema_usage": [
+        "ai",
+        "core_schema"
+      ],
+      "table_select": [
+        "operational_memory_source_snapshots",
+        "operational_memory_snapshot_state_events",
+        "operational_memory_daily_projections",
+        "operational_memory_projection_state_events",
+        "operational_memory_projection_lineage",
+        "operational_memory_ingestion_rejections"
+      ],
+      "table_insert": [],
+      "table_update": [],
+      "table_delete": [],
+      "function_execute": [],
+      "trigger_function_execute": false
+    }
+  },
+  "transition_matrix_summary": {
+    "states": 5,
+    "ordered_pairs": 25,
+    "allowed": 4,
+    "forbidden": 21
+  },
+  "test_results": [
+    {
+      "id": "legacy_active_immutable",
+      "category": "legacy_compatibility",
+      "status": "PASS"
+    },
+    {
+      "id": "legacy_superseded_immutable",
+      "category": "legacy_compatibility",
+      "status": "PASS"
+    },
+    {
+      "id": "initial_candidate_valid",
+      "category": "initial_candidate",
+      "status": "PASS"
+    },
+    {
+      "id": "initial_projection_without_event",
+      "category": "deferred_trigger",
+      "status": "PASS"
+    },
+    {
+      "id": "sequence_zero_rejected",
+      "category": "sequence_identity",
+      "status": "PASS"
+    },
+    {
+      "id": "lifecycle_resolution_duplicate",
+      "category": "lifecycle_uniqueness",
+      "status": "PASS"
+    },
+    {
+      "id": "active_scope_conflict_sequential",
+      "category": "active_uniqueness",
+      "status": "PASS"
+    },
+    {
+      "id": "append_only_event_update",
+      "category": "append_only",
+      "status": "PASS"
+    },
+    {
+      "id": "privilege_authenticated_direct_insert",
+      "category": "privilege_matrix",
+      "status": "PASS"
+    },
+    {
+      "id": "bundle_candidate_atomic_exact_readback",
+      "category": "bundle_integration",
+      "status": "PASS"
+    },
+    {
+      "id": "read_candidate_only_missing",
+      "category": "read_integration",
+      "status": "PASS"
+    },
+    {
+      "id": "atomic_bundle_constraint_failure",
+      "category": "transaction_atomicity",
+      "status": "PASS"
+    },
+    {
+      "id": "concurrency_forward",
+      "category": "concurrency",
+      "status": "PASS"
+    },
+    {
+      "id": "concurrency_reverse",
+      "category": "concurrency",
+      "status": "PASS"
+    },
+    {
+      "id": "initial_active_rejected",
+      "category": "initial_candidate",
+      "status": "PASS"
+    },
+    {
+      "id": "initial_rejected_rejected",
+      "category": "initial_candidate",
+      "status": "PASS"
+    },
+    {
+      "id": "initial_failed_rejected",
+      "category": "initial_candidate",
+      "status": "PASS"
+    },
+    {
+      "id": "initial_superseded_rejected",
+      "category": "initial_candidate",
+      "status": "PASS"
+    },
+    {
+      "id": "initial_candidate_then_active_same_transaction",
+      "category": "initial_candidate",
+      "status": "PASS"
+    },
+    {
+      "id": "sequence_negative_rejected",
+      "category": "sequence_identity",
+      "status": "PASS"
+    },
+    {
+      "id": "sequence_duplicate_rejected",
+      "category": "sequence_identity",
+      "status": "PASS"
+    },
+    {
+      "id": "sequence_lower_rejected",
+      "category": "sequence_identity",
+      "status": "PASS"
+    },
+    {
+      "id": "sequence_equal_rejected",
+      "category": "sequence_identity",
+      "status": "PASS"
+    },
+    {
+      "id": "sequence_out_of_order_rejected",
+      "category": "sequence_identity",
+      "status": "PASS"
+    },
+    {
+      "id": "sequence_strictly_higher_allowed",
+      "category": "sequence_identity",
+      "status": "PASS"
+    },
+    {
+      "id": "identity_duplicate_event_id_rejected",
+      "category": "sequence_identity",
+      "status": "PASS"
+    },
+    {
+      "id": "identity_nonexistent_projection_rejected",
+      "category": "sequence_identity",
+      "status": "PASS"
+    },
+    {
+      "id": "identity_event_projection_binding_retained",
+      "category": "sequence_identity",
+      "status": "PASS"
+    },
+    {
+      "id": "lifecycle_duplicate_candidate_rejected",
+      "category": "lifecycle_uniqueness",
+      "status": "PASS"
+    },
+    {
+      "id": "lifecycle_duplicate_resolution_rejected",
+      "category": "lifecycle_uniqueness",
+      "status": "PASS"
+    },
+    {
+      "id": "lifecycle_duplicate_superseded_rejected",
+      "category": "lifecycle_uniqueness",
+      "status": "PASS"
+    },
+    {
+      "id": "lifecycle_three_candidates_same_scope_allowed",
+      "category": "lifecycle_uniqueness",
+      "status": "PASS"
+    },
+    {
+      "id": "active_supersede_then_activate_other",
+      "category": "active_uniqueness",
+      "status": "PASS"
+    },
+    {
+      "id": "active_different_business_dates_allowed",
+      "category": "active_uniqueness",
+      "status": "PASS"
+    },
+    {
+      "id": "deferred_projection_candidate_commit",
+      "category": "deferred_trigger",
+      "status": "PASS"
+    },
+    {
+      "id": "deferred_projection_candidate_active_commit",
+      "category": "deferred_trigger",
+      "status": "PASS"
+    },
+    {
+      "id": "deferred_explicit_transaction_rollback_leaves_zero",
+      "category": "deferred_trigger",
+      "status": "PASS"
+    },
+    {
+      "id": "deferred_multi_projection_missing_candidate_rolls_back_all",
+      "category": "deferred_trigger",
+      "status": "PASS"
+    },
+    {
+      "id": "deferred_legacy_rows_not_retroactively_checked",
+      "category": "deferred_trigger",
+      "status": "PASS"
+    },
+    {
+      "id": "append_only_event_delete",
+      "category": "append_only",
+      "status": "PASS"
+    },
+    {
+      "id": "append_only_projection_update",
+      "category": "append_only",
+      "status": "PASS"
+    },
+    {
+      "id": "append_only_projection_delete",
+      "category": "append_only",
+      "status": "PASS"
+    },
+    {
+      "id": "privilege_public_transition_function_execute",
+      "category": "privilege_matrix",
+      "status": "PASS"
+    },
+    {
+      "id": "privilege_public_deferred_function_execute",
+      "category": "privilege_matrix",
+      "status": "PASS"
+    },
+    {
+      "id": "privilege_public_projection_insert_denied",
+      "category": "privilege_matrix",
+      "status": "PASS"
+    },
+    {
+      "id": "privilege_public_state_event_insert_denied",
+      "category": "privilege_matrix",
+      "status": "PASS"
+    },
+    {
+      "id": "privilege_public_projection_update_denied",
+      "category": "privilege_matrix",
+      "status": "PASS"
+    },
+    {
+      "id": "privilege_public_state_event_update_denied",
+      "category": "privilege_matrix",
+      "status": "PASS"
+    },
+    {
+      "id": "privilege_public_projection_delete_denied",
+      "category": "privilege_matrix",
+      "status": "PASS"
+    },
+    {
+      "id": "privilege_public_state_event_delete_denied",
+      "category": "privilege_matrix",
+      "status": "PASS"
+    },
+    {
+      "id": "privilege_anon_transition_function_execute",
+      "category": "privilege_matrix",
+      "status": "PASS"
+    },
+    {
+      "id": "privilege_anon_deferred_function_execute",
+      "category": "privilege_matrix",
+      "status": "PASS"
+    },
+    {
+      "id": "privilege_anon_projection_insert_denied",
+      "category": "privilege_matrix",
+      "status": "PASS"
+    },
+    {
+      "id": "privilege_anon_state_event_insert_denied",
+      "category": "privilege_matrix",
+      "status": "PASS"
+    },
+    {
+      "id": "privilege_anon_projection_update_denied",
+      "category": "privilege_matrix",
+      "status": "PASS"
+    },
+    {
+      "id": "privilege_anon_state_event_update_denied",
+      "category": "privilege_matrix",
+      "status": "PASS"
+    },
+    {
+      "id": "privilege_anon_projection_delete_denied",
+      "category": "privilege_matrix",
+      "status": "PASS"
+    },
+    {
+      "id": "privilege_anon_state_event_delete_denied",
+      "category": "privilege_matrix",
+      "status": "PASS"
+    },
+    {
+      "id": "privilege_authenticated_transition_function_execute",
+      "category": "privilege_matrix",
+      "status": "PASS"
+    },
+    {
+      "id": "privilege_authenticated_deferred_function_execute",
+      "category": "privilege_matrix",
+      "status": "PASS"
+    },
+    {
+      "id": "privilege_authenticated_projection_insert_denied",
+      "category": "privilege_matrix",
+      "status": "PASS"
+    },
+    {
+      "id": "privilege_authenticated_state_event_insert_denied",
+      "category": "privilege_matrix",
+      "status": "PASS"
+    },
+    {
+      "id": "privilege_authenticated_projection_update_denied",
+      "category": "privilege_matrix",
+      "status": "PASS"
+    },
+    {
+      "id": "privilege_authenticated_state_event_update_denied",
+      "category": "privilege_matrix",
+      "status": "PASS"
+    },
+    {
+      "id": "privilege_authenticated_projection_delete_denied",
+      "category": "privilege_matrix",
+      "status": "PASS"
+    },
+    {
+      "id": "privilege_authenticated_state_event_delete_denied",
+      "category": "privilege_matrix",
+      "status": "PASS"
+    },
+    {
+      "id": "privilege_bundle_runtime_fixture_bundle_success",
+      "category": "privilege_matrix",
+      "status": "PASS"
+    },
+    {
+      "id": "privilege_bundle_runtime_fixture_projection_update_denied",
+      "category": "privilege_matrix",
+      "status": "PASS"
+    },
+    {
+      "id": "privilege_bundle_runtime_fixture_projection_delete_denied",
+      "category": "privilege_matrix",
+      "status": "PASS"
+    },
+    {
+      "id": "bundle_supersedes_null_existing_active_unchanged",
+      "category": "bundle_integration",
+      "status": "PASS"
+    },
+    {
+      "id": "bundle_constraint_failure_rolls_back_all_relations",
+      "category": "transaction_atomicity",
+      "status": "PASS"
+    },
+    {
+      "id": "bundle_repository_readback_failure_rolls_back",
+      "category": "transaction_atomicity",
+      "status": "PASS"
+    },
+    {
+      "id": "read_active_plus_candidate_selects_active",
+      "category": "read_integration",
+      "status": "PASS"
+    },
+    {
+      "id": "read_active_plus_multiple_candidates_selects_active",
+      "category": "read_integration",
+      "status": "PASS"
+    },
+    {
+      "id": "read_legacy_active_selected",
+      "category": "read_integration",
+      "status": "PASS"
+    },
+    {
+      "id": "read_legacy_superseded_missing",
+      "category": "read_integration",
+      "status": "PASS"
+    },
+    {
+      "id": "read_candidate_content_and_lineage_not_exposed",
+      "category": "read_integration",
+      "status": "PASS"
+    },
+    {
+      "id": "transition_allowed_candidate_to_active",
+      "category": "transition_matrix",
+      "status": "PASS"
+    },
+    {
+      "id": "transition_allowed_candidate_to_rejected",
+      "category": "transition_matrix",
+      "status": "PASS"
+    },
+    {
+      "id": "transition_allowed_candidate_to_failed",
+      "category": "transition_matrix",
+      "status": "PASS"
+    },
+    {
+      "id": "transition_allowed_active_to_superseded",
+      "category": "transition_matrix",
+      "status": "PASS"
+    },
+    {
+      "id": "transition_forbidden_candidate_to_candidate",
+      "category": "transition_matrix",
+      "status": "PASS"
+    },
+    {
+      "id": "transition_forbidden_candidate_to_superseded",
+      "category": "transition_matrix",
+      "status": "PASS"
+    },
+    {
+      "id": "transition_forbidden_active_to_candidate",
+      "category": "transition_matrix",
+      "status": "PASS"
+    },
+    {
+      "id": "transition_forbidden_active_to_active",
+      "category": "transition_matrix",
+      "status": "PASS"
+    },
+    {
+      "id": "transition_forbidden_active_to_rejected",
+      "category": "transition_matrix",
+      "status": "PASS"
+    },
+    {
+      "id": "transition_forbidden_active_to_failed",
+      "category": "transition_matrix",
+      "status": "PASS"
+    },
+    {
+      "id": "transition_forbidden_rejected_to_candidate",
+      "category": "transition_matrix",
+      "status": "PASS"
+    },
+    {
+      "id": "transition_forbidden_rejected_to_active",
+      "category": "transition_matrix",
+      "status": "PASS"
+    },
+    {
+      "id": "transition_forbidden_rejected_to_rejected",
+      "category": "transition_matrix",
+      "status": "PASS"
+    },
+    {
+      "id": "transition_forbidden_rejected_to_superseded",
+      "category": "transition_matrix",
+      "status": "PASS"
+    },
+    {
+      "id": "transition_forbidden_rejected_to_failed",
+      "category": "transition_matrix",
+      "status": "PASS"
+    },
+    {
+      "id": "transition_forbidden_superseded_to_candidate",
+      "category": "transition_matrix",
+      "status": "PASS"
+    },
+    {
+      "id": "transition_forbidden_superseded_to_active",
+      "category": "transition_matrix",
+      "status": "PASS"
+    },
+    {
+      "id": "transition_forbidden_superseded_to_rejected",
+      "category": "transition_matrix",
+      "status": "PASS"
+    },
+    {
+      "id": "transition_forbidden_superseded_to_superseded",
+      "category": "transition_matrix",
+      "status": "PASS"
+    },
+    {
+      "id": "transition_forbidden_superseded_to_failed",
+      "category": "transition_matrix",
+      "status": "PASS"
+    },
+    {
+      "id": "transition_forbidden_failed_to_candidate",
+      "category": "transition_matrix",
+      "status": "PASS"
+    },
+    {
+      "id": "transition_forbidden_failed_to_active",
+      "category": "transition_matrix",
+      "status": "PASS"
+    },
+    {
+      "id": "transition_forbidden_failed_to_rejected",
+      "category": "transition_matrix",
+      "status": "PASS"
+    },
+    {
+      "id": "transition_forbidden_failed_to_superseded",
+      "category": "transition_matrix",
+      "status": "PASS"
+    },
+    {
+      "id": "transition_forbidden_failed_to_failed",
+      "category": "transition_matrix",
+      "status": "PASS"
+    }
+  ],
+  "concurrency_timeline": [
+    "writer1_begin",
+    "writer1_active_inserted",
+    "writer2_begin",
+    "writer2_insert_started",
+    "observer_exact_lock_wait_confirmed",
+    "writer1_committed",
+    "writer2_duplicate_active_rejected",
+    "writer2_rolled_back",
+    "final_active_count_confirmed",
+    "clients_closed",
+    "writer1_begin",
+    "writer1_active_inserted",
+    "writer2_begin",
+    "writer2_insert_started",
+    "observer_exact_lock_wait_confirmed",
+    "writer1_committed",
+    "writer2_duplicate_active_rejected",
+    "writer2_rolled_back",
+    "final_active_count_confirmed",
+    "clients_closed"
+  ],
+  "row_counts": {
+    "snapshots": 1,
+    "projections": 12,
+    "events": 17,
+    "lineage": 1
+  },
+  "failure_codes": {
+    "primary": null,
+    "cleanup": null,
+    "evidence_writer": null
+  },
+  "cleanup": {
+    "phase": "CLEANUP_COMPLETED",
+    "attempted": true,
+    "completed": true,
+    "post_cleanup_verified": true,
+    "container_absent": true,
+    "clients_closed": true,
+    "mapped_port_closed": true,
+    "persistent_volume_absent": true,
+    "failure_code": null
+  },
+  "safety": {
+    "local_only_gate_passed": true,
+    "docker_daemon_local": true,
+    "remote_endpoint_rejected": true,
+    "secrets_absent": true,
+    "production_operations": 0,
+    "docker_commands_expected": "isolated_only",
+    "database_connections_expected": "isolated_only"
+  },
+  "migrations": {
+    "day146": "PASS",
+    "prepare_apply": "PASS",
+    "prepare_verify": "PASS",
+    "activate_apply": "PASS",
+    "activate_verify": "PASS"
+  },
+  "case_registry": {
+    "expected_count": 102,
+    "executed_count": 102,
+    "failed_count": 0,
+    "unique_count": 102,
+    "exact_case_set": true,
+    "expected_digest": "16a9402d7c0b6696cded4ecb7282cce550dd9745c662d75edf5e1426eb819eaa",
+    "actual_digest": "16a9402d7c0b6696cded4ecb7282cce550dd9745c662d75edf5e1426eb819eaa",
+    "digest_match": true
+  },
+  "transition_provenance": {
+    "raw_transition_count": 5,
+    "explicit_authorized_count": 5,
+    "unauthorized_count": 0,
+    "cleanup_leak_count": 0,
+    "unknown_count": 0,
+    "baseline_active_mutation_count": 0,
+    "comparison_complete": true,
+    "transitions": [
+      {
+        "case_id": "concurrency_reverse",
+        "database": "main",
+        "classification": "EXPLICIT_AUTHORIZED_TEST_TRANSITION",
+        "opaque_reference": "58a28c6fa90b7171"
+      },
+      {
+        "case_id": "read_active_plus_candidate_selects_active",
+        "database": "main",
+        "classification": "EXPLICIT_AUTHORIZED_TEST_TRANSITION",
+        "opaque_reference": "70177afd37fbda6a"
+      },
+      {
+        "case_id": "concurrency_forward",
+        "database": "main",
+        "classification": "EXPLICIT_AUTHORIZED_TEST_TRANSITION",
+        "opaque_reference": "9ef7494eb730f0a4"
+      },
+      {
+        "case_id": "read_active_plus_multiple_candidates_selects_active",
+        "database": "main",
+        "classification": "EXPLICIT_AUTHORIZED_TEST_TRANSITION",
+        "opaque_reference": "de5864c6fcf4c800"
+      },
+      {
+        "case_id": "bundle_supersedes_null_existing_active_unchanged",
+        "database": "main",
+        "classification": "EXPLICIT_AUTHORIZED_TEST_TRANSITION",
+        "opaque_reference": "b3213b6f9f9fe491"
+      }
+    ]
+  },
+  "state_invariants": {
+    "comparison_complete": true,
+    "automatic_promotion_count": 0,
+    "active_state_unchanged": true,
+    "baseline_active_mutation_count": 0,
+    "baseline_active_count": 1,
+    "final_active_count": 6,
+    "baseline_digest": "7a620978dbc1401265d0e4d2788c20fed5cbe77c78fd281da92d7c4af3efc36a",
+    "final_digest": "7a620978dbc1401265d0e4d2788c20fed5cbe77c78fd281da92d7c4af3efc36a"
+  },
+  "result_transport": {
+    "contract": "HOST_NONCE_RESULT_BIND",
+    "file_observed": true,
+    "regular_file": true,
+    "mode": "0600",
+    "link_count": 1,
+    "size": 9383,
+    "sha256": "57e7dc53585d1888659876769f62ac89ea53835af821c6289d0b7e2cabdf7a5c",
+    "validator": "ACCEPTED"
+  },
+  "client_cleanup": {
+    "clients_created": 34,
+    "close_attempted": 34,
+    "close_completed": 34,
+    "close_failed": 0,
+    "open_clients_after_cleanup": 0,
+    "result": "PASS"
+  },
+  "resource_cleanup": {
+    "runner": "PASS_REMOVED",
+    "postgres": "PASS_REMOVED",
+    "network": "PASS_REMOVED",
+    "result_file": "PASS_REMOVED",
+    "result_directory": "PASS_REMOVED",
+    "temporary_bundle": "PASS_REMOVED",
+    "temporary_root": "PASS_REMOVED",
+    "residual_resources": 0,
+    "result": "PASS"
+  }
+}

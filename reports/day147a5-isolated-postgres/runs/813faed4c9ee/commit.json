@@ -1,0 +1,7 @@
+{
+  "schema_version": 1,
+  "execution_nonce": "813faed4c9ee",
+  "receipt_relative_path": "receipt.json",
+  "receipt_sha256": "a7145d55ac4ac2f9ade781d8f0b2db647bc60144e3c7836b1842c5a4285d53df",
+  "status": "COMMITTED"
+}
