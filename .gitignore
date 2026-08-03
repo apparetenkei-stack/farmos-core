@@ -32,6 +32,10 @@ reviews/
 !scripts/sql/
 !scripts/sql/*.sql
 
+# Local isolated PostgreSQL execution artifacts
+/reports/day147a5-isolated-postgres/runs/*/
+!/reports/day147a5-isolated-postgres/runs/813faed4c9ee/
+
 # FarmOS local runtime data - never commit originals, OCR outputs, backups, or secrets
 data/
 storage/
