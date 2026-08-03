@@ -128,6 +128,8 @@
     "test-farm-os-day147a5-isolated-postgres": "tsx scripts/hermes/test_farm_os_day147a5_isolated_postgres.ts",
     "test-farm-os-day147a5-minimal-network": "tsx scripts/hermes/test_farm_os_day147a5_minimal_network.ts",
     "typecheck-farm-os-day147a5-isolated-postgres": "tsc --ignoreConfig --noEmit --strict --skipLibCheck --target ES2022 --lib ES2022,DOM --types node --module ESNext --moduleResolution Bundler --esModuleInterop scripts/hermes/lib/farm_os_day147a5_evidence_contract.ts scripts/hermes/lib/farm_os_day147a5_client_suite.ts scripts/hermes/test_farm_os_day147a5_isolated_postgres.ts scripts/hermes/test_farm_os_day147a5_minimal_network.ts",
+    "test-farm-os-day147b-daily-projection-contract": "tsx scripts/hermes/test_farm_os_day147b_daily_projection_contract.ts",
+    "typecheck-farm-os-day147b-daily-projection-contract": "tsc --ignoreConfig --noEmit --strict --skipLibCheck --target ES2023 --lib ES2023,DOM --types node --module ESNext --moduleResolution Bundler --esModuleInterop --pretty false src/lib/hermes/farm_os_daily_operational_projection_contract.ts scripts/hermes/test_farm_os_day147b_daily_projection_contract.ts",
     "run-farm-os-day135-isolated-build": "tsx scripts/hermes/run_farm_os_day135_isolated_build.ts",
     "run-farm-os-day135-final-gate": "tsx scripts/hermes/run_farm_os_day135_final_gate.ts",
     "run-hermes-runtime-operational-baseline": "tsx scripts/hermes/run_hermes_runtime_operational_baseline.ts",
