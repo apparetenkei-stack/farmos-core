@@ -1,5 +1,36 @@
 # FarmOS Core Master Roadmap
 
+## Source of Truth Status
+
+```yaml
+master_roadmap:
+  version: v4.0
+  status: Product Owner Approved / Active
+  authority: Human Product Owner
+  source_of_truth: true
+  effective_date: 2026-08-03
+  current_baseline: Day147 COMPLETE
+  current_execution_start: Day148
+  current_execution_status: NEXT
+  canonical_path: docs/roadmap/master-roadmap-day95-220.md
+  supersedes: v3.1
+
+precedence:
+  active_version: v4.0
+  superseded_version: v3.1
+  rule: Only v4.0 is the active Master Roadmap SOT.
+```
+
+### Version History
+
+| Version | Status | Baseline / role |
+| --- | --- | --- |
+| v4.0 | Product Owner Approved / Active | Day147 COMPLETE; execution resumes from Day148 |
+| v3.1 | Superseded | Previous active roadmap retained in Git history at `1887ce42dc5ae6c74e5e753a0bdc36c0cfab206e`; it is not an active execution authority |
+
+v3.1 remains preserved as history and must not be interpreted as a competing
+current SOT. v4.0 is the single active roadmap authority from Day148 onward.
+
 ## North Star
 
 Agricultural Knowledge OS を構築し、農場全体の知識、方針、提案、承認、実行結果を安全につなぐ。
@@ -76,12 +107,23 @@ The canonical Day146 close evidence is recorded in
 
 ```yaml
 day147:
+  status: COMPLETE
+  roadmap_classification: Completed Baseline
   formal_name: Daily Operational Projection Candidate Foundation
   processes:
-    - Day147-A Projection Candidate State Authority and Persistence Evolution
-    - Day147-B Deterministic Daily Operational Projection Generation
-  canonical_document:
-    docs/roadmap/day147-daily-operational-projection-candidate-foundation.md
+    - name: Day147-A Projection Candidate State Authority and Persistence Evolution
+      status: COMPLETE
+    - name: Day147-B Deterministic Daily Operational Projection Generation
+      status: COMPLETE
+  canonical_document: docs/roadmap/day147-daily-operational-projection-candidate-foundation.md
+  completion_evidence:
+    day147_a: docs/roadmap/day147-a-final-evidence-and-closure.md
+    day147_b: docs/roadmap/day147-b-daily-operational-projection-contract.md
+    interpretation: Historical point-in-time evidence; Product Owner-approved v4.0 controls current gate status.
+  completion_commits:
+    day147_a: "c878b309b092ae29909fffdf3bdceb7869e6698a"
+    day147_b: "1887ce42dc5ae6c74e5e753a0bdc36c0cfab206e"
+  completed_baseline_commit: "1887ce42dc5ae6c74e5e753a0bdc36c0cfab206e"
 
 day147_b_entry_gate:
   - active selector candidate exclusion proven
@@ -110,13 +152,34 @@ day147_a_rollout:
     prohibited_in: A1-PREPARE
 
 day147_to_day148_gate:
-  - Day147-A COMPLETE
-  - Day147-B COMPLETE
-  - Day147 completion evidence PASS
-  - no unresolved P1 or P2
-  - Git clean and synchronized
-  - Day148 canonical Authority defined
+  status: PASS
+  day147_a: COMPLETE
+  day147_b: COMPLETE
+  completion_evidence: PASS
+  unresolved_p1: 0
+  unresolved_p2: 0
+  completed_baseline_matches_origin_main: true
+
+day148:
+  status: NEXT
+  execution_start: Day148
+  roadmap_authority: docs/roadmap/master-roadmap-day95-220.md
+  authority_resolution_allowed: true
+  implementation_started: false
+  implementation_authorized: false
+  implementation_start_gate: Formal canonical Day148 Authority with day-specific scope and gates is required.
 ```
+
+The Day147 authority and evidence documents above preserve the status recorded
+when each document was created. Statements in those documents that describe
+pending commits, pending pushes, or Day147-B as not started are historical
+point-in-time evidence. The Product Owner-approved v4.0 SOT establishes the
+current baseline: Day147 is `COMPLETE`, and Day148 is `NEXT`. The recorded
+commits are immutable completion evidence; they are not a separate authority.
+
+`NEXT` authorizes Day148 Authority Resolution under v4.0. It does not by itself
+authorize Day148 implementation; the formal Day148 Authority must define the
+day-specific scope and gates before implementation starts.
 
 ## Production AI Runtime Platform
 
