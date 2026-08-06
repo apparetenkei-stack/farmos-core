@@ -1,5 +1,3 @@
-import { createHash, timingSafeEqual } from "node:crypto";
-
 import { parseHermesDailyFarmBriefAllowedScopeKeys } from "../../../scripts/hermes/brief_runtime/hermes_daily_farm_brief_scope_contract";
 import {
   parseHermesDailyFarmBriefAuthenticatedActorContext,
@@ -11,6 +9,12 @@ import {
   type HermesDailyFarmBriefServerAuthenticationProvider,
   type HermesDailyFarmBriefServerAuthenticationProviderResult,
 } from "../../../scripts/hermes/brief_runtime/hermes_daily_farm_brief_production_readiness_contract";
+import {
+  createFarmOsServerBearerIdentity,
+  isFarmOsServerBearerToken,
+  type FarmOsServerBearerActorDirectory,
+  type FarmOsServerBearerAuthenticationProvider,
+} from "./farm_os_server_bearer_identity";
 
 export const HERMES_DAILY_FARM_BRIEF_PILOT_ENV_KEYS = {
   token: "HERMES_DAILY_FARM_BRIEF_PILOT_TOKEN",
@@ -18,9 +22,6 @@ export const HERMES_DAILY_FARM_BRIEF_PILOT_ENV_KEYS = {
   role: "HERMES_DAILY_FARM_BRIEF_PILOT_ROLE",
   allowedScopeKeys: "HERMES_DAILY_FARM_BRIEF_PILOT_ALLOWED_SCOPE_KEYS",
 } as const;
-
-const MAXIMUM_TOKEN_LENGTH = 512;
-const SAFE_TOKEN = /^[\x21-\x2b\x2d-\x7e]+$/u;
 
 type PilotConfiguration = {
   token: string;
@@ -39,16 +40,6 @@ function invalid(): HermesDailyFarmBriefServerAuthenticationProviderResult {
   return { schema_version: "hermes.daily_farm_brief.server_authentication_provider.v1", status: "invalid", principal_ref: null };
 }
 
-function isSafeToken(value: unknown): value is string {
-  return typeof value === "string" && value.length > 0 && value.length <= MAXIMUM_TOKEN_LENGTH && SAFE_TOKEN.test(value);
-}
-
-function equalSecret(left: string, right: string): boolean {
-  const leftDigest = createHash("sha256").update(left, "utf8").digest();
-  const rightDigest = createHash("sha256").update(right, "utf8").digest();
-  return timingSafeEqual(leftDigest, rightDigest);
-}
-
 function parseHermesDailyFarmBriefPilotConfiguration(
   environment: Readonly<Record<string, string | undefined>>,
 ): PilotConfiguration | null {
@@ -56,7 +47,8 @@ function parseHermesDailyFarmBriefPilotConfiguration(
   const principalRef = environment[HERMES_DAILY_FARM_BRIEF_PILOT_ENV_KEYS.principalRef];
   const role = environment[HERMES_DAILY_FARM_BRIEF_PILOT_ENV_KEYS.role];
   const encodedAllowedScopeKeys = environment[HERMES_DAILY_FARM_BRIEF_PILOT_ENV_KEYS.allowedScopeKeys];
-  if (!isSafeToken(token) || typeof encodedAllowedScopeKeys !== "string") return null;
+  if (!isFarmOsServerBearerToken(token) ||
+    typeof encodedAllowedScopeKeys !== "string") return null;
 
   let rawAllowedScopeKeys: unknown;
   try { rawAllowedScopeKeys = JSON.parse(encodedAllowedScopeKeys); } catch { return null; }
@@ -74,29 +66,44 @@ function parseHermesDailyFarmBriefPilotConfiguration(
 }
 
 export class HermesDailyFarmBriefPilotAuthenticationProvider implements HermesDailyFarmBriefServerAuthenticationProvider {
-  constructor(private readonly configuration: PilotConfiguration | null) {}
+  private readonly provider: FarmOsServerBearerAuthenticationProvider;
+
+  constructor(configuration: PilotConfiguration | null) {
+    this.provider = createFarmOsServerBearerIdentity({
+      token: configuration?.token,
+      principal_ref: configuration?.actor.principal_ref,
+      actor: configuration?.actor ?? null,
+    }).authenticationProvider;
+  }
 
   async authenticateServerRequest(request: Request): Promise<unknown> {
-    if (this.configuration === null) return unavailable();
-    const authorization = request.headers.get("authorization");
-    if (authorization === null) return unauthenticated();
-    if (authorization.includes(",") || !authorization.startsWith("Bearer ")) return invalid();
-    const token = authorization.slice("Bearer ".length);
-    if (!isSafeToken(token) || !equalSecret(token, this.configuration.token)) return unauthenticated();
+    const result = await this.provider.authenticateServerRequest(request);
+    if (result.status === "unavailable") return unavailable();
+    if (result.status === "unauthenticated") return unauthenticated();
+    if (result.status === "invalid") return invalid();
     return parseHermesDailyFarmBriefServerAuthenticationProviderResult({
       schema_version: "hermes.daily_farm_brief.server_authentication_provider.v1",
       status: "authenticated",
-      principal_ref: this.configuration.actor.principal_ref,
+      principal_ref: result.principal_ref,
     }) ?? invalid();
   }
 }
 
 export class HermesDailyFarmBriefPilotActorDirectory implements HermesDailyFarmBriefActorDirectory {
-  constructor(private readonly configuration: PilotConfiguration | null) {}
+  private readonly directory: FarmOsServerBearerActorDirectory<
+    HermesDailyFarmBriefAuthenticatedActorContext
+  >;
+
+  constructor(configuration: PilotConfiguration | null) {
+    this.directory = createFarmOsServerBearerIdentity({
+      token: configuration?.token,
+      principal_ref: configuration?.actor.principal_ref,
+      actor: configuration?.actor ?? null,
+    }).actorDirectory;
+  }
 
   async resolvePrincipal(principalRef: string): Promise<unknown> {
-    if (this.configuration === null || principalRef !== this.configuration.actor.principal_ref) return null;
-    return structuredClone(this.configuration.actor);
+    return this.directory.resolvePrincipal(principalRef);
   }
 }
 
