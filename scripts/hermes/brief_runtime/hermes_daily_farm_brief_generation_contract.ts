@@ -3,6 +3,10 @@ import {
   HERMES_DAILY_FARM_BRIEF_TIMEZONE,
 } from "./hermes_daily_farm_brief_generation_policy";
 import {
+  deriveFarmOsBusinessDate,
+  isFarmOsBusinessDate,
+} from "../../../src/lib/hermes/farm_os_business_date";
+import {
   HERMES_DAILY_FARM_SOURCE_ORDER,
   type HermesDailyFarmFreshness,
   type HermesDailyFarmSourceType,
@@ -126,7 +130,6 @@ export type HermesDailyFarmBriefGenerationDecision = {
 
 type JsonRecord = Record<string, unknown>;
 const ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u;
-const BUSINESS_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/u;
 
 function isRecord(value: unknown): value is JsonRecord {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -143,22 +146,11 @@ export function isCanonicalIso(value: unknown): value is string {
 }
 
 export function isHermesDailyFarmBusinessDate(value: unknown): value is string {
-  if (typeof value !== "string" || !BUSINESS_DATE_PATTERN.test(value)) return false;
-  const [year, month, day] = value.split("-").map(Number);
-  const date = new Date(Date.UTC(year, month - 1, day));
-  return date.toISOString().slice(0, 10) === value;
+  return isFarmOsBusinessDate(value);
 }
 
 export function deriveHermesDailyFarmBusinessDate(requestedAt: string): string | null {
-  if (!isCanonicalIso(requestedAt)) return null;
-  const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone: HERMES_DAILY_FARM_BRIEF_TIMEZONE,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).formatToParts(new Date(requestedAt));
-  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
-  return `${values.year}-${values.month}-${values.day}`;
+  return deriveFarmOsBusinessDate(requestedAt);
 }
 
 export function parseHermesDailyFarmBriefGenerationRequest(
@@ -244,18 +236,21 @@ export function parseHermesDailyFarmBriefGenerationDecision(value: unknown): Her
   const request = parseHermesDailyFarmBriefGenerationRequest(value.request);
   if (value.schema_version !== "hermes.daily_farm_brief.generation_decision.v1" || !DECISIONS.includes(String(value.decision)) || !REASONS.includes(String(value.reason_code)) || request === null) return null;
   if (![value.should_execute_generation, value.should_reuse_existing, value.should_show_stale, value.duplicate_prevented].every((item) => typeof item === "boolean") || (value.should_execute_generation && value.should_reuse_existing)) return null;
-  if (!Array.isArray(value.stale_reason_codes) || value.stale_reason_codes.some((code) => !["previous_business_date", "required_source_stale", "generated_at_stale"].includes(String(code))) || new Set(value.stale_reason_codes).size !== value.stale_reason_codes.length || value.stale_reason_count !== value.stale_reason_codes.length) return null;
+  const staleReasonCodes = value.stale_reason_codes;
+  if (!Array.isArray(staleReasonCodes) || staleReasonCodes.some((code) => !["previous_business_date", "required_source_stale", "generated_at_stale"].includes(String(code))) || new Set(staleReasonCodes).size !== staleReasonCodes.length || value.stale_reason_count !== staleReasonCodes.length) return null;
   const staleReasonOrder = ["previous_business_date", "required_source_stale", "generated_at_stale"];
-  if (value.stale_reason_codes.some((code, index) => index > 0 && staleReasonOrder.indexOf(String(value.stale_reason_codes[index - 1])) >= staleReasonOrder.indexOf(String(code)))) return null;
-  if (value.should_show_stale !== (value.stale_reason_codes.length > 0) || (value.stale_age_days !== null && (!Number.isInteger(value.stale_age_days) || Number(value.stale_age_days) < 0))) return null;
-  if (!Array.isArray(value.stale_source_types) || value.stale_source_types.some((type) => !HERMES_DAILY_FARM_SOURCE_ORDER.includes(type as HermesDailyFarmSourceType)) || value.stale_source_types.some((type, index) => index > 0 && HERMES_DAILY_FARM_SOURCE_ORDER.indexOf(value.stale_source_types[index - 1] as HermesDailyFarmSourceType) >= HERMES_DAILY_FARM_SOURCE_ORDER.indexOf(type as HermesDailyFarmSourceType))) return null;
+  if (staleReasonCodes.some((code, index) => index > 0 && staleReasonOrder.indexOf(String(staleReasonCodes[index - 1])) >= staleReasonOrder.indexOf(String(code)))) return null;
+  if (value.should_show_stale !== (staleReasonCodes.length > 0) || (value.stale_age_days !== null && (!Number.isInteger(value.stale_age_days) || Number(value.stale_age_days) < 0))) return null;
+  const staleSourceTypes = value.stale_source_types;
+  if (!Array.isArray(staleSourceTypes) || staleSourceTypes.some((type) => !HERMES_DAILY_FARM_SOURCE_ORDER.includes(type as HermesDailyFarmSourceType)) || staleSourceTypes.some((type, index) => index > 0 && HERMES_DAILY_FARM_SOURCE_ORDER.indexOf(staleSourceTypes[index - 1] as HermesDailyFarmSourceType) >= HERMES_DAILY_FARM_SOURCE_ORDER.indexOf(type as HermesDailyFarmSourceType))) return null;
   if (value.schedule !== null && parseHermesDailyFarmBriefScheduleEvaluation(value.schedule) === null) return null;
   if (value.existing_state_summary !== null) {
     if (!isRecord(value.existing_state_summary) || !hasExactKeys(value.existing_state_summary, ["business_date", "generation_status", "brief_status", "has_brief", "generation_retry_count"]) || !isHermesDailyFarmBusinessDate(value.existing_state_summary.business_date) || !["none", "completed", "failed", "in_progress"].includes(String(value.existing_state_summary.generation_status)) || ![null, "ready", "partial", "unavailable"].includes(value.existing_state_summary.brief_status as null | string) || typeof value.existing_state_summary.has_brief !== "boolean" || !Number.isInteger(value.existing_state_summary.generation_retry_count)) return null;
     const completed = value.existing_state_summary.generation_status === "completed";
     if (value.existing_state_summary.has_brief !== completed || (completed ? value.existing_state_summary.brief_status === null : value.existing_state_summary.brief_status !== null)) return null;
   }
-  if (!isRecord(value.safety) || !hasExactKeys(value.safety, Object.keys(HERMES_DAILY_FARM_BRIEF_GENERATION_SAFETY)) || !Object.entries(HERMES_DAILY_FARM_BRIEF_GENERATION_SAFETY).every(([key, expected]) => value.safety[key] === expected)) return null;
+  const safety = value.safety;
+  if (!isRecord(safety) || !hasExactKeys(safety, Object.keys(HERMES_DAILY_FARM_BRIEF_GENERATION_SAFETY)) || !Object.entries(HERMES_DAILY_FARM_BRIEF_GENERATION_SAFETY).every(([key, expected]) => safety[key] === expected)) return null;
   const expectedDecisionFlags: Record<string, [boolean, boolean]> = {
     generate: [true, false], reuse_existing: [false, true], reject_duplicate: [false, false], reject_unauthorized: [false, false], reject_invalid_state: [false, false], wait_in_progress: [false, false], fail_closed: [false, false],
   };
@@ -272,9 +267,9 @@ export function parseHermesDailyFarmBriefGenerationDecision(value: unknown): Her
   };
   if (!allowedReasonsByDecision[String(value.decision)].includes(String(value.reason_code))) return null;
   if ((request.trigger_type === "scheduled") !== (value.schedule !== null)) return null;
-  const hasRequiredStaleReason = value.stale_reason_codes.includes("required_source_stale");
-  if (hasRequiredStaleReason !== (value.stale_source_types.length > 0) || value.stale_source_types.some((type) => type !== "inventory" && type !== "work_log")) return null;
-  const hasPreviousDayReason = value.stale_reason_codes.includes("previous_business_date");
+  const hasRequiredStaleReason = staleReasonCodes.includes("required_source_stale");
+  if (hasRequiredStaleReason !== (staleSourceTypes.length > 0) || staleSourceTypes.some((type) => type !== "inventory" && type !== "work_log")) return null;
+  const hasPreviousDayReason = staleReasonCodes.includes("previous_business_date");
   if (hasPreviousDayReason !== (value.stale_age_days !== null)) return null;
   const duplicateReasons = ["same_day_completed_exists", "existing_brief_stale", "same_day_generation_in_progress", "manual_force_regeneration_allowed", "previous_generation_failed", "scheduled_retry_limit_reached"];
   if (value.duplicate_prevented !== duplicateReasons.includes(String(value.reason_code))) return null;

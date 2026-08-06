@@ -130,6 +130,16 @@ const PROJECTION_EVENT_KEYS = [
   "sequence",
   "occurred_at",
 ] as const;
+const SCOPED_BUNDLE_KEYS = [
+  "farm_scope",
+  "business_date",
+  "full_history_scan_performed",
+  "projections",
+  "projection_state_events",
+  "lineage",
+  "snapshots",
+  "snapshot_state_events",
+] as const;
 const HASH_PATTERN = /^[0-9a-f]{64}$/u;
 const ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u;
 
@@ -575,4 +585,45 @@ export function selectFarmOsProjectionFirstProjection(input: {
       ),
     failure_code: null,
   };
+}
+
+export function isFarmOsProjectionFirstExactDateScopedBundle(
+  value: unknown,
+  expected: { farm_scope: string; business_date: string },
+): value is FarmOsProjectionFirstScopedBundle {
+  if (!isRecord(value) || !exact(value, SCOPED_BUNDLE_KEYS) ||
+    value.farm_scope !== expected.farm_scope ||
+    value.business_date !== expected.business_date ||
+    value.full_history_scan_performed !== false ||
+    !Array.isArray(value.projections) ||
+    !Array.isArray(value.projection_state_events) ||
+    !Array.isArray(value.lineage) ||
+    !Array.isArray(value.snapshots) ||
+    !Array.isArray(value.snapshot_state_events) ||
+    !isFarmOsProjectionFirstCalendarDate(expected.business_date) ||
+    value.projections.some((projection) =>
+      !validProjection(projection) ||
+      projection.business_date !== expected.business_date
+    ) ||
+    value.projection_state_events.some((event) => !validProjectionEvent(event)) ||
+    value.lineage.some((entry) => !validLineage(entry)) ||
+    value.snapshots.some((snapshot) =>
+      !validSnapshot(snapshot) || snapshot.business_date !== expected.business_date
+    ) ||
+    value.snapshot_state_events.some((event) => !validSnapshotEvent(event))) {
+    return false;
+  }
+  const bundle = value as FarmOsProjectionFirstScopedBundle;
+  const projectionIds = new Set(
+    bundle.projections.map((projection) => projection.projection_id),
+  );
+  const snapshotIds = new Set(
+    bundle.snapshots.map((snapshot) => snapshot.snapshot_id),
+  );
+  return projectionIds.size === bundle.projections.length &&
+    snapshotIds.size === bundle.snapshots.length &&
+    bundle.projection_state_events.every((event) =>
+      projectionIds.has(event.projection_id)
+    ) &&
+    bundle.lineage.every((entry) => projectionIds.has(entry.projection_id));
 }

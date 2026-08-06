@@ -1,4 +1,8 @@
-export const HERMES_DAILY_FARM_BRIEF_TIMEZONE = "Asia/Tokyo" as const;
+import {
+  FARM_OS_BUSINESS_TIMEZONE,
+} from "../../../src/lib/hermes/farm_os_business_date";
+
+export const HERMES_DAILY_FARM_BRIEF_TIMEZONE = FARM_OS_BUSINESS_TIMEZONE;
 
 export const HERMES_DAILY_FARM_BRIEF_GENERATION_POLICY = {
   schema_version: "hermes.daily_farm_brief.generation_policy.v1" as const,
@@ -33,4 +37,3 @@ export type HermesDailyFarmBriefServerSchedule = {
   scheduled_local_time: `${number}${number}:${number}${number}`;
   allowed_lateness_minutes: number;
 };
-
