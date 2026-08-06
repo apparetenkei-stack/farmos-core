@@ -18,6 +18,8 @@ const APPLY_PATH = `db/migrations/${MIGRATION_ID}.sql`;
 const VERIFY_PATH = `db/migrations/${MIGRATION_ID}.verify.sql`;
 const ACTIVATION_ID =
   "202607310001_daily_operational_projection_candidate_activation";
+const COMMAND_LEDGER_ID =
+  "202608030001_daily_operational_projection_command_ledger";
 const DAY146_SQL_PATH =
   "scripts/sql/day146_operational_memory_snapshot_persistence.sql";
 const DAY146_SQL_CHECKSUM =
@@ -140,7 +142,7 @@ assert.deepEqual(
   pendingPlan.result === "ready"
     ? pendingPlan.pending.map((entry) => entry.migration_id)
     : [],
-  [MIGRATION_ID, ACTIVATION_ID],
+  [MIGRATION_ID, ACTIVATION_ID, COMMAND_LEDGER_ID],
 );
 const activationPendingPlan = planFarmOsCoreMigrations({
   manifest: manifestRaw,
@@ -151,7 +153,7 @@ assert.deepEqual(
   activationPendingPlan.result === "ready"
     ? activationPendingPlan.pending.map((entry) => entry.migration_id)
     : [],
-  [ACTIVATION_ID],
+  [ACTIVATION_ID, COMMAND_LEDGER_ID],
 );
 assert.equal(
   planFarmOsCoreMigrations({

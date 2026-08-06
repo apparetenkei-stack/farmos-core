@@ -14,6 +14,8 @@ const PREPARE_CHECKSUM =
   "sha256:350489282b921b879a9c4fab8280cfd38ff7432ed75cc70a905a7dabd45846bf";
 const ACTIVATION_ID =
   "202607310001_daily_operational_projection_candidate_activation";
+const COMMAND_LEDGER_ID =
+  "202608030001_daily_operational_projection_command_ledger";
 const ACTIVATION_CHECKSUM =
   "sha256:e55b7b2c33d432b37d9733d599f8ed4dd7de99a82fb64c5f90158dae7addbbc2";
 const APPLY_PATH = `db/migrations/${ACTIVATION_ID}.sql`;
@@ -58,7 +60,7 @@ assert.equal(
 );
 assert.deepEqual(
   manifest.migrations.map((entry) => entry.sequence),
-  [202607260001, 202607300001, 202607310001],
+  [202607260001, 202607300001, 202607310001, 202608030001],
 );
 
 const prepareEntry = manifest.migrations.find((entry) =>
@@ -82,7 +84,9 @@ assert.doesNotMatch(
   /enforce_operational_memory_projection_state_transition/u,
 );
 
-const activationEntry = manifest.migrations.at(-1);
+const activationEntry = manifest.migrations.find((entry) =>
+  entry.migration_id === ACTIVATION_ID
+);
 assert.ok(activationEntry);
 assert.deepEqual(activationEntry, {
   migration_id: ACTIVATION_ID,
@@ -572,7 +576,7 @@ const validatePlannerActivationSemantics = (source: unknown): void => {
     pending.result === "ready"
       ? pending.pending.map((entry) => entry.migration_id)
       : [],
-    [PREPARE_ID, ACTIVATION_ID],
+    [PREPARE_ID, ACTIVATION_ID, COMMAND_LEDGER_ID],
   );
 };
 validatePlannerActivationSemantics(manifestRaw);
