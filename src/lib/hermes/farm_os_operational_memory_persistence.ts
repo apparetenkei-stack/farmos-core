@@ -385,12 +385,13 @@ export function ingestFarmOsStableChanges(input: {
           throw new Error("invalid_change");
         }
         const ingestionSequence = draft.next_ingestion_sequence++;
-        const snapshotId = createFarmOsSnapshotId(change);
+        const { change_sequence: _consumerSequence, ...snapshotChange } = change;
+        const snapshotId = createFarmOsSnapshotId(snapshotChange);
         const snapshot: FarmOsSourceSnapshot = {
           snapshot_id: snapshotId,
           contract_version: FARM_OS_STABLE_CHANGES_CONTRACT_ID,
           source_system: "farming_app",
-          ...change,
+          ...snapshotChange,
           safe_payload: {},
           observed_at: input.observed_at,
           ingestion_sequence: ingestionSequence,

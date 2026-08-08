@@ -6,6 +6,7 @@
       "fixture_id": "valid_idempotent",
       "input_changes": [
         {
+          "change_sequence": "1",
           "operation": "upsert",
           "source_record_id": "work_fixture_valid",
           "source_record_version": 1,
@@ -20,6 +21,7 @@
           "safe_payload": {}
         },
         {
+          "change_sequence": "2",
           "operation": "upsert",
           "source_record_id": "work_fixture_valid",
           "source_record_version": 1,
@@ -54,16 +56,17 @@
       "fixture_id": "late_entry",
       "input_changes": [
         {
+          "change_sequence": "3",
           "operation": "upsert",
           "source_record_id": "work_fixture_late",
           "source_record_version": 1,
-          "source_content_hash": null,
+          "source_content_hash": "7777777777777777777777777777777777777777777777777777777777777777",
           "business_date": "2026-07-27",
           "recorded_at": "2026-07-28T09:30:00+09:00",
           "source_updated_at": "2026-07-28T09:30:00+09:00",
           "deleted_at": null,
           "field_reference": "field_fixture_alpha",
-          "crop_cycle_reference": "cycle_fixture_summer",
+          "crop_cycle_reference": null,
           "work_type_reference": "work_type_fixture_observation",
           "safe_payload": {}
         }
@@ -90,6 +93,7 @@
       "fixture_id": "update_supersede",
       "input_changes": [
         {
+          "change_sequence": "4",
           "operation": "upsert",
           "source_record_id": "work_fixture_update",
           "source_record_version": null,
@@ -104,6 +108,7 @@
           "safe_payload": {}
         },
         {
+          "change_sequence": "5",
           "operation": "upsert",
           "source_record_id": "work_fixture_update",
           "source_record_version": null,
@@ -144,10 +149,11 @@
       "fixture_id": "delete_tombstone",
       "input_changes": [
         {
+          "change_sequence": "6",
           "operation": "tombstone",
           "source_record_id": "work_fixture_deleted",
           "source_record_version": 2,
-          "source_content_hash": null,
+          "source_content_hash": "8888888888888888888888888888888888888888888888888888888888888888",
           "business_date": "2026-07-27",
           "recorded_at": null,
           "source_updated_at": "2026-07-28T11:00:00+09:00",
@@ -180,6 +186,7 @@
       "fixture_id": "stale_or_missing_required_time",
       "input_changes": [
         {
+          "change_sequence": "7",
           "operation": "upsert",
           "source_record_id": "work_fixture_missing_date",
           "source_record_version": null,
@@ -213,6 +220,7 @@
       ],
       "input_changes": [
         {
+          "change_sequence": "8",
           "operation": "upsert",
           "source_record_id": "work_fixture_conflict",
           "source_record_version": 7,

@@ -39,6 +39,15 @@
       "apply_script": "db/migrations/202608030001_daily_operational_projection_command_ledger.sql",
       "verification_script": "db/migrations/202608030001_daily_operational_projection_command_ledger.verify.sql",
       "created_at": "2026-08-03T00:00:00.000Z"
+    },
+    {
+      "migration_id": "202608070001_stable_changes_consumer_persistence",
+      "sequence": 202608070001,
+      "description": "Add atomic Stable Changes scope, checkpoint, receipt, and validated ingress persistence",
+      "checksum": "sha256:835b76ba23380d388c3532136564a5c83d04a2e9decf473726ef971ced8c6de0",
+      "apply_script": "db/migrations/202608070001_stable_changes_consumer_persistence.sql",
+      "verification_script": "db/migrations/202608070001_stable_changes_consumer_persistence.verify.sql",
+      "created_at": "2026-08-07T00:00:00.000Z"
     }
   ]
 }

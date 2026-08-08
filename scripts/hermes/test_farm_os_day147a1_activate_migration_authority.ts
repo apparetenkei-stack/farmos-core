@@ -60,7 +60,13 @@ assert.equal(
 );
 assert.deepEqual(
   manifest.migrations.map((entry) => entry.sequence),
-  [202607260001, 202607300001, 202607310001, 202608030001],
+  [
+    202607260001,
+    202607300001,
+    202607310001,
+    202608030001,
+    202608070001,
+  ],
 );
 
 const prepareEntry = manifest.migrations.find((entry) =>
@@ -576,7 +582,12 @@ const validatePlannerActivationSemantics = (source: unknown): void => {
     pending.result === "ready"
       ? pending.pending.map((entry) => entry.migration_id)
       : [],
-    [PREPARE_ID, ACTIVATION_ID, COMMAND_LEDGER_ID],
+    [
+      PREPARE_ID,
+      ACTIVATION_ID,
+      COMMAND_LEDGER_ID,
+      "202608070001_stable_changes_consumer_persistence",
+    ],
   );
 };
 validatePlannerActivationSemantics(manifestRaw);

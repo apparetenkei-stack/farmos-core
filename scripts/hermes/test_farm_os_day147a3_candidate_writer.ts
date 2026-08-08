@@ -21,9 +21,10 @@ const STRING_HASH = "a".repeat(64);
 function change(input: {
   source_record_id: string;
   source_record_version: number;
-  source_content_hash: string | null;
+  source_content_hash: string;
 }): FarmOsStableChange {
   return {
+    change_sequence: "1",
     operation: "upsert",
     source_record_id: input.source_record_id,
     source_record_version: input.source_record_version,
@@ -33,7 +34,7 @@ function change(input: {
     source_updated_at: "2026-07-31T08:00:00+09:00",
     deleted_at: null,
     field_reference: "field_fixture_01",
-    crop_cycle_reference: "crop_cycle_fixture_01",
+    crop_cycle_reference: null,
     work_type_reference: "work_type_fixture_01",
     safe_payload: {},
   };
@@ -375,7 +376,7 @@ function fakePostgres(input: {
 }
 
 async function postgresCase(input: {
-  source_content_hash?: string | null;
+  source_content_hash?: string;
   mutateReadback?: ReadbackMutation;
   bundleError?: boolean;
 } = {}) {
@@ -450,16 +451,9 @@ const bundleIndex = exact.fake.queries.findIndex((query) =>
 );
 assert.ok(lockIndex >= 0 && bundleIndex > lockIndex);
 
-const nullExact = await postgresCase({ source_content_hash: null });
-assert.equal(nullExact.result.result, "success");
-assert.equal(
-  parseBundleRows(nullExact.fake.bundleValues?.[4])[0]?.source_content_hash,
-  null,
-);
-
 async function expectReadbackMismatch(
   mutateReadback: ReadbackMutation,
-  sourceContentHash: string | null = STRING_HASH,
+  sourceContentHash: string = STRING_HASH,
 ): Promise<void> {
   assertRollback(await postgresCase({
     source_content_hash: sourceContentHash,
@@ -494,10 +488,6 @@ await expectReadbackMismatch((rows) => {
 await expectReadbackMismatch((rows) => {
   rows.lineage[0]!.source_content_hash = null;
 });
-await expectReadbackMismatch((rows) => {
-  rows.lineage[0]!.source_content_hash = STRING_HASH;
-}, null);
-
 for (const collection of [
   "projections",
   "projectionEvents",
