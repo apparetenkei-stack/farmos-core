@@ -1,29 +1,24 @@
 import { createHash } from "node:crypto";
 
 import {
+  FARM_OS_PRODUCTION_POSTGRES_BOOTSTRAP_QUERY_AUTHORITY as ADOPTED_BOOTSTRAP_AUTHORITY,
+  FARM_OS_PRODUCTION_POSTGRES_BOOTSTRAP_QUERY_CANDIDATE_HISTORY,
+  parseFarmOsProductionPostgresBootstrapResult,
+  type FarmOsProductionPostgresBootstrapResult,
+} from "../../../src/lib/hermes/farm_os_production_postgres_bootstrap_query_authority";
+import {
   FARM_OS_PRODUCTION_IDENTITY_QUERY_V2_RESULT_CONTRACT_VERSION,
 } from "../../../src/lib/hermes/farm_os_production_identity_query_v2_contract";
 import {
   FARM_OS_PRODUCTION_IDENTITY_QUERY_V2_SHA256,
 } from "../../../src/lib/hermes/farm_os_production_identity_runtime_foundation";
 
-export const FARM_OS_PRODUCTION_POSTGRES_BOOTSTRAP_QUERY_CANDIDATE = Object.freeze({
-  authority_id: "farmos.production-postgres-version-bootstrap-query.v1",
-  purpose: "postgres_compatibility_preflight",
-  status: "CANDIDATE_FOR_APPROVAL",
-  authority_status: "REQUIRED_NOT_APPROVED",
-  artifact_path: "scripts/sql/farm_os_production_postgres_version_bootstrap_query_v1.sql",
-  sha256: "sha256:18aa8d2617daaf01fee517d453eeb21c611e9365b020b557881edf6828a8862a",
-  caller_input_count: 0,
-  mutation_count: 0,
-  credential_selection_count: 0,
-  output_row_count: 1,
-  output_column_count: 1,
-  output_column: "server_version_num",
-  repository_authority_adopted: false,
-  runtime_bound: false,
-  execution_authorized: false,
-} as const);
+export const FARM_OS_PRODUCTION_POSTGRES_BOOTSTRAP_QUERY_CANDIDATE =
+  FARM_OS_PRODUCTION_POSTGRES_BOOTSTRAP_QUERY_CANDIDATE_HISTORY;
+export const FARM_OS_PRODUCTION_POSTGRES_BOOTSTRAP_QUERY_AUTHORITY =
+  ADOPTED_BOOTSTRAP_AUTHORITY;
+export { parseFarmOsProductionPostgresBootstrapResult };
+export type { FarmOsProductionPostgresBootstrapResult };
 
 export const FARM_OS_PRODUCTION_IDENTITY_POSTGRES_QUALIFICATION_EVIDENCE_VERSION =
   "farmos.production-identity-postgres-qualification-evidence.v1" as const;
@@ -45,11 +40,6 @@ export type FarmOsProductionIdentityPostgresIncompatibilityReason =
   | "CATALOG_COLUMN_MISSING_INHERIT_OPTION"
   | "CATALOG_COLUMN_MISSING_SET_OPTION";
 
-export type FarmOsProductionPostgresBootstrapResult = Readonly<{
-  server_version_num: number;
-  postgres_major: number;
-}>;
-
 const exactKeys = (value: Record<string, unknown>, expected: readonly string[]): boolean => {
   const actual = Object.keys(value).sort();
   const sortedExpected = [...expected].sort();
@@ -66,17 +56,6 @@ const isCanonicalInstant = (value: unknown): value is string => {
   const epoch = Date.parse(value);
   return Number.isFinite(epoch) && new Date(epoch).toISOString() === value;
 };
-
-export function parseFarmOsProductionPostgresBootstrapResult(
-  value: unknown,
-): FarmOsProductionPostgresBootstrapResult | null {
-  if (!isRecord(value) || !exactKeys(value, ["server_version_num"])) return null;
-  const version = value.server_version_num;
-  if (typeof version !== "number" || !Number.isSafeInteger(version) || version < 0) return null;
-  const postgresMajor = Math.floor(version / 10_000);
-  if (postgresMajor <= 0) return null;
-  return Object.freeze({ server_version_num: version, postgres_major: postgresMajor });
-}
 
 export const FARM_OS_PRODUCTION_IDENTITY_POSTGRES_COMPATIBILITY_QUALIFICATION_POLICY = Object.freeze({
   minimum_proposed_postgres_major: 16,

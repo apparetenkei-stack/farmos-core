@@ -7,6 +7,7 @@ import {
 } from "../../../src/lib/hermes/farm_os_production_identity_runtime_foundation";
 import {
   FARM_OS_PRODUCTION_IDENTITY_POSTGRES_COMPATIBILITY_QUALIFICATION_POLICY,
+  FARM_OS_PRODUCTION_POSTGRES_BOOTSTRAP_QUERY_AUTHORITY,
   classifyFarmOsProductionIdentityPostgresCompatibility,
   parseFarmOsProductionIdentityPostgresQualificationEvidence,
   sha256FarmOsProductionIdentityQualificationSource,
@@ -282,7 +283,7 @@ export function evaluateFarmOsProductionIdentityQualificationClosure(
   technical_evidence_valid: true;
   technical_qualification_achieved: true;
   runtime_authority_closed: false;
-  blocker: "BOOTSTRAP_AUTHORITY_UNAPPROVED";
+  blocker: "BOOTSTRAP_RUNTIME_NOT_BOUND";
   runtime_evidence_assembly: "BLOCKED_RUNTIME_EVIDENCE_ASSEMBLY";
 }> | null {
   if (evidenceMatrix.length !== 2) return null;
@@ -304,7 +305,7 @@ export function evaluateFarmOsProductionIdentityQualificationClosure(
     technical_evidence_valid: true,
     technical_qualification_achieved: true,
     runtime_authority_closed: false,
-    blocker: "BOOTSTRAP_AUTHORITY_UNAPPROVED",
+    blocker: "BOOTSTRAP_RUNTIME_NOT_BOUND",
     runtime_evidence_assembly: "BLOCKED_RUNTIME_EVIDENCE_ASSEMBLY",
   });
 }
@@ -323,8 +324,11 @@ export function planFarmOsProductionIdentitySourceOnlyQualification(
   docker_runner_calls: 0;
   policy: ReturnType<typeof classifyFarmOsProductionIdentityPostgresCompatibility>;
   fixture: FarmOsProductionIdentitySyntheticFixture;
-  bootstrap_authority: "REQUIRED_NOT_APPROVED";
+  bootstrap_repository_authority: "ADOPTED";
+  bootstrap_runtime_binding: "NOT_RUNTIME_BOUND";
+  technical_qualification_status: "NOT_RUN";
   runtime_evidence_assembly: "BLOCKED_RUNTIME_EVIDENCE_ASSEMBLY";
+  production_operations: 0;
 }> {
   void input.docker_runner;
   return Object.freeze({
@@ -333,8 +337,11 @@ export function planFarmOsProductionIdentitySourceOnlyQualification(
     docker_runner_calls: 0,
     policy: classifyFarmOsProductionIdentityPostgresCompatibility(input.postgres_major * 10_000),
     fixture: buildFarmOsProductionIdentitySyntheticFixture(input.postgres_major, input.fixture_case),
-    bootstrap_authority: "REQUIRED_NOT_APPROVED",
+    bootstrap_repository_authority: FARM_OS_PRODUCTION_POSTGRES_BOOTSTRAP_QUERY_AUTHORITY.adoption_status,
+    bootstrap_runtime_binding: FARM_OS_PRODUCTION_POSTGRES_BOOTSTRAP_QUERY_AUTHORITY.runtime_binding_status,
+    technical_qualification_status: "NOT_RUN",
     runtime_evidence_assembly: "BLOCKED_RUNTIME_EVIDENCE_ASSEMBLY",
+    production_operations: 0,
   });
 }
 

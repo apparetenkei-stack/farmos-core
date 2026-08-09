@@ -5,6 +5,7 @@ import { readFileSync } from "node:fs";
 import {
   FARM_OS_PRODUCTION_IDENTITY_POSTGRES_COMPATIBILITY_QUALIFICATION_POLICY,
   FARM_OS_PRODUCTION_IDENTITY_POSTGRES_QUALIFICATION_EVIDENCE_VERSION,
+  FARM_OS_PRODUCTION_POSTGRES_BOOTSTRAP_QUERY_AUTHORITY,
   FARM_OS_PRODUCTION_POSTGRES_BOOTSTRAP_QUERY_CANDIDATE,
   classifyFarmOsProductionIdentityPostgresCompatibility,
   parseFarmOsProductionIdentityPostgresQualificationEvidence,
@@ -55,6 +56,10 @@ assert.equal(FARM_OS_PRODUCTION_POSTGRES_BOOTSTRAP_QUERY_CANDIDATE.execution_aut
 assert.equal(FARM_OS_PRODUCTION_POSTGRES_BOOTSTRAP_QUERY_CANDIDATE.caller_input_count, 0);
 assert.equal(FARM_OS_PRODUCTION_POSTGRES_BOOTSTRAP_QUERY_CANDIDATE.mutation_count, 0);
 assert.equal(FARM_OS_PRODUCTION_POSTGRES_BOOTSTRAP_QUERY_CANDIDATE.credential_selection_count, 0);
+assert.equal(FARM_OS_PRODUCTION_POSTGRES_BOOTSTRAP_QUERY_AUTHORITY.adoption_status, "ADOPTED");
+assert.equal(FARM_OS_PRODUCTION_POSTGRES_BOOTSTRAP_QUERY_AUTHORITY.review_status, "APPROVED");
+assert.equal(FARM_OS_PRODUCTION_POSTGRES_BOOTSTRAP_QUERY_AUTHORITY.runtime_binding_status, "NOT_RUNTIME_BOUND");
+assert.equal(FARM_OS_PRODUCTION_POSTGRES_BOOTSTRAP_QUERY_AUTHORITY.execution_authorized, false);
 assert.match(bootstrapSql, /^SELECT\b/u);
 assert.doesNotMatch(bootstrapSql, /\b(?:INSERT|UPDATE|DELETE|MERGE|CREATE|ALTER|DROP|TRUNCATE|GRANT|REVOKE|EXECUTE|CALL|DO|COPY)\b/iu);
 assert.doesNotMatch(bootstrapSql, /\b(?:FROM|JOIN|WHERE|inet_|pg_stat_activity|pg_roles|pg_authid|dblink|http)\b/iu);
@@ -161,8 +166,11 @@ for (const major of [14, 15, 16, 17] as const) {
     assert.equal(sourcePlan.phase, "SOURCE_ONLY");
     assert.equal(sourcePlan.docker_execution_authorized, false);
     assert.equal(sourcePlan.docker_runner_calls, 0);
-    assert.equal(sourcePlan.bootstrap_authority, "REQUIRED_NOT_APPROVED");
+    assert.equal(sourcePlan.bootstrap_repository_authority, "ADOPTED");
+    assert.equal(sourcePlan.bootstrap_runtime_binding, "NOT_RUNTIME_BOUND");
+    assert.equal(sourcePlan.technical_qualification_status, "NOT_RUN");
     assert.equal(sourcePlan.runtime_evidence_assembly, "BLOCKED_RUNTIME_EVIDENCE_ASSEMBLY");
+    assert.equal(sourcePlan.production_operations, 0);
     assert.equal(sourcePlan.fixture.business_row_count, 0);
     assert.equal(sourcePlan.fixture.target_relation_universe_count, 20);
     assert.equal(sourcePlan.fixture.target_function_universe_count, 21);
@@ -265,7 +273,7 @@ assert.deepEqual(evaluateFarmOsProductionIdentityQualificationClosure([parsedAbs
   technical_evidence_valid: true,
   technical_qualification_achieved: true,
   runtime_authority_closed: false,
-  blocker: "BOOTSTRAP_AUTHORITY_UNAPPROVED",
+  blocker: "BOOTSTRAP_RUNTIME_NOT_BOUND",
   runtime_evidence_assembly: "BLOCKED_RUNTIME_EVIDENCE_ASSEMBLY",
 });
 assert.equal(evaluateFarmOsProductionIdentityQualificationClosure([parsedEvidence]), null);
@@ -331,6 +339,8 @@ console.log(JSON.stringify({
   fixture_cases: fixtureCases,
   docker_execution_count: dockerExecutionCount,
   production_operations: 0,
-  bootstrap_authority: "REQUIRED_NOT_APPROVED",
+  bootstrap_repository_authority: "ADOPTED",
+  bootstrap_runtime_binding: "NOT_RUNTIME_BOUND",
+  technical_qualification_status: "NOT_RUN",
   runtime_evidence_assembly: "BLOCKED_RUNTIME_EVIDENCE_ASSEMBLY",
 }));

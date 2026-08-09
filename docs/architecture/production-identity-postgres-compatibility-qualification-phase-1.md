@@ -5,6 +5,12 @@ This phase creates source artifacts only. It does not close
 `BLOCKED_POSTGRES_COMPATIBILITY`, adopt bootstrap authority, change the runtime
 binding, connect to PostgreSQL, or authorize Docker.
 
+Historical-status note: this document preserves the Phase 1 candidate state at
+source-foundation commit `5713ecfa2cdbcecb2e14fa47946424bca7b353ff`.
+The subsequent formal Repository Authority adoption is recorded separately in
+`production-postgres-bootstrap-query-authority-v1-adoption.md`; it does not
+rewrite this candidate history or authorize runtime binding/execution.
+
 ## Authority separation
 
 The exact bootstrap candidate is
