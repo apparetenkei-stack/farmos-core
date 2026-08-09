@@ -148,12 +148,39 @@ working-tree files do not expand or replace this fixed source set.
 Successful and expected-negative records use
 `farmos.production-identity-postgres-qualification-evidence.v1` and are parsed
 again before output. Evidence persistence is zero; stdout is the only sink.
-Failures use a separate sanitized coded envelope and never include exception
-messages or raw command/database output.
+Qualification failures use the exact-key, lineage-bound diagnostic contract
+`farmos.production-identity-postgres-qualification-failure.v2`. It records only
+the allowlisted failure phase, formal section ID and ordinal, completed SQL
+section count, canonical five-character SQLSTATE or `null`, transaction,
+rollback and session-close state, exact-owned cleanup state, primary and terminal failure codes,
+and the fixed executor/query/bootstrap authority lineage. It never includes an
+exception message, detail, hint, context, position, SQL text, object identifier
+from an error payload, driver object, credential, connection data, catalog row,
+or Docker log. CLI failures that occur before repository lineage is available
+remain the separate pre-lineage executor error v1 and are not qualification
+diagnostic evidence.
+
+The completed-section count is parser-bound to the exact failed ordinal and
+fixture case, and includes only successfully executed SQL sections.
+The in-memory H2 not-applicable sentinel does not increment it. Adapter
+allowlist rejection, database query rejection, and result materialization are
+distinct phases. SQLSTATE is copied only from an authentic PostgreSQL
+`DatabaseError` and only when it matches `^[0-9A-Z]{5}$`; otherwise it is
+`null`. Parser and sanitizer handoffs are also distinct phases. Rollback and
+session close are tracked separately. Rollback, session-close, or cleanup
+failure becomes the terminal failure without replacing the
+primary failure code, phase, section, ordinal, completed count, or SQLSTATE.
+Only actual successful owned-container cleanup sets
+`container_cleanup_performed=true`.
+
+This diagnostic contract does not amend the v2 SQL authority, fixture
+privileges, qualification principal, PostgreSQL compatibility policy, runtime
+binding, or success evidence. In particular it does not grant access to
+`pg_control_system()` and does not establish the cause of a section failure.
 
 The error taxonomy includes Docker/image/container/readiness/setup/bootstrap/
-capability/artifact/transaction/section/parser/sanitizer/rollback/cleanup and
-evidence failures. `CLEANUP_FAILED` invalidates a case. A successful source
+capability/artifact/transaction/section/parser/sanitizer/rollback/session-close/
+cleanup and evidence failures. `CLEANUP_FAILED` invalidates a case. A successful source
 review is not an actual PostgreSQL qualification and must not be represented as
 `QUALIFIED`.
 

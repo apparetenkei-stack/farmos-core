@@ -20,11 +20,17 @@ import {
   parseFarmOsProductionPostgresBootstrapResultSet,
 } from "../../../src/lib/hermes/farm_os_production_postgres_bootstrap_query_authority";
 import {
+  FARM_OS_PRODUCTION_IDENTITY_POSTGRES_QUALIFICATION_FAILURE_CODES,
+  FARM_OS_PRODUCTION_IDENTITY_POSTGRES_QUALIFICATION_FAILURE_VERSION,
   FARM_OS_PRODUCTION_IDENTITY_POSTGRES_QUALIFICATION_EVIDENCE_VERSION,
   FARM_OS_PRODUCTION_POSTGRES_BOOTSTRAP_QUERY_AUTHORITY,
   FARM_OS_PRODUCTION_POSTGRES_BOOTSTRAP_QUERY_CANDIDATE,
+  parseFarmOsProductionIdentityPostgresQualificationFailure,
   parseFarmOsProductionIdentityPostgresQualificationEvidence,
   type FarmOsProductionIdentityPostgresMajor,
+  type FarmOsProductionIdentityPostgresQualificationFailure,
+  type FarmOsProductionIdentityPostgresQualificationFailureCode,
+  type FarmOsProductionIdentityPostgresQualificationFailurePhase,
   type FarmOsProductionIdentityPostgresQualificationEvidence,
 } from "./farm_os_production_identity_postgres_qualification_contract";
 import {
@@ -51,34 +57,45 @@ export const FARM_OS_PRODUCTION_IDENTITY_POSTGRES_ISOLATED_QUALIFICATION_EXECUTO
   } as const);
 
 export const FARM_OS_PRODUCTION_IDENTITY_POSTGRES_QUALIFICATION_ERRORS =
-  Object.freeze([
-    "DOCKER_UNAVAILABLE",
-    "IMAGE_MISSING",
-    "IMAGE_PULL_FAILED",
-    "IMAGE_METADATA_INVALID",
-    "CONTAINER_START_FAILED",
-    "CONTAINER_OWNERSHIP_MISMATCH",
-    "READINESS_FAILED",
-    "FIXTURE_SETUP_FAILED",
-    "BOOTSTRAP_MISMATCH",
-    "PG_NOT_ELIGIBLE",
-    "CAPABILITY_MISMATCH",
-    "QUERY_ARTIFACT_DRIFT",
-    "TRANSACTION_READ_ONLY_FAILED",
-    "SECTION_EXECUTION_FAILED",
-    "PARSER_FAILED",
-    "SANITIZATION_FAILED",
-    "ROLLBACK_FAILED",
-    "CLEANUP_FAILED",
-    "EVIDENCE_INVALID",
-  ] as const);
+  FARM_OS_PRODUCTION_IDENTITY_POSTGRES_QUALIFICATION_FAILURE_CODES;
 
 export type FarmOsProductionIdentityPostgresQualificationErrorCode =
-  typeof FARM_OS_PRODUCTION_IDENTITY_POSTGRES_QUALIFICATION_ERRORS[number];
+  FarmOsProductionIdentityPostgresQualificationFailureCode;
+
+type InternalFailureDiagnostic = Readonly<{
+  primary_failure_code: FarmOsProductionIdentityPostgresQualificationErrorCode;
+  terminal_failure_code: FarmOsProductionIdentityPostgresQualificationErrorCode;
+  failure_phase: FarmOsProductionIdentityPostgresQualificationFailurePhase;
+  section_id: FarmOsProductionIdentityQueryV2CandidateSection | null;
+  statement_ordinal: number | null;
+  completed_section_count: number;
+  sqlstate: string | null;
+  transaction_started: boolean;
+  rollback_attempted: boolean;
+  rollback_performed: boolean;
+  rollback_status: "NOT_REQUIRED" | "NOT_ATTEMPTED" | "SUCCEEDED" | "FAILED";
+  session_close_performed: boolean;
+  cleanup_status: "NOT_ATTEMPTED" | "SUCCEEDED" | "FAILED";
+  container_cleanup_performed: boolean;
+}>;
+
+export type FarmOsProductionIdentitySafeSectionQueryFailurePhase =
+  "ADAPTER_ALLOWLIST" | "SECTION_QUERY" | "SECTION_RESULT_MATERIALIZATION";
+
+export class FarmOsProductionIdentitySafeSectionQueryError extends Error {
+  constructor(
+    readonly failure_phase: FarmOsProductionIdentitySafeSectionQueryFailurePhase,
+    readonly sqlstate: string | null,
+  ) {
+    super("SECTION_EXECUTION_FAILED");
+    this.name = "FarmOsProductionIdentitySafeSectionQueryError";
+  }
+}
 
 export class FarmOsProductionIdentityPostgresQualificationError extends Error {
   constructor(
     readonly code: FarmOsProductionIdentityPostgresQualificationErrorCode,
+    readonly diagnostic: InternalFailureDiagnostic | null = null,
   ) {
     super(code);
     this.name = "FarmOsProductionIdentityPostgresQualificationError";
@@ -89,6 +106,59 @@ function fail(
   code: FarmOsProductionIdentityPostgresQualificationErrorCode,
 ): never {
   throw new FarmOsProductionIdentityPostgresQualificationError(code);
+}
+
+function canonicalSqlstate(value: unknown): string | null {
+  return typeof value === "string" && /^[0-9A-Z]{5}$/u.test(value) ? value : null;
+}
+
+function defaultFailureDiagnostic(
+  code: FarmOsProductionIdentityPostgresQualificationErrorCode,
+): InternalFailureDiagnostic {
+  return Object.freeze({
+    primary_failure_code: code,
+    terminal_failure_code: code,
+    failure_phase: code === "ROLLBACK_FAILED" ? "ROLLBACK" :
+      code === "SESSION_CLOSE_FAILED" ? "SESSION_CLOSE" :
+      code === "CLEANUP_FAILED" ? "CLEANUP" : "OTHER",
+    section_id: null,
+    statement_ordinal: null,
+    completed_section_count: 0,
+    sqlstate: null,
+    transaction_started: false,
+    rollback_attempted: false,
+    rollback_performed: false,
+    rollback_status: "NOT_REQUIRED",
+    session_close_performed: false,
+    cleanup_status: "NOT_ATTEMPTED",
+    container_cleanup_performed: false,
+  });
+}
+
+function diagnosticError(
+  code: FarmOsProductionIdentityPostgresQualificationErrorCode,
+  overrides: Partial<InternalFailureDiagnostic>,
+): FarmOsProductionIdentityPostgresQualificationError {
+  return new FarmOsProductionIdentityPostgresQualificationError(code, Object.freeze({
+    ...defaultFailureDiagnostic(code),
+    ...overrides,
+    terminal_failure_code: overrides.terminal_failure_code ?? code,
+  }));
+}
+
+function preservedDiagnosticError(
+  error: unknown,
+  terminalCode: FarmOsProductionIdentityPostgresQualificationErrorCode,
+  overrides: Partial<InternalFailureDiagnostic>,
+): FarmOsProductionIdentityPostgresQualificationError {
+  const existing = error instanceof FarmOsProductionIdentityPostgresQualificationError
+    ? error.diagnostic ?? defaultFailureDiagnostic(error.code)
+    : defaultFailureDiagnostic("EVIDENCE_INVALID");
+  return new FarmOsProductionIdentityPostgresQualificationError(terminalCode, Object.freeze({
+    ...existing,
+    ...overrides,
+    terminal_failure_code: terminalCode,
+  }));
 }
 
 export type FarmOsProductionIdentityImageAuthority = Readonly<{
@@ -168,19 +238,6 @@ export type FarmOsProductionIdentityQualificationExecutorInput = Readonly<{
   random_bytes?: (size: number) => Buffer;
 }>;
 
-export type FarmOsProductionIdentityQualificationFailureEvidence = Readonly<{
-  schema_version:
-    "farmos.production-identity-postgres-qualification-executor-error.v1";
-  executor_authority_id:
-    "farmos.production-identity-postgres-isolated-qualification-executor.v1";
-  postgres_major: FarmOsProductionIdentityPostgresMajor;
-  case: FarmOsProductionIdentityFixtureCase | "NEGATIVE_CAPABILITY_ONLY";
-  error_code: FarmOsProductionIdentityPostgresQualificationErrorCode;
-  production_operations: 0;
-  secret_exposed: false;
-  filesystem_persistence: 0;
-}>;
-
 export type FarmOsProductionIdentityQualificationRunResult = Readonly<{
   lineage: Readonly<{
     schema_version:
@@ -194,7 +251,7 @@ export type FarmOsProductionIdentityQualificationRunResult = Readonly<{
     filesystem_persistence: 0;
   }>;
   evidence: readonly FarmOsProductionIdentityPostgresQualificationEvidence[];
-  failures: readonly FarmOsProductionIdentityQualificationFailureEvidence[];
+  failures: readonly FarmOsProductionIdentityPostgresQualificationFailure[];
 }>;
 
 const FIXTURE_PASSWORD_PLACEHOLDER =
@@ -373,25 +430,35 @@ function systemIdentifier(
   return typeof value === "string" && /^[0-9]{1,20}$/u.test(value) ? value : null;
 }
 
-async function safeRollbackAndClose(
+async function rollbackAndClose(
   session: FarmOsProductionIdentityQualificationSession,
   transactionStarted: boolean,
-): Promise<boolean> {
-  let rollbackPass = !transactionStarted;
+): Promise<Readonly<{
+  rollback_attempted: boolean;
+  rollback_performed: boolean;
+  session_close_performed: boolean;
+}>> {
+  let rollbackPerformed = !transactionStarted;
   if (transactionStarted) {
     try {
       await session.rollback();
-      rollbackPass = true;
+      rollbackPerformed = true;
     } catch {
-      rollbackPass = false;
+      rollbackPerformed = false;
     }
   }
+  let sessionClosePerformed = false;
   try {
     await session.close();
+    sessionClosePerformed = true;
   } catch {
-    rollbackPass = false;
+    sessionClosePerformed = false;
   }
-  return rollbackPass;
+  return Object.freeze({
+    rollback_attempted: transactionStarted,
+    rollback_performed: rollbackPerformed,
+    session_close_performed: sessionClosePerformed,
+  });
 }
 
 async function executeNegative(
@@ -434,10 +501,10 @@ async function executePositive(
   h2_row_count: 0 | 5;
   assertion_count: number;
   rollback_performed: true;
-}>> {
+  }>> {
   let transactionStarted = false;
-  let rollbackPass = false;
   let assertionCount = 0;
+  let completedSectionCount = 0;
   try {
     const principal = await session.query(FARM_OS_PRODUCTION_IDENTITY_QUALIFICATION_PRINCIPAL_SQL)
       .catch(() => fail("FIXTURE_SETUP_FAILED"));
@@ -479,15 +546,35 @@ async function executePositive(
         assertionCount += 1;
         continue;
       }
-      const rows = await session.query(section.statement_sql).catch(() =>
-        fail("SECTION_EXECUTION_FAILED"));
+      let rows: readonly Record<string, unknown>[];
+      try {
+        rows = await session.query(section.statement_sql);
+      } catch (error) {
+        const safe = error instanceof FarmOsProductionIdentitySafeSectionQueryError
+          ? error : null;
+        throw diagnosticError("SECTION_EXECUTION_FAILED", {
+          failure_phase: safe?.failure_phase ?? "SECTION_QUERY",
+          section_id: section.section_id,
+          statement_ordinal: section.ordinal,
+          completed_section_count: completedSectionCount,
+          sqlstate: canonicalSqlstate(safe?.sqlstate),
+          transaction_started: true,
+          rollback_status: "NOT_ATTEMPTED",
+        });
+      }
       resultSets.push(resultSet(section.section_id, rows));
+      completedSectionCount += 1;
       assertionCount += 1;
       if (section.section_id === "H1_MIGRATION_HISTORY_EXISTENCE") {
         observedH1 = h1State(rows);
         if (observedH1 === null || observedH1 !==
           (fixtureCase === "MIGRATION_HISTORY_PRESENT" ? "present" : "absent")) {
-          fail("PARSER_FAILED");
+          throw diagnosticError("PARSER_FAILED", {
+            failure_phase: "PARSER_HANDOFF",
+            completed_section_count: completedSectionCount,
+            transaction_started: true,
+            rollback_status: "NOT_ATTEMPTED",
+          });
         }
       }
       if (section.section_id === "H2_MIGRATION_HISTORY_ROWS_IF_PRESENT") {
@@ -495,7 +582,14 @@ async function executePositive(
       }
     }
     if (validateFarmOsProductionIdentityQueryV2CandidateResultSets(resultSets).valid !== true ||
-      !rawFixtureSemanticsPass(resultSets, fixtureCase)) fail("PARSER_FAILED");
+      !rawFixtureSemanticsPass(resultSets, fixtureCase)) {
+      throw diagnosticError("PARSER_FAILED", {
+        failure_phase: "PARSER_HANDOFF",
+        completed_section_count: completedSectionCount,
+        transaction_started: true,
+        rollback_status: "NOT_ATTEMPTED",
+      });
+    }
     assertionCount += 2;
     const transformed = transformFarmOsProductionIdentityQueryV2CandidateResultSets(resultSets);
     const sanitized = sanitizeFarmOsProductionIdentityQueryV2ResultSets(resultSets);
@@ -503,12 +597,38 @@ async function executePositive(
     if (transformed === null || sanitized === null || rawSystemIdentifier === null ||
       !validateFarmOsProductionIdentitySanitizedEvidenceCandidate(transformed) ||
       !finalSanitationPass(transformed, rawSystemIdentifier, credential)) {
-      fail("SANITIZATION_FAILED");
+      throw diagnosticError("SANITIZATION_FAILED", {
+        failure_phase: "SANITIZER_HANDOFF",
+        completed_section_count: completedSectionCount,
+        transaction_started: true,
+        rollback_status: "NOT_ATTEMPTED",
+      });
     }
     assertionCount += 4;
-    rollbackPass = await safeRollbackAndClose(session, transactionStarted);
+    const completion = await rollbackAndClose(session, transactionStarted);
     transactionStarted = false;
-    if (!rollbackPass) fail("ROLLBACK_FAILED");
+    if (!completion.rollback_performed) {
+      throw diagnosticError("ROLLBACK_FAILED", {
+        failure_phase: "ROLLBACK",
+        completed_section_count: completedSectionCount,
+        transaction_started: true,
+        rollback_attempted: true,
+        rollback_performed: false,
+        rollback_status: "FAILED",
+        session_close_performed: completion.session_close_performed,
+      });
+    }
+    if (!completion.session_close_performed) {
+      throw diagnosticError("SESSION_CLOSE_FAILED", {
+        failure_phase: "SESSION_CLOSE",
+        completed_section_count: completedSectionCount,
+        transaction_started: true,
+        rollback_attempted: true,
+        rollback_performed: true,
+        rollback_status: "SUCCEEDED",
+        session_close_performed: false,
+      });
+    }
     assertionCount += 1;
     return Object.freeze({
       server_version_num: bootstrap.server_version_num,
@@ -519,14 +639,47 @@ async function executePositive(
       rollback_performed: true,
     });
   } catch (error) {
+    if (error instanceof FarmOsProductionIdentityPostgresQualificationError &&
+      error.diagnostic?.rollback_attempted) throw error;
     if (transactionStarted) {
-      rollbackPass = await safeRollbackAndClose(session, true);
-      if (!rollbackPass) fail("ROLLBACK_FAILED");
+      const outcome = await rollbackAndClose(session, true);
+      if (!outcome.rollback_performed) {
+        throw preservedDiagnosticError(error, "ROLLBACK_FAILED", {
+          transaction_started: true,
+          rollback_attempted: true,
+          rollback_performed: false,
+          rollback_status: "FAILED",
+          session_close_performed: outcome.session_close_performed,
+        });
+      }
+      if (!outcome.session_close_performed) {
+        throw preservedDiagnosticError(error, "SESSION_CLOSE_FAILED", {
+          transaction_started: true,
+          rollback_attempted: true,
+          rollback_performed: true,
+          rollback_status: "SUCCEEDED",
+          session_close_performed: false,
+        });
+      }
+      throw preservedDiagnosticError(
+        error,
+        error instanceof FarmOsProductionIdentityPostgresQualificationError
+          ? error.code : "EVIDENCE_INVALID",
+        {
+          transaction_started: true,
+          rollback_attempted: true,
+          rollback_performed: true,
+          rollback_status: "SUCCEEDED",
+          session_close_performed: true,
+        },
+      );
     } else {
       try {
         await session.close();
       } catch {
-        fail("ROLLBACK_FAILED");
+        throw preservedDiagnosticError(error, "SESSION_CLOSE_FAILED", {
+          session_close_performed: false,
+        });
       }
     }
     throw error;
@@ -534,25 +687,52 @@ async function executePositive(
 }
 
 function failureEvidence(
+  input: FarmOsProductionIdentityQualificationExecutorInput,
   major: FarmOsProductionIdentityPostgresMajor,
   fixtureCase: FarmOsProductionIdentityFixtureCase | "NEGATIVE_CAPABILITY_ONLY",
   error: unknown,
-): FarmOsProductionIdentityQualificationFailureEvidence {
+): FarmOsProductionIdentityPostgresQualificationFailure {
   const code = error instanceof FarmOsProductionIdentityPostgresQualificationError
     ? error.code
     : "EVIDENCE_INVALID";
-  return Object.freeze({
-    schema_version:
-      "farmos.production-identity-postgres-qualification-executor-error.v1",
+  const diagnostic = error instanceof FarmOsProductionIdentityPostgresQualificationError
+    ? error.diagnostic ?? defaultFailureDiagnostic(code)
+    : defaultFailureDiagnostic(code);
+  const failure: FarmOsProductionIdentityPostgresQualificationFailure = Object.freeze({
+    schema_version: FARM_OS_PRODUCTION_IDENTITY_POSTGRES_QUALIFICATION_FAILURE_VERSION,
+    failure_code: diagnostic.terminal_failure_code,
+    failure_phase: diagnostic.failure_phase,
+    section_id: diagnostic.section_id,
+    statement_ordinal: diagnostic.statement_ordinal,
+    completed_section_count: diagnostic.completed_section_count,
+    sqlstate: canonicalSqlstate(diagnostic.sqlstate),
+    postgres_major: major,
+    fixture_case: fixtureCase,
+    transaction_started: diagnostic.transaction_started,
+    rollback_attempted: diagnostic.rollback_attempted,
+    rollback_performed: diagnostic.rollback_performed,
+    rollback_status: diagnostic.rollback_status,
+    session_close_performed: diagnostic.session_close_performed,
+    container_cleanup_performed: diagnostic.container_cleanup_performed,
+    cleanup_status: diagnostic.cleanup_status,
+    primary_failure_code: diagnostic.primary_failure_code,
+    terminal_failure_code: diagnostic.terminal_failure_code,
     executor_authority_id:
       "farmos.production-identity-postgres-isolated-qualification-executor.v1",
-    postgres_major: major,
-    case: fixtureCase,
-    error_code: code,
+    source_commit: input.git_commit,
+    source_digest: input.executor_source_sha256,
+    query_authority_id: "farmos.production-target-identity-query.v2",
+    query_sha256: FARM_OS_PRODUCTION_IDENTITY_QUERY_V2_SHA256,
+    bootstrap_authority_id: FARM_OS_PRODUCTION_POSTGRES_BOOTSTRAP_QUERY_CANDIDATE.authority_id,
+    bootstrap_sha256: FARM_OS_PRODUCTION_POSTGRES_BOOTSTRAP_QUERY_CANDIDATE.sha256,
     production_operations: 0,
     secret_exposed: false,
     filesystem_persistence: 0,
   });
+  if (parseFarmOsProductionIdentityPostgresQualificationFailure(failure) === null) {
+    fail("EVIDENCE_INVALID");
+  }
+  return failure;
 }
 
 async function imageFor(
@@ -597,6 +777,7 @@ async function runCase(
   let evidenceWithoutCleanup: Omit<FarmOsProductionIdentityPostgresQualificationEvidence,
     "container_cleanup_performed"> | null = null;
   let pendingError: unknown = null;
+  let successfulCleanupFailure: FarmOsProductionIdentityPostgresQualificationError | null = null;
   try {
     try {
       container = await input.platform.startContainer({ major, image, nonce, credential });
@@ -650,8 +831,16 @@ async function runCase(
       try {
         await session.close();
       } catch {
-        fail("ROLLBACK_FAILED");
+        throw diagnosticError("SESSION_CLOSE_FAILED", {
+          failure_phase: "SESSION_CLOSE",
+          session_close_performed: false,
+        });
       }
+      successfulCleanupFailure = diagnosticError("CLEANUP_FAILED", {
+        failure_phase: "CLEANUP",
+        completed_section_count: 0,
+        session_close_performed: true,
+      });
       evidenceWithoutCleanup = {
         schema_version: FARM_OS_PRODUCTION_IDENTITY_POSTGRES_QUALIFICATION_EVIDENCE_VERSION,
         qualification_id: `pg${major}-${nonce}-src${sourceDigest}-negative`,
@@ -691,6 +880,15 @@ async function runCase(
       const positiveCase = fixtureCase;
       const result = await executePositive(
         major, positiveCase, session, bootstrapSql, credential);
+      successfulCleanupFailure = diagnosticError("CLEANUP_FAILED", {
+        failure_phase: "CLEANUP",
+        completed_section_count: result.executed_section_count,
+        transaction_started: true,
+        rollback_attempted: true,
+        rollback_performed: true,
+        rollback_status: "SUCCEEDED",
+        session_close_performed: true,
+      });
       evidenceWithoutCleanup = {
         schema_version: FARM_OS_PRODUCTION_IDENTITY_POSTGRES_QUALIFICATION_EVIDENCE_VERSION,
         qualification_id: `pg${major}-${nonce}-src${sourceDigest}-${positiveCase.toLowerCase()}`,
@@ -737,8 +935,22 @@ async function runCase(
   } catch {
     cleanupPass = false;
   }
-  if (!cleanupPass) fail("CLEANUP_FAILED");
-  if (pendingError !== null) throw pendingError;
+  if (!cleanupPass) {
+    throw preservedDiagnosticError(
+      pendingError ?? successfulCleanupFailure ??
+        new FarmOsProductionIdentityPostgresQualificationError("CLEANUP_FAILED"),
+      "CLEANUP_FAILED",
+      { cleanup_status: "FAILED", container_cleanup_performed: false },
+    );
+  }
+  if (pendingError !== null) {
+    throw preservedDiagnosticError(
+      pendingError,
+      pendingError instanceof FarmOsProductionIdentityPostgresQualificationError
+        ? pendingError.code : "EVIDENCE_INVALID",
+      { cleanup_status: "SUCCEEDED", container_cleanup_performed: true },
+    );
+  }
   if (evidenceWithoutCleanup === null) fail("EVIDENCE_INVALID");
   const completedEvidence = evidenceWithoutCleanup;
   const evidence: FarmOsProductionIdentityPostgresQualificationEvidence = Object.freeze({
@@ -762,7 +974,7 @@ export async function executeFarmOsProductionIdentityPostgresQualificationMatrix
   if (bootstrap.status !== "VERIFIED") fail("BOOTSTRAP_MISMATCH");
   const bootstrapSql = Buffer.from(bootstrap.raw_bytes).toString("utf8");
   const evidence: FarmOsProductionIdentityPostgresQualificationEvidence[] = [];
-  const failures: FarmOsProductionIdentityQualificationFailureEvidence[] = [];
+  const failures: FarmOsProductionIdentityPostgresQualificationFailure[] = [];
   for (const major of FARM_OS_PRODUCTION_IDENTITY_POSTGRES_ISOLATED_QUALIFICATION_EXECUTOR
     .allowed_postgres_majors) {
     const cases: readonly (FarmOsProductionIdentityFixtureCase | "NEGATIVE_CAPABILITY_ONLY")[] =
@@ -772,14 +984,16 @@ export async function executeFarmOsProductionIdentityPostgresQualificationMatrix
     try {
       image = await imageFor(input, major);
     } catch (error) {
-      for (const fixtureCase of cases) failures.push(failureEvidence(major, fixtureCase, error));
+      for (const fixtureCase of cases) {
+        failures.push(failureEvidence(input, major, fixtureCase, error));
+      }
       continue;
     }
     for (const fixtureCase of cases) {
       try {
         evidence.push(await runCase(input, major, fixtureCase, image, bootstrapSql));
       } catch (error) {
-        failures.push(failureEvidence(major, fixtureCase, error));
+        failures.push(failureEvidence(input, major, fixtureCase, error));
       }
     }
   }
@@ -804,7 +1018,9 @@ export function serializeFarmOsProductionIdentityQualificationStdout(
   result: FarmOsProductionIdentityQualificationRunResult,
 ): readonly string[] {
   if (!executorLineageValid(result.lineage) || result.evidence.some((evidence) =>
-    parseFarmOsProductionIdentityExecutorBoundEvidence(evidence, result.lineage) === null)) {
+    parseFarmOsProductionIdentityExecutorBoundEvidence(evidence, result.lineage) === null) ||
+    result.failures.some((failure) =>
+      parseFarmOsProductionIdentityExecutorBoundFailure(failure, result.lineage) === null)) {
     fail("EVIDENCE_INVALID");
   }
   return Object.freeze([result.lineage, ...result.evidence, ...result.failures].map((entry) =>
@@ -832,6 +1048,16 @@ export function parseFarmOsProductionIdentityExecutorBoundEvidence(
   if (evidence === null || evidence.git_commit !== lineage.git_commit) return null;
   const digest = lineage.executor_source_sha256.slice(7);
   return evidence.qualification_id.includes(`-src${digest}-`) ? evidence : null;
+}
+
+export function parseFarmOsProductionIdentityExecutorBoundFailure(
+  value: unknown,
+  lineage: FarmOsProductionIdentityQualificationRunResult["lineage"],
+): FarmOsProductionIdentityPostgresQualificationFailure | null {
+  if (!executorLineageValid(lineage)) return null;
+  const failure = parseFarmOsProductionIdentityPostgresQualificationFailure(value);
+  return failure !== null && failure.source_commit === lineage.git_commit &&
+    failure.source_digest === lineage.executor_source_sha256 ? failure : null;
 }
 
 export function evaluateFarmOsProductionIdentityExecutorQualificationClosure(

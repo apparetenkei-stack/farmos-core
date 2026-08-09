@@ -1,11 +1,12 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 
-import { Client, type ClientConfig } from "pg";
+import { Client, DatabaseError, type ClientConfig, type QueryResult } from "pg";
 
 import {
   FARM_OS_PRODUCTION_IDENTITY_QUALIFICATION_PRINCIPAL_SQL,
   FarmOsProductionIdentityPostgresQualificationError,
+  FarmOsProductionIdentitySafeSectionQueryError,
   buildFarmOsProductionIdentityRuntimeFixtureStatements,
   type FarmOsProductionIdentityFixtureCredential,
   type FarmOsProductionIdentityImageAuthority,
@@ -45,6 +46,16 @@ type DockerResult = Readonly<{
   stdout: string;
   failure_kind: "NONE" | "NOT_FOUND" | "FAILED";
 }>;
+
+export function sanitizeFarmOsProductionIdentityPgSectionError(
+  error: unknown,
+): FarmOsProductionIdentitySafeSectionQueryError {
+  const code = error instanceof DatabaseError ? error.code : null;
+  return new FarmOsProductionIdentitySafeSectionQueryError(
+    "SECTION_QUERY",
+    typeof code === "string" && /^[0-9A-Z]{5}$/u.test(code) ? code : null,
+  );
+}
 
 export interface FarmOsProductionIdentityDockerCommandRunner {
   run(
@@ -291,11 +302,21 @@ class PgQualificationSession implements FarmOsProductionIdentityQualificationSes
 
   async query(statementSql: string): Promise<readonly Record<string, unknown>[]> {
     if (!this.allowedSql.has(statementSql)) {
-      throw new FarmOsProductionIdentityPostgresQualificationError(
-        "SECTION_EXECUTION_FAILED");
+      throw new FarmOsProductionIdentitySafeSectionQueryError(
+        "ADAPTER_ALLOWLIST", null);
     }
-    const result = await this.client.query(statementSql);
-    return Object.freeze(result.rows.map((row) => Object.freeze({ ...row })));
+    let result: QueryResult<Record<string, unknown>>;
+    try {
+      result = await this.client.query<Record<string, unknown>>(statementSql);
+    } catch (error) {
+      throw sanitizeFarmOsProductionIdentityPgSectionError(error);
+    }
+    try {
+      return Object.freeze(result.rows.map((row) => Object.freeze({ ...row })));
+    } catch {
+      throw new FarmOsProductionIdentitySafeSectionQueryError(
+        "SECTION_RESULT_MATERIALIZATION", null);
+    }
   }
 
   async rollback(): Promise<void> {

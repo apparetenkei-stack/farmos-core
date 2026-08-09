@@ -7,7 +7,9 @@ import {
   type FarmOsProductionPostgresBootstrapResult,
 } from "../../../src/lib/hermes/farm_os_production_postgres_bootstrap_query_authority";
 import {
+  FARM_OS_PRODUCTION_IDENTITY_QUERY_V2_CANDIDATE_SECTIONS,
   FARM_OS_PRODUCTION_IDENTITY_QUERY_V2_RESULT_CONTRACT_VERSION,
+  type FarmOsProductionIdentityQueryV2CandidateSection,
 } from "../../../src/lib/hermes/farm_os_production_identity_query_v2_contract";
 import {
   FARM_OS_PRODUCTION_IDENTITY_QUERY_V2_SHA256,
@@ -22,6 +24,43 @@ export type { FarmOsProductionPostgresBootstrapResult };
 
 export const FARM_OS_PRODUCTION_IDENTITY_POSTGRES_QUALIFICATION_EVIDENCE_VERSION =
   "farmos.production-identity-postgres-qualification-evidence.v1" as const;
+export const FARM_OS_PRODUCTION_IDENTITY_POSTGRES_QUALIFICATION_FAILURE_VERSION =
+  "farmos.production-identity-postgres-qualification-failure.v2" as const;
+
+export const FARM_OS_PRODUCTION_IDENTITY_POSTGRES_QUALIFICATION_FAILURE_PHASES = [
+  "ADAPTER_ALLOWLIST",
+  "SECTION_QUERY",
+  "SECTION_RESULT_MATERIALIZATION",
+  "PARSER_HANDOFF",
+  "SANITIZER_HANDOFF",
+  "ROLLBACK",
+  "SESSION_CLOSE",
+  "CLEANUP",
+  "OTHER",
+] as const;
+
+export const FARM_OS_PRODUCTION_IDENTITY_POSTGRES_QUALIFICATION_FAILURE_CODES = [
+  "DOCKER_UNAVAILABLE",
+  "IMAGE_MISSING",
+  "IMAGE_PULL_FAILED",
+  "IMAGE_METADATA_INVALID",
+  "CONTAINER_START_FAILED",
+  "CONTAINER_OWNERSHIP_MISMATCH",
+  "READINESS_FAILED",
+  "FIXTURE_SETUP_FAILED",
+  "BOOTSTRAP_MISMATCH",
+  "PG_NOT_ELIGIBLE",
+  "CAPABILITY_MISMATCH",
+  "QUERY_ARTIFACT_DRIFT",
+  "TRANSACTION_READ_ONLY_FAILED",
+  "SECTION_EXECUTION_FAILED",
+  "PARSER_FAILED",
+  "SANITIZATION_FAILED",
+  "ROLLBACK_FAILED",
+  "SESSION_CLOSE_FAILED",
+  "CLEANUP_FAILED",
+  "EVIDENCE_INVALID",
+] as const;
 
 export const FARM_OS_PRODUCTION_IDENTITY_POSTGRES_QUALIFICATION_CLASSIFICATIONS = [
   "QUALIFIED",
@@ -34,6 +73,10 @@ export const FARM_OS_PRODUCTION_IDENTITY_POSTGRES_QUALIFICATION_CLASSIFICATIONS 
 ] as const;
 
 export type FarmOsProductionIdentityPostgresMajor = 14 | 15 | 16 | 17;
+export type FarmOsProductionIdentityPostgresQualificationFailureCode =
+  typeof FARM_OS_PRODUCTION_IDENTITY_POSTGRES_QUALIFICATION_FAILURE_CODES[number];
+export type FarmOsProductionIdentityPostgresQualificationFailurePhase =
+  typeof FARM_OS_PRODUCTION_IDENTITY_POSTGRES_QUALIFICATION_FAILURE_PHASES[number];
 export type FarmOsProductionIdentityQualificationClassification =
   typeof FARM_OS_PRODUCTION_IDENTITY_POSTGRES_QUALIFICATION_CLASSIFICATIONS[number];
 export type FarmOsProductionIdentityPostgresIncompatibilityReason =
@@ -155,6 +198,146 @@ export type FarmOsProductionIdentityPostgresQualificationEvidence = Readonly<{
   production_operations: 0;
   secret_exposed: false;
 }>;
+
+export type FarmOsProductionIdentityPostgresQualificationFailure = Readonly<{
+  schema_version: typeof FARM_OS_PRODUCTION_IDENTITY_POSTGRES_QUALIFICATION_FAILURE_VERSION;
+  failure_code: FarmOsProductionIdentityPostgresQualificationFailureCode;
+  failure_phase: FarmOsProductionIdentityPostgresQualificationFailurePhase;
+  section_id: FarmOsProductionIdentityQueryV2CandidateSection | null;
+  statement_ordinal: number | null;
+  completed_section_count: number;
+  sqlstate: string | null;
+  postgres_major: FarmOsProductionIdentityPostgresMajor;
+  fixture_case: "MIGRATION_HISTORY_ABSENT" | "MIGRATION_HISTORY_PRESENT" |
+    "NEGATIVE_CAPABILITY_ONLY";
+  transaction_started: boolean;
+  rollback_attempted: boolean;
+  rollback_performed: boolean;
+  rollback_status: "NOT_REQUIRED" | "NOT_ATTEMPTED" | "SUCCEEDED" | "FAILED";
+  session_close_performed: boolean;
+  container_cleanup_performed: boolean;
+  cleanup_status: "NOT_ATTEMPTED" | "SUCCEEDED" | "FAILED";
+  primary_failure_code: FarmOsProductionIdentityPostgresQualificationFailureCode;
+  terminal_failure_code: FarmOsProductionIdentityPostgresQualificationFailureCode;
+  executor_authority_id:
+    "farmos.production-identity-postgres-isolated-qualification-executor.v1";
+  source_commit: string;
+  source_digest: `sha256:${string}`;
+  query_authority_id: "farmos.production-target-identity-query.v2";
+  query_sha256: typeof FARM_OS_PRODUCTION_IDENTITY_QUERY_V2_SHA256;
+  bootstrap_authority_id: typeof FARM_OS_PRODUCTION_POSTGRES_BOOTSTRAP_QUERY_CANDIDATE.authority_id;
+  bootstrap_sha256: typeof FARM_OS_PRODUCTION_POSTGRES_BOOTSTRAP_QUERY_CANDIDATE.sha256;
+  production_operations: 0;
+  secret_exposed: false;
+  filesystem_persistence: 0;
+}>;
+
+const FAILURE_KEYS = [
+  "schema_version", "failure_code", "failure_phase", "section_id", "statement_ordinal",
+  "completed_section_count", "sqlstate", "postgres_major", "fixture_case",
+  "transaction_started", "rollback_attempted", "rollback_performed", "rollback_status",
+  "session_close_performed", "container_cleanup_performed", "cleanup_status", "primary_failure_code",
+  "terminal_failure_code", "executor_authority_id", "source_commit", "source_digest",
+  "query_authority_id", "query_sha256", "bootstrap_authority_id", "bootstrap_sha256",
+  "production_operations", "secret_exposed", "filesystem_persistence",
+] as const;
+
+export function parseFarmOsProductionIdentityPostgresQualificationFailure(
+  value: unknown,
+): FarmOsProductionIdentityPostgresQualificationFailure | null {
+  if (!isRecord(value) || !exactKeys(value, FAILURE_KEYS)) return null;
+  const sectionIndex = typeof value.section_id === "string"
+    ? FARM_OS_PRODUCTION_IDENTITY_QUERY_V2_CANDIDATE_SECTIONS.indexOf(
+      value.section_id as FarmOsProductionIdentityQueryV2CandidateSection)
+    : -1;
+  const sectionPairValid = value.section_id === null
+    ? value.statement_ordinal === null
+    : sectionIndex >= 0 && value.statement_ordinal === sectionIndex + 1;
+  const expectedCompletedSectionCount = sectionIndex < 0 ? null :
+    value.fixture_case === "MIGRATION_HISTORY_ABSENT" && sectionIndex > 8
+      ? sectionIndex - 1 : sectionIndex;
+  if (value.schema_version !== FARM_OS_PRODUCTION_IDENTITY_POSTGRES_QUALIFICATION_FAILURE_VERSION ||
+    !FARM_OS_PRODUCTION_IDENTITY_POSTGRES_QUALIFICATION_FAILURE_CODES.includes(
+      value.failure_code as FarmOsProductionIdentityPostgresQualificationFailureCode) ||
+    !FARM_OS_PRODUCTION_IDENTITY_POSTGRES_QUALIFICATION_FAILURE_PHASES.includes(
+      value.failure_phase as FarmOsProductionIdentityPostgresQualificationFailurePhase) ||
+    !sectionPairValid ||
+    typeof value.completed_section_count !== "number" ||
+    !Number.isSafeInteger(value.completed_section_count) || value.completed_section_count < 0 ||
+    value.completed_section_count > 11 ||
+    (sectionIndex >= 0 && value.completed_section_count !== expectedCompletedSectionCount) ||
+    !(value.sqlstate === null ||
+      (typeof value.sqlstate === "string" && /^[0-9A-Z]{5}$/u.test(value.sqlstate))) ||
+    ![14, 15, 16, 17].includes(value.postgres_major as number) ||
+    !["MIGRATION_HISTORY_ABSENT", "MIGRATION_HISTORY_PRESENT",
+      "NEGATIVE_CAPABILITY_ONLY"].includes(value.fixture_case as string) ||
+    typeof value.transaction_started !== "boolean" ||
+    typeof value.rollback_attempted !== "boolean" ||
+    typeof value.rollback_performed !== "boolean" ||
+    !["NOT_REQUIRED", "NOT_ATTEMPTED", "SUCCEEDED", "FAILED"].includes(
+      value.rollback_status as string) ||
+    typeof value.session_close_performed !== "boolean" ||
+    typeof value.container_cleanup_performed !== "boolean" ||
+    !["NOT_ATTEMPTED", "SUCCEEDED", "FAILED"].includes(value.cleanup_status as string) ||
+    !FARM_OS_PRODUCTION_IDENTITY_POSTGRES_QUALIFICATION_FAILURE_CODES.includes(
+      value.primary_failure_code as FarmOsProductionIdentityPostgresQualificationFailureCode) ||
+    !FARM_OS_PRODUCTION_IDENTITY_POSTGRES_QUALIFICATION_FAILURE_CODES.includes(
+      value.terminal_failure_code as FarmOsProductionIdentityPostgresQualificationFailureCode) ||
+    value.failure_code !== value.terminal_failure_code ||
+    value.executor_authority_id !==
+      "farmos.production-identity-postgres-isolated-qualification-executor.v1" ||
+    typeof value.source_commit !== "string" || !/^[a-f0-9]{40}$/u.test(value.source_commit) ||
+    !isDigest(value.source_digest) ||
+    value.query_authority_id !== "farmos.production-target-identity-query.v2" ||
+    value.query_sha256 !== FARM_OS_PRODUCTION_IDENTITY_QUERY_V2_SHA256 ||
+    value.bootstrap_authority_id !==
+      FARM_OS_PRODUCTION_POSTGRES_BOOTSTRAP_QUERY_CANDIDATE.authority_id ||
+    value.bootstrap_sha256 !== FARM_OS_PRODUCTION_POSTGRES_BOOTSTRAP_QUERY_CANDIDATE.sha256 ||
+    value.production_operations !== 0 || value.secret_exposed !== false ||
+    value.filesystem_persistence !== 0) return null;
+  if ((value.rollback_status === "SUCCEEDED") !== value.rollback_performed ||
+    (value.rollback_status === "NOT_REQUIRED" &&
+      (value.transaction_started || value.rollback_attempted || value.rollback_performed)) ||
+    (value.rollback_status === "NOT_ATTEMPTED" &&
+      (!value.transaction_started || value.rollback_attempted || value.rollback_performed)) ||
+    (value.rollback_status === "FAILED" &&
+      (!value.transaction_started || !value.rollback_attempted || value.rollback_performed)) ||
+    (value.rollback_status === "SUCCEEDED" &&
+      (!value.transaction_started || !value.rollback_attempted)) ||
+    (value.cleanup_status === "SUCCEEDED") !== value.container_cleanup_performed ||
+    (value.cleanup_status === "FAILED" && value.container_cleanup_performed)) return null;
+  const sectionPhase = ["ADAPTER_ALLOWLIST", "SECTION_QUERY",
+    "SECTION_RESULT_MATERIALIZATION"].includes(value.failure_phase as string);
+  if (sectionPhase !== (value.section_id !== null) ||
+    (sectionPhase && value.fixture_case === "NEGATIVE_CAPABILITY_ONLY") ||
+    (value.section_id === "H2_MIGRATION_HISTORY_ROWS_IF_PRESENT" &&
+      value.fixture_case !== "MIGRATION_HISTORY_PRESENT") ||
+    value.sqlstate !== null && value.failure_phase !== "SECTION_QUERY" ||
+    (sectionPhase && value.primary_failure_code !== "SECTION_EXECUTION_FAILED") ||
+    (value.failure_phase === "PARSER_HANDOFF" && value.primary_failure_code !== "PARSER_FAILED") ||
+    (value.failure_phase === "SANITIZER_HANDOFF" &&
+      value.primary_failure_code !== "SANITIZATION_FAILED") ||
+    (value.failure_phase === "ROLLBACK" && value.primary_failure_code !== "ROLLBACK_FAILED") ||
+    (value.failure_phase === "SESSION_CLOSE" &&
+      value.primary_failure_code !== "SESSION_CLOSE_FAILED") ||
+    (value.failure_phase === "CLEANUP" && value.primary_failure_code !== "CLEANUP_FAILED") ||
+    (value.failure_phase === "CLEANUP" && value.completed_section_count !==
+      (value.fixture_case === "NEGATIVE_CAPABILITY_ONLY" ? 0 :
+        value.fixture_case === "MIGRATION_HISTORY_PRESENT" ? 11 : 10)) ||
+    (value.failure_phase === "PARSER_HANDOFF" &&
+      ![8, value.fixture_case === "MIGRATION_HISTORY_PRESENT" ? 11 : 10]
+        .includes(value.completed_section_count)) ||
+    (value.failure_phase === "SANITIZER_HANDOFF" &&
+      value.completed_section_count !==
+        (value.fixture_case === "MIGRATION_HISTORY_PRESENT" ? 11 : 10)) ||
+    (value.cleanup_status === "FAILED") !== (value.terminal_failure_code === "CLEANUP_FAILED") ||
+    (value.terminal_failure_code === "SESSION_CLOSE_FAILED" && value.session_close_performed) ||
+    (value.rollback_status === "FAILED" &&
+      !["ROLLBACK_FAILED", "CLEANUP_FAILED"].includes(value.terminal_failure_code as string))) {
+    return null;
+  }
+  return Object.freeze(value as unknown as FarmOsProductionIdentityPostgresQualificationFailure);
+}
 
 const EVIDENCE_KEYS = [
   "schema_version", "qualification_id", "git_commit", "observed_at", "postgres_major",

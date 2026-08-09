@@ -1,13 +1,17 @@
 import assert from "node:assert/strict";
 
+import { DatabaseError } from "pg";
+
 import {
   FARM_OS_PRODUCTION_IDENTITY_POSTGRES_ISOLATED_QUALIFICATION_EXECUTOR,
   FARM_OS_PRODUCTION_IDENTITY_POSTGRES_QUALIFICATION_ERRORS,
   FARM_OS_PRODUCTION_IDENTITY_QUALIFICATION_PRINCIPAL_SQL,
   FarmOsProductionIdentityPostgresQualificationError,
+  FarmOsProductionIdentitySafeSectionQueryError,
   createFarmOsProductionIdentityFixtureCredential,
   evaluateFarmOsProductionIdentityExecutorQualificationClosure,
   executeFarmOsProductionIdentityPostgresQualificationMatrix,
+  parseFarmOsProductionIdentityExecutorBoundFailure,
   serializeFarmOsProductionIdentityQualificationStdout,
   type FarmOsProductionIdentityFixtureCredential,
   type FarmOsProductionIdentityImageAuthority,
@@ -18,10 +22,12 @@ import {
 import {
   FarmOsProductionIdentityExactDockerCommandRunner,
   FarmOsProductionIdentityIsolatedPostgresPlatform,
+  sanitizeFarmOsProductionIdentityPgSectionError,
   type FarmOsProductionIdentityDockerCommandRunner,
 } from "./lib/farm_os_production_identity_postgres_qualification_docker_adapter";
-import type {
-  FarmOsProductionIdentityPostgresMajor,
+import {
+  parseFarmOsProductionIdentityPostgresQualificationFailure,
+  type FarmOsProductionIdentityPostgresMajor,
 } from "./lib/farm_os_production_identity_postgres_qualification_contract";
 import {
   loadFarmOsProductionIdentityQueryV2Artifact,
@@ -95,6 +101,12 @@ class FakeSession implements FarmOsProductionIdentityQualificationSession {
   constructor(
     private readonly trace: SessionTrace,
     private readonly positiveFixture: readonly FarmOsProductionIdentityCandidateResultSet[] | null,
+    private readonly sectionFailure: Readonly<{
+      section_id: string;
+      phase: "ADAPTER_ALLOWLIST" | "SECTION_QUERY" | "SECTION_RESULT_MATERIALIZATION";
+      sqlstate: string | null;
+    }> | null,
+    private readonly h1StateOverride: "absent" | "present" | "invalid" | null,
   ) {}
 
   async beginRepeatableReadOnly(): Promise<void> {
@@ -125,7 +137,23 @@ class FakeSession implements FarmOsProductionIdentityQualificationSession {
     }
     const section = sectionBySql.get(sql);
     if (section === undefined) throw new Error("unexpected_sql");
+    if (this.sectionFailure?.section_id === section) {
+      throw new FarmOsProductionIdentitySafeSectionQueryError(
+        this.sectionFailure.phase, this.sectionFailure.sqlstate);
+    }
     this.trace.sectionCalls.push(section);
+    if (section === "H1_MIGRATION_HISTORY_EXISTENCE" && this.h1StateOverride !== null) {
+      return [{
+        section_id: section,
+        row_key: "core_schema.migration_history",
+        payload: {
+          collection_status: "complete",
+          relation: "core_schema.migration_history",
+          state: this.h1StateOverride === "invalid" ? "unknown" : this.h1StateOverride,
+        },
+        sanitization_class: "SAFE_STRUCTURAL",
+      }];
+    }
     const positiveRows = this.positiveFixture?.find((candidate) =>
       candidate.section_id === section)?.rows;
     if (positiveRows !== undefined) {
@@ -172,8 +200,15 @@ class FakePlatform implements FarmOsProductionIdentityPostgresQualificationPlatf
   readinessInputs: unknown[] = [];
   cleanupPass = true;
   rollbackPass = true;
+  closePass = true;
   imagesPresent = true;
   positiveSuccess = false;
+  sectionFailure: Readonly<{
+    section_id: string;
+    phase: "ADAPTER_ALLOWLIST" | "SECTION_QUERY" | "SECTION_RESULT_MATERIALIZATION";
+    sqlstate: string | null;
+  }> | null = null;
+  h1StateOverride: "absent" | "present" | "invalid" | null = null;
   private currentFixtureCase: "MIGRATION_HISTORY_ABSENT" | "MIGRATION_HISTORY_PRESENT" =
     "MIGRATION_HISTORY_ABSENT";
 
@@ -252,11 +287,18 @@ class FakePlatform implements FarmOsProductionIdentityPostgresQualificationPlatf
       assert.deepEqual(validateFarmOsProductionIdentityQueryV2CandidateResultSets(
         positiveFixture), { valid: true });
     }
-    const session = new FakeSession(trace, positiveFixture);
+    const session = new FakeSession(
+      trace, positiveFixture, this.sectionFailure, this.h1StateOverride);
     if (!this.rollbackPass) {
       session.rollback = async () => {
         trace.rollback += 1;
         throw new Error("synthetic_rollback_failure");
+      };
+    }
+    if (!this.closePass) {
+      session.close = async () => {
+        trace.close += 1;
+        throw new Error("synthetic_close_failure");
       };
     }
     return session;
@@ -289,7 +331,7 @@ assert.equal(matrix.evidence.length, 2);
 assert.deepEqual(matrix.evidence.map((entry) => entry.classification),
   ["NOT_ELIGIBLE", "NOT_ELIGIBLE"]);
 assert.equal(matrix.failures.length, 4);
-assert.equal(matrix.failures.every((entry) => entry.error_code === "PARSER_FAILED"), true);
+assert.equal(matrix.failures.every((entry) => entry.failure_code === "PARSER_FAILED"), true);
 assert.equal(platform.startCount, 6);
 assert.equal(platform.cleanupCount, 6);
 assert.equal(platform.pullCount, 0);
@@ -356,6 +398,241 @@ assert.equal(evaluateFarmOsProductionIdentityExecutorQualificationClosure({
   ...positiveMatrix,
   lineage: { ...positiveMatrix.lineage, executor_source_sha256: `sha256:${"8".repeat(64)}` },
 }), null);
+
+async function sectionFailureMatrix(input: Readonly<{
+  section_id: string;
+  phase?: "ADAPTER_ALLOWLIST" | "SECTION_QUERY" | "SECTION_RESULT_MATERIALIZATION";
+  sqlstate?: string | null;
+  rollback_pass?: boolean;
+  cleanup_pass?: boolean;
+}>) {
+  const failurePlatform = new FakePlatform();
+  failurePlatform.positiveSuccess = true;
+  failurePlatform.sectionFailure = {
+    section_id: input.section_id,
+    phase: input.phase ?? "SECTION_QUERY",
+    sqlstate: input.sqlstate ?? null,
+  };
+  failurePlatform.rollbackPass = input.rollback_pass ?? true;
+  failurePlatform.cleanupPass = input.cleanup_pass ?? true;
+  return await executeFarmOsProductionIdentityPostgresQualificationMatrix({
+    git_commit: "6".repeat(40),
+    executor_source_sha256: TEST_SOURCE_DIGEST,
+    allow_image_pull: false,
+    platform: failurePlatform,
+    now: () => new Date("2026-08-09T00:00:00.000Z"),
+    random_bytes: fixedRandom,
+  });
+}
+
+const sectionCases = [
+  ["A_TRANSACTION_SERVER_GATE", 1, 0],
+  ["B_CLUSTER_IDENTITY_SOURCE", 2, 1],
+  ["J_DATABASE_SIZE", 11, 10],
+] as const;
+for (const [sectionId, ordinal, completed] of sectionCases) {
+  const failed = await sectionFailureMatrix({ section_id: sectionId, sqlstate: "42501" });
+  const diagnostic = failed.failures.find((entry) => entry.postgres_major === 16 &&
+    entry.fixture_case === "MIGRATION_HISTORY_PRESENT");
+  assert.ok(diagnostic);
+  assert.equal(diagnostic.section_id, sectionId);
+  assert.equal(diagnostic.statement_ordinal, ordinal);
+  assert.equal(diagnostic.completed_section_count, completed);
+  assert.equal(diagnostic.sqlstate, "42501");
+  assert.equal(diagnostic.primary_failure_code, "SECTION_EXECUTION_FAILED");
+  assert.equal(diagnostic.terminal_failure_code, "SECTION_EXECUTION_FAILED");
+  assert.equal(diagnostic.transaction_started, true);
+  assert.equal(diagnostic.rollback_status, "SUCCEEDED");
+  assert.equal(diagnostic.cleanup_status, "SUCCEEDED");
+  assert.equal(parseFarmOsProductionIdentityPostgresQualificationFailure(diagnostic), diagnostic);
+  assert.equal(parseFarmOsProductionIdentityExecutorBoundFailure(diagnostic, failed.lineage), diagnostic);
+  if (sectionId === "J_DATABASE_SIZE") {
+    const absent = failed.failures.find((entry) => entry.postgres_major === 16 &&
+      entry.fixture_case === "MIGRATION_HISTORY_ABSENT");
+    assert.equal(absent?.completed_section_count, 9);
+  }
+}
+
+const h2Failed = await sectionFailureMatrix({
+  section_id: "H2_MIGRATION_HISTORY_ROWS_IF_PRESENT", sqlstate: "42703",
+});
+const h2PresentFailure = h2Failed.failures.find((entry) => entry.postgres_major === 16 &&
+  entry.fixture_case === "MIGRATION_HISTORY_PRESENT");
+assert.ok(h2PresentFailure);
+assert.equal(h2PresentFailure.statement_ordinal, 9);
+assert.equal(h2PresentFailure.completed_section_count, 8);
+assert.equal(h2Failed.failures.some((entry) => entry.fixture_case ===
+  "MIGRATION_HISTORY_ABSENT" && entry.section_id ===
+  "H2_MIGRATION_HISTORY_ROWS_IF_PRESENT"), false);
+assert.equal(h2Failed.evidence.some((entry) => entry.postgres_major === 16 &&
+  entry.h1_h2_case === "MIGRATION_HISTORY_ABSENT" && entry.classification === "QUALIFIED"), true);
+
+for (const h1Override of ["invalid", "present", "absent"] as const) {
+  const h1Platform = new FakePlatform();
+  h1Platform.positiveSuccess = true;
+  h1Platform.h1StateOverride = h1Override;
+  const h1Matrix = await executeFarmOsProductionIdentityPostgresQualificationMatrix({
+    git_commit: "6".repeat(40), executor_source_sha256: TEST_SOURCE_DIGEST,
+    allow_image_pull: false, platform: h1Platform, random_bytes: fixedRandom,
+  });
+  const expectedCases = h1Override === "invalid"
+    ? ["MIGRATION_HISTORY_ABSENT", "MIGRATION_HISTORY_PRESENT"]
+    : h1Override === "present" ? ["MIGRATION_HISTORY_ABSENT"]
+      : ["MIGRATION_HISTORY_PRESENT"];
+  for (const fixtureCase of expectedCases) {
+    const diagnostic = h1Matrix.failures.find((entry) => entry.postgres_major === 16 &&
+      entry.fixture_case === fixtureCase);
+    assert.ok(diagnostic);
+    assert.equal(diagnostic.primary_failure_code, "PARSER_FAILED");
+    assert.equal(diagnostic.failure_phase, "PARSER_HANDOFF");
+    assert.equal(diagnostic.completed_section_count, 8);
+  }
+}
+
+for (const sqlstate of ["42501", "42703", "42883", "42601"] as const) {
+  const pgError = new DatabaseError("SYNTHETIC_SECRET_MARKER_MESSAGE", 1, "error");
+  pgError.code = sqlstate;
+  pgError.detail = "SYNTHETIC_SECRET_MARKER_DETAIL";
+  pgError.hint = "SYNTHETIC_SECRET_MARKER_HINT";
+  pgError.where = "SYNTHETIC_SECRET_MARKER_CONTEXT";
+  pgError.internalQuery = "SELECT SYNTHETIC_SECRET_MARKER_QUERY";
+  const sanitizedError = sanitizeFarmOsProductionIdentityPgSectionError(pgError);
+  assert.equal(sanitizedError.failure_phase, "SECTION_QUERY");
+  assert.equal(sanitizedError.sqlstate, sqlstate);
+  assert.doesNotMatch(JSON.stringify(sanitizedError), /SYNTHETIC_SECRET_MARKER|SELECT/u);
+}
+assert.equal(sanitizeFarmOsProductionIdentityPgSectionError({ code: "42501" }).sqlstate, null);
+for (const malformed of ["4250", "425010", "42p01", "", null, 42501]) {
+  const pgError = new DatabaseError("hidden", 1, "error");
+  pgError.code = malformed as string | undefined;
+  assert.equal(sanitizeFarmOsProductionIdentityPgSectionError(pgError).sqlstate, null);
+}
+
+const allowlistFailure = await sectionFailureMatrix({
+  section_id: "A_TRANSACTION_SERVER_GATE", phase: "ADAPTER_ALLOWLIST", sqlstate: null,
+});
+assert.equal(allowlistFailure.failures.find((entry) => entry.postgres_major === 16)?.failure_phase,
+  "ADAPTER_ALLOWLIST");
+const materializationFailure = await sectionFailureMatrix({
+  section_id: "C_SCHEMA_IDENTITY", phase: "SECTION_RESULT_MATERIALIZATION",
+});
+assert.equal(materializationFailure.failures.find((entry) => entry.postgres_major === 16)
+  ?.failure_phase, "SECTION_RESULT_MATERIALIZATION");
+
+const precedenceCases = [
+  [true, true, "SECTION_EXECUTION_FAILED", "SUCCEEDED", "SUCCEEDED"],
+  [false, true, "ROLLBACK_FAILED", "FAILED", "SUCCEEDED"],
+  [true, false, "CLEANUP_FAILED", "SUCCEEDED", "FAILED"],
+  [false, false, "CLEANUP_FAILED", "FAILED", "FAILED"],
+] as const;
+for (const [rollbackPass, cleanupPass, terminal, rollbackStatus, cleanupStatus] of
+  precedenceCases) {
+  const precedence = await sectionFailureMatrix({
+    section_id: "B_CLUSTER_IDENTITY_SOURCE",
+    sqlstate: "42501",
+    rollback_pass: rollbackPass,
+    cleanup_pass: cleanupPass,
+  });
+  const diagnostic = precedence.failures.find((entry) => entry.postgres_major === 16 &&
+    entry.fixture_case === "MIGRATION_HISTORY_ABSENT");
+  assert.ok(diagnostic);
+  assert.equal(diagnostic.primary_failure_code, "SECTION_EXECUTION_FAILED");
+  assert.equal(diagnostic.terminal_failure_code, terminal);
+  assert.equal(diagnostic.failure_code, terminal);
+  assert.equal(diagnostic.failure_phase, "SECTION_QUERY");
+  assert.equal(diagnostic.section_id, "B_CLUSTER_IDENTITY_SOURCE");
+  assert.equal(diagnostic.sqlstate, "42501");
+  assert.equal(diagnostic.rollback_status, rollbackStatus);
+  assert.equal(diagnostic.cleanup_status, cleanupStatus);
+}
+
+const successRollbackFailurePlatform = new FakePlatform();
+successRollbackFailurePlatform.positiveSuccess = true;
+successRollbackFailurePlatform.rollbackPass = false;
+const successRollbackFailure = await executeFarmOsProductionIdentityPostgresQualificationMatrix({
+  git_commit: "6".repeat(40), executor_source_sha256: TEST_SOURCE_DIGEST,
+  allow_image_pull: false, platform: successRollbackFailurePlatform,
+  random_bytes: fixedRandom,
+});
+const successRollbackDiagnostic = successRollbackFailure.failures.find((entry) =>
+  entry.postgres_major === 16 && entry.fixture_case === "MIGRATION_HISTORY_ABSENT");
+assert.ok(successRollbackDiagnostic);
+assert.equal(successRollbackDiagnostic.primary_failure_code, "ROLLBACK_FAILED");
+assert.equal(successRollbackDiagnostic.failure_phase, "ROLLBACK");
+assert.equal(successRollbackDiagnostic.transaction_started, true);
+assert.equal(successRollbackDiagnostic.rollback_attempted, true);
+assert.equal(successRollbackDiagnostic.rollback_status, "FAILED");
+assert.equal(successRollbackDiagnostic.session_close_performed, true);
+
+const successCloseFailurePlatform = new FakePlatform();
+successCloseFailurePlatform.positiveSuccess = true;
+successCloseFailurePlatform.closePass = false;
+const successCloseFailure = await executeFarmOsProductionIdentityPostgresQualificationMatrix({
+  git_commit: "6".repeat(40), executor_source_sha256: TEST_SOURCE_DIGEST,
+  allow_image_pull: false, platform: successCloseFailurePlatform,
+  random_bytes: fixedRandom,
+});
+const successCloseDiagnostic = successCloseFailure.failures.find((entry) =>
+  entry.postgres_major === 16 && entry.fixture_case === "MIGRATION_HISTORY_ABSENT");
+assert.ok(successCloseDiagnostic);
+assert.equal(successCloseDiagnostic.primary_failure_code, "SESSION_CLOSE_FAILED");
+assert.equal(successCloseDiagnostic.failure_phase, "SESSION_CLOSE");
+assert.equal(successCloseDiagnostic.transaction_started, true);
+assert.equal(successCloseDiagnostic.rollback_status, "SUCCEEDED");
+assert.equal(successCloseDiagnostic.session_close_performed, false);
+
+const sectionAndCloseFailurePlatform = new FakePlatform();
+sectionAndCloseFailurePlatform.positiveSuccess = true;
+sectionAndCloseFailurePlatform.closePass = false;
+sectionAndCloseFailurePlatform.sectionFailure = {
+  section_id: "B_CLUSTER_IDENTITY_SOURCE", phase: "SECTION_QUERY", sqlstate: "42501",
+};
+const sectionAndCloseFailure = await executeFarmOsProductionIdentityPostgresQualificationMatrix({
+  git_commit: "6".repeat(40), executor_source_sha256: TEST_SOURCE_DIGEST,
+  allow_image_pull: false, platform: sectionAndCloseFailurePlatform,
+  random_bytes: fixedRandom,
+});
+const sectionAndCloseDiagnostic = sectionAndCloseFailure.failures.find((entry) =>
+  entry.postgres_major === 16 && entry.fixture_case === "MIGRATION_HISTORY_ABSENT");
+assert.ok(sectionAndCloseDiagnostic);
+assert.equal(sectionAndCloseDiagnostic.primary_failure_code, "SECTION_EXECUTION_FAILED");
+assert.equal(sectionAndCloseDiagnostic.terminal_failure_code, "SESSION_CLOSE_FAILED");
+assert.equal(sectionAndCloseDiagnostic.failure_phase, "SECTION_QUERY");
+assert.equal(sectionAndCloseDiagnostic.section_id, "B_CLUSTER_IDENTITY_SOURCE");
+assert.equal(sectionAndCloseDiagnostic.rollback_status, "SUCCEEDED");
+assert.equal(sectionAndCloseDiagnostic.session_close_performed, false);
+
+const lineageFailure = (await sectionFailureMatrix({
+  section_id: "B_CLUSTER_IDENTITY_SOURCE", sqlstate: "42501",
+})).failures[0]!;
+assert.equal(parseFarmOsProductionIdentityPostgresQualificationFailure({
+  ...lineageFailure, unexpected: true,
+}), null);
+assert.equal(parseFarmOsProductionIdentityPostgresQualificationFailure({
+  ...lineageFailure, sqlstate: "42p01",
+}), null);
+assert.equal(parseFarmOsProductionIdentityPostgresQualificationFailure({
+  ...lineageFailure, section_id: "UNKNOWN",
+}), null);
+assert.equal(parseFarmOsProductionIdentityPostgresQualificationFailure({
+  ...lineageFailure, statement_ordinal: 3,
+}), null);
+assert.equal(parseFarmOsProductionIdentityPostgresQualificationFailure({
+  ...lineageFailure, completed_section_count: 0,
+}), null);
+assert.equal(parseFarmOsProductionIdentityPostgresQualificationFailure({
+  ...h2PresentFailure, fixture_case: "MIGRATION_HISTORY_ABSENT",
+}), null);
+assert.equal(parseFarmOsProductionIdentityExecutorBoundFailure(lineageFailure, {
+  schema_version: "farmos.production-identity-postgres-qualification-executor-lineage.v1",
+  executor_authority_id:
+    "farmos.production-identity-postgres-isolated-qualification-executor.v1",
+  git_commit: "6".repeat(40),
+  executor_source_sha256: `sha256:${"8".repeat(64)}`,
+  repository_source_gate: "TRACKED_CLEAN_REQUIRED",
+  production_operations: 0,
+  filesystem_persistence: 0,
+}), null);
 const mismatchedImageEvidence = positiveMatrix.evidence.map((entry) =>
   entry.postgres_major === 16 && entry.h1_h2_case === "MIGRATION_HISTORY_PRESENT"
     ? { ...entry, image_id: `sha256:${"7".repeat(64)}` }
@@ -374,7 +651,7 @@ const missingResult = await executeFarmOsProductionIdentityPostgresQualification
 });
 assert.equal(missingResult.evidence.length, 0);
 assert.equal(missingResult.failures.length, 6);
-assert.equal(missingResult.failures.every((entry) => entry.error_code === "IMAGE_MISSING"), true);
+assert.equal(missingResult.failures.every((entry) => entry.failure_code === "IMAGE_MISSING"), true);
 assert.equal(missingImages.startCount, 0);
 assert.equal(missingImages.pullCount, 0);
 
@@ -395,7 +672,34 @@ const cleanupResult = await executeFarmOsProductionIdentityPostgresQualification
   random_bytes: fixedRandom,
 });
 assert.equal(cleanupResult.evidence.length, 0);
-assert.equal(cleanupResult.failures.every((entry) => entry.error_code === "CLEANUP_FAILED"), true);
+assert.equal(cleanupResult.failures.every((entry) => entry.failure_code === "CLEANUP_FAILED"), true);
+
+const successfulCleanupFailurePlatform = new FakePlatform();
+successfulCleanupFailurePlatform.positiveSuccess = true;
+successfulCleanupFailurePlatform.cleanupPass = false;
+const successfulCleanupResult = await executeFarmOsProductionIdentityPostgresQualificationMatrix({
+  git_commit: "c".repeat(40), allow_image_pull: false,
+  platform: successfulCleanupFailurePlatform,
+  executor_source_sha256: TEST_SOURCE_DIGEST,
+  random_bytes: fixedRandom,
+});
+const negativeCleanupDiagnostic = successfulCleanupResult.failures.find((entry) =>
+  entry.postgres_major === 14);
+assert.ok(negativeCleanupDiagnostic);
+assert.equal(negativeCleanupDiagnostic.completed_section_count, 0);
+assert.equal(negativeCleanupDiagnostic.transaction_started, false);
+assert.equal(negativeCleanupDiagnostic.rollback_status, "NOT_REQUIRED");
+assert.equal(negativeCleanupDiagnostic.session_close_performed, true);
+const absentCleanupDiagnostic = successfulCleanupResult.failures.find((entry) =>
+  entry.postgres_major === 16 && entry.fixture_case === "MIGRATION_HISTORY_ABSENT");
+assert.ok(absentCleanupDiagnostic);
+assert.equal(absentCleanupDiagnostic.completed_section_count, 10);
+assert.equal(absentCleanupDiagnostic.transaction_started, true);
+assert.equal(absentCleanupDiagnostic.rollback_status, "SUCCEEDED");
+assert.equal(absentCleanupDiagnostic.session_close_performed, true);
+const presentCleanupDiagnostic = successfulCleanupResult.failures.find((entry) =>
+  entry.postgres_major === 16 && entry.fixture_case === "MIGRATION_HISTORY_PRESENT");
+assert.equal(presentCleanupDiagnostic?.completed_section_count, 11);
 
 const rollbackFailure = new FakePlatform();
 rollbackFailure.rollbackPass = false;
@@ -407,7 +711,7 @@ const rollbackResult = await executeFarmOsProductionIdentityPostgresQualificatio
   random_bytes: fixedRandom,
 });
 assert.equal(rollbackResult.failures.filter((entry) => entry.postgres_major >= 16)
-  .every((entry) => entry.error_code === "ROLLBACK_FAILED"), true);
+  .every((entry) => entry.failure_code === "ROLLBACK_FAILED"), true);
 assert.equal(rollbackFailure.cleanupCount, 6);
 
 type RecordedDockerCall = Readonly<{
