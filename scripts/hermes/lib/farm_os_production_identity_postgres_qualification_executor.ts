@@ -1,4 +1,4 @@
-import { randomBytes } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 
 import {
   FARM_OS_PRODUCTION_IDENTITY_QUERY_V2_CANDIDATE_SECTIONS,
@@ -17,6 +17,7 @@ import {
   FARM_OS_PRODUCTION_IDENTITY_QUERY_V3_CANDIDATE,
   FARM_OS_PRODUCTION_IDENTITY_QUERY_V3_SHA256,
   loadFarmOsProductionIdentityQueryV3Artifact,
+  type FarmOsProductionIdentityQueryV3ArtifactVerification,
 } from "../../../src/lib/hermes/farm_os_production_identity_query_v3_authority";
 import {
   loadFarmOsProductionPostgresBootstrapQueryArtifact,
@@ -64,6 +65,69 @@ export const FARM_OS_PRODUCTION_IDENTITY_POSTGRES_QUALIFICATION_ERRORS =
 
 export type FarmOsProductionIdentityPostgresQualificationErrorCode =
   FarmOsProductionIdentityPostgresQualificationFailureCode;
+
+export type FarmOsProductionIdentityQueryV3StatementAuthorityAgreement = Readonly<{
+  query_authority_id: typeof FARM_OS_PRODUCTION_IDENTITY_QUERY_V3_CANDIDATE.authority_id;
+  query_sha256: typeof FARM_OS_PRODUCTION_IDENTITY_QUERY_V3_SHA256;
+  section_id: FarmOsProductionIdentityQueryV2CandidateSection;
+  statement_ordinal: number;
+  statement_sha256: `sha256:${string}`;
+  statement_sql: string;
+}>;
+
+export type FarmOsProductionIdentityQueryV3AuthorityAgreementPlan =
+  readonly FarmOsProductionIdentityQueryV3StatementAuthorityAgreement[];
+
+const statementSha256 = (statementSql: string): `sha256:${string}` =>
+  `sha256:${createHash("sha256").update(statementSql, "utf8").digest("hex")}`;
+
+export function createFarmOsProductionIdentityQueryV3AuthorityAgreementPlan(
+  artifact: FarmOsProductionIdentityQueryV3ArtifactVerification,
+): FarmOsProductionIdentityQueryV3AuthorityAgreementPlan | null {
+  if (artifact.status !== "VERIFIED" || artifact.section_plan.length !== 11) return null;
+  return Object.freeze(artifact.section_plan.map((section) => Object.freeze({
+    query_authority_id: FARM_OS_PRODUCTION_IDENTITY_QUERY_V3_CANDIDATE.authority_id,
+    query_sha256: FARM_OS_PRODUCTION_IDENTITY_QUERY_V3_SHA256,
+    section_id: section.section_id,
+    statement_ordinal: section.ordinal,
+    statement_sha256: statementSha256(section.statement_sql),
+    statement_sql: section.statement_sql,
+  })));
+}
+
+export function validateFarmOsProductionIdentityQueryV3AuthorityAgreementPlan(
+  candidate: FarmOsProductionIdentityQueryV3AuthorityAgreementPlan,
+  artifact: FarmOsProductionIdentityQueryV3ArtifactVerification,
+): boolean {
+  const expected = createFarmOsProductionIdentityQueryV3AuthorityAgreementPlan(artifact);
+  return expected !== null && Object.isFrozen(candidate) &&
+    candidate.length === expected.length && candidate.every((entry, index) => {
+      const reviewed = expected[index];
+      return reviewed !== undefined && Object.isFrozen(entry) &&
+        entry.query_authority_id === reviewed.query_authority_id &&
+        entry.query_sha256 === reviewed.query_sha256 &&
+        entry.section_id === reviewed.section_id &&
+        entry.statement_ordinal === reviewed.statement_ordinal &&
+        entry.statement_sha256 === reviewed.statement_sha256 &&
+        entry.statement_sql === reviewed.statement_sql;
+    });
+}
+
+export function validateFarmOsProductionIdentityQueryV3StatementAuthorityAgreement(
+  candidate: FarmOsProductionIdentityQueryV3StatementAuthorityAgreement,
+  plan: FarmOsProductionIdentityQueryV3AuthorityAgreementPlan,
+): boolean {
+  if (!Object.isFrozen(plan) || !Object.isFrozen(candidate)) return false;
+  const reviewed = plan.find((entry) => entry.section_id === candidate.section_id);
+  return reviewed !== undefined &&
+    candidate.query_authority_id === reviewed.query_authority_id &&
+    candidate.query_sha256 === reviewed.query_sha256 &&
+    candidate.section_id === reviewed.section_id &&
+    candidate.statement_ordinal === reviewed.statement_ordinal &&
+    candidate.statement_sha256 === reviewed.statement_sha256 &&
+    candidate.statement_sha256 === statementSha256(candidate.statement_sql) &&
+    candidate.statement_sql === reviewed.statement_sql;
+}
 
 type InternalFailureDiagnostic = Readonly<{
   primary_failure_code: FarmOsProductionIdentityPostgresQualificationErrorCode;
@@ -190,6 +254,9 @@ export interface FarmOsProductionIdentityQualificationSession {
   beginRepeatableReadOnly(): Promise<void>;
   setLocalTimeouts(): Promise<void>;
   query(statementSql: string): Promise<readonly Record<string, unknown>[]>;
+  querySection(
+    agreement: FarmOsProductionIdentityQueryV3StatementAuthorityAgreement,
+  ): Promise<readonly Record<string, unknown>[]>;
   rollback(): Promise<void>;
   close(): Promise<void>;
 }
@@ -226,6 +293,7 @@ export interface FarmOsProductionIdentityPostgresQualificationPlatform {
   openQualificationSession(input: Readonly<{
     container: FarmOsProductionIdentityOwnedContainer;
     credential: FarmOsProductionIdentityFixtureCredential;
+    section_authority_plan: FarmOsProductionIdentityQueryV3AuthorityAgreementPlan;
   }>): Promise<FarmOsProductionIdentityQualificationSession>;
   cleanupExactOwnedContainer(
     container: FarmOsProductionIdentityOwnedContainer,
@@ -497,6 +565,7 @@ async function executePositive(
   session: FarmOsProductionIdentityQualificationSession,
   bootstrapSql: string,
   credential: FarmOsProductionIdentityFixtureCredential,
+  sectionAuthorityPlan: FarmOsProductionIdentityQueryV3AuthorityAgreementPlan,
 ): Promise<Readonly<{
   server_version_num: number;
   executed_section_count: 10 | 11;
@@ -524,10 +593,7 @@ async function executePositive(
     if (capabilities === null || JSON.stringify(capabilities) !==
       JSON.stringify(CAPABILITY_COLUMNS)) fail("CAPABILITY_MISMATCH");
     assertionCount += 1;
-    const artifact = loadFarmOsProductionIdentityQueryV3Artifact();
-    if (artifact.status !== "VERIFIED" || artifact.section_plan.length !== 11) {
-      fail("QUERY_ARTIFACT_DRIFT");
-    }
+    if (sectionAuthorityPlan.length !== 11) fail("QUERY_ARTIFACT_DRIFT");
     assertionCount += 1;
     try {
       await session.beginRepeatableReadOnly();
@@ -541,8 +607,8 @@ async function executePositive(
     const resultSets: FarmOsProductionIdentityCandidateResultSet[] = [];
     let observedH1: "absent" | "present" | null = null;
     let h2InvocationCount: 0 | 1 = 0;
-    for (const section of artifact.section_plan) {
-      if (section.section_id === "H2_MIGRATION_HISTORY_ROWS_IF_PRESENT" &&
+    for (const agreement of sectionAuthorityPlan) {
+      if (agreement.section_id === "H2_MIGRATION_HISTORY_ROWS_IF_PRESENT" &&
         observedH1 === "absent") {
         const sentinel = createFarmOsProductionIdentityH2NotApplicableSentinel("absent");
         resultSets.push({ section_id: sentinel.section_id, rows: [...sentinel.rows] });
@@ -551,24 +617,24 @@ async function executePositive(
       }
       let rows: readonly Record<string, unknown>[];
       try {
-        rows = await session.query(section.statement_sql);
+        rows = await session.querySection(agreement);
       } catch (error) {
         const safe = error instanceof FarmOsProductionIdentitySafeSectionQueryError
           ? error : null;
         throw diagnosticError("SECTION_EXECUTION_FAILED", {
           failure_phase: safe?.failure_phase ?? "SECTION_QUERY",
-          section_id: section.section_id,
-          statement_ordinal: section.ordinal,
+          section_id: agreement.section_id,
+          statement_ordinal: agreement.statement_ordinal,
           completed_section_count: completedSectionCount,
           sqlstate: canonicalSqlstate(safe?.sqlstate),
           transaction_started: true,
           rollback_status: "NOT_ATTEMPTED",
         });
       }
-      resultSets.push(resultSet(section.section_id, rows));
+      resultSets.push(resultSet(agreement.section_id, rows));
       completedSectionCount += 1;
       assertionCount += 1;
-      if (section.section_id === "H1_MIGRATION_HISTORY_EXISTENCE") {
+      if (agreement.section_id === "H1_MIGRATION_HISTORY_EXISTENCE") {
         observedH1 = h1State(rows);
         if (observedH1 === null || observedH1 !==
           (fixtureCase === "MIGRATION_HISTORY_PRESENT" ? "present" : "absent")) {
@@ -580,7 +646,7 @@ async function executePositive(
           });
         }
       }
-      if (section.section_id === "H2_MIGRATION_HISTORY_ROWS_IF_PRESENT") {
+      if (agreement.section_id === "H2_MIGRATION_HISTORY_ROWS_IF_PRESENT") {
         h2InvocationCount = 1;
       }
     }
@@ -770,6 +836,7 @@ async function runCase(
   fixtureCase: FarmOsProductionIdentityFixtureCase | "NEGATIVE_CAPABILITY_ONLY",
   image: FarmOsProductionIdentityImageAuthority,
   bootstrapSql: string,
+  sectionAuthorityPlan: FarmOsProductionIdentityQueryV3AuthorityAgreementPlan,
 ): Promise<FarmOsProductionIdentityPostgresQualificationEvidence> {
   const random = input.random_bytes ?? randomBytes;
   const credential = createFarmOsProductionIdentityFixtureCredential(random);
@@ -827,7 +894,9 @@ async function runCase(
     } catch {
       fail("FIXTURE_SETUP_FAILED");
     }
-    const session = await input.platform.openQualificationSession({ container, credential })
+    const session = await input.platform.openQualificationSession({
+      container, credential, section_authority_plan: sectionAuthorityPlan,
+    })
       .catch(() => fail("FIXTURE_SETUP_FAILED"));
     if (major === 14 || major === 15) {
       const result = await executeNegative(major, session, bootstrapSql);
@@ -882,7 +951,7 @@ async function runCase(
       if (fixtureCase === "NEGATIVE_CAPABILITY_ONLY") fail("PG_NOT_ELIGIBLE");
       const positiveCase = fixtureCase;
       const result = await executePositive(
-        major, positiveCase, session, bootstrapSql, credential);
+        major, positiveCase, session, bootstrapSql, credential, sectionAuthorityPlan);
       successfulCleanupFailure = diagnosticError("CLEANUP_FAILED", {
         failure_phase: "CLEANUP",
         completed_section_count: result.executed_section_count,
@@ -976,6 +1045,12 @@ export async function executeFarmOsProductionIdentityPostgresQualificationMatrix
   const bootstrap = loadFarmOsProductionPostgresBootstrapQueryArtifact();
   if (bootstrap.status !== "VERIFIED") fail("BOOTSTRAP_MISMATCH");
   const bootstrapSql = Buffer.from(bootstrap.raw_bytes).toString("utf8");
+  const queryArtifact = loadFarmOsProductionIdentityQueryV3Artifact();
+  const sectionAuthorityPlan =
+    createFarmOsProductionIdentityQueryV3AuthorityAgreementPlan(queryArtifact);
+  if (sectionAuthorityPlan === null ||
+    !validateFarmOsProductionIdentityQueryV3AuthorityAgreementPlan(
+      sectionAuthorityPlan, queryArtifact)) fail("QUERY_ARTIFACT_DRIFT");
   const evidence: FarmOsProductionIdentityPostgresQualificationEvidence[] = [];
   const failures: FarmOsProductionIdentityPostgresQualificationFailure[] = [];
   for (const major of FARM_OS_PRODUCTION_IDENTITY_POSTGRES_ISOLATED_QUALIFICATION_EXECUTOR
@@ -994,7 +1069,8 @@ export async function executeFarmOsProductionIdentityPostgresQualificationMatrix
     }
     for (const fixtureCase of cases) {
       try {
-        evidence.push(await runCase(input, major, fixtureCase, image, bootstrapSql));
+        evidence.push(await runCase(
+          input, major, fixtureCase, image, bootstrapSql, sectionAuthorityPlan));
       } catch (error) {
         failures.push(failureEvidence(input, major, fixtureCase, error));
       }

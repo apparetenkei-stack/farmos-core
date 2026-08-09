@@ -8,18 +8,22 @@ import {
   FarmOsProductionIdentityPostgresQualificationError,
   FarmOsProductionIdentitySafeSectionQueryError,
   buildFarmOsProductionIdentityRuntimeFixtureStatements,
+  validateFarmOsProductionIdentityQueryV3AuthorityAgreementPlan,
+  validateFarmOsProductionIdentityQueryV3StatementAuthorityAgreement,
   type FarmOsProductionIdentityFixtureCredential,
   type FarmOsProductionIdentityImageAuthority,
   type FarmOsProductionIdentityOwnedContainer,
   type FarmOsProductionIdentityPostgresQualificationPlatform,
+  type FarmOsProductionIdentityQueryV3AuthorityAgreementPlan,
+  type FarmOsProductionIdentityQueryV3StatementAuthorityAgreement,
   type FarmOsProductionIdentityQualificationSession,
 } from "./farm_os_production_identity_postgres_qualification_executor";
 import {
   FARM_OS_PRODUCTION_IDENTITY_CAPABILITY_PROBE_SQL,
 } from "./farm_os_production_identity_isolated_postgres_fixture";
 import {
-  loadFarmOsProductionIdentityQueryV2Artifact,
-} from "../../../src/lib/hermes/farm_os_production_identity_runtime_foundation";
+  loadFarmOsProductionIdentityQueryV3Artifact,
+} from "../../../src/lib/hermes/farm_os_production_identity_query_v3_authority";
 import {
   loadFarmOsProductionPostgresBootstrapQueryArtifact,
 } from "../../../src/lib/hermes/farm_os_production_postgres_bootstrap_query_authority";
@@ -266,21 +270,44 @@ function clientConfig(
   };
 }
 
-class PgQualificationSession implements FarmOsProductionIdentityQualificationSession {
-  private readonly allowedSql: ReadonlySet<string>;
-
-  constructor(private readonly client: Client) {
-    const bootstrap = loadFarmOsProductionPostgresBootstrapQueryArtifact();
-    const v2 = loadFarmOsProductionIdentityQueryV2Artifact();
-    if (bootstrap.status !== "VERIFIED" || v2.status !== "VERIFIED") {
+export class FarmOsProductionIdentityRealAdapterSectionAuthority {
+  constructor(
+    private readonly plan: FarmOsProductionIdentityQueryV3AuthorityAgreementPlan,
+  ) {
+    const artifact = loadFarmOsProductionIdentityQueryV3Artifact();
+    if (!validateFarmOsProductionIdentityQueryV3AuthorityAgreementPlan(plan, artifact)) {
       throw new FarmOsProductionIdentityPostgresQualificationError(
         "QUERY_ARTIFACT_DRIFT");
     }
+  }
+
+  accepts(
+    agreement: FarmOsProductionIdentityQueryV3StatementAuthorityAgreement,
+  ): boolean {
+    return validateFarmOsProductionIdentityQueryV3StatementAuthorityAgreement(
+      agreement, this.plan);
+  }
+}
+
+class PgQualificationSession implements FarmOsProductionIdentityQualificationSession {
+  private readonly allowedSql: ReadonlySet<string>;
+  private readonly sectionAuthority: FarmOsProductionIdentityRealAdapterSectionAuthority;
+
+  constructor(
+    private readonly client: Client,
+    sectionAuthorityPlan: FarmOsProductionIdentityQueryV3AuthorityAgreementPlan,
+  ) {
+    const bootstrap = loadFarmOsProductionPostgresBootstrapQueryArtifact();
+    if (bootstrap.status !== "VERIFIED") {
+      throw new FarmOsProductionIdentityPostgresQualificationError(
+        "QUERY_ARTIFACT_DRIFT");
+    }
+    this.sectionAuthority =
+      new FarmOsProductionIdentityRealAdapterSectionAuthority(sectionAuthorityPlan);
     this.allowedSql = new Set([
       Buffer.from(bootstrap.raw_bytes).toString("utf8"),
       FARM_OS_PRODUCTION_IDENTITY_CAPABILITY_PROBE_SQL,
       FARM_OS_PRODUCTION_IDENTITY_QUALIFICATION_PRINCIPAL_SQL,
-      ...v2.section_plan.map((entry) => entry.statement_sql),
     ]);
   }
 
@@ -308,6 +335,28 @@ class PgQualificationSession implements FarmOsProductionIdentityQualificationSes
     let result: QueryResult<Record<string, unknown>>;
     try {
       result = await this.client.query<Record<string, unknown>>(statementSql);
+    } catch (error) {
+      throw sanitizeFarmOsProductionIdentityPgSectionError(error);
+    }
+    try {
+      return Object.freeze(result.rows.map((row) => Object.freeze({ ...row })));
+    } catch {
+      throw new FarmOsProductionIdentitySafeSectionQueryError(
+        "SECTION_RESULT_MATERIALIZATION", null);
+    }
+  }
+
+  async querySection(
+    agreement: FarmOsProductionIdentityQueryV3StatementAuthorityAgreement,
+  ): Promise<readonly Record<string, unknown>[]> {
+    if (!this.sectionAuthority.accepts(agreement)) {
+      throw new FarmOsProductionIdentitySafeSectionQueryError(
+        "ADAPTER_ALLOWLIST", null);
+    }
+    let result: QueryResult<Record<string, unknown>>;
+    try {
+      result = await this.client.query<Record<string, unknown>>(
+        agreement.statement_sql);
     } catch (error) {
       throw sanitizeFarmOsProductionIdentityPgSectionError(error);
     }
@@ -530,10 +579,12 @@ implements FarmOsProductionIdentityPostgresQualificationPlatform {
   async openQualificationSession(input: Readonly<{
     container: FarmOsProductionIdentityOwnedContainer;
     credential: FarmOsProductionIdentityFixtureCredential;
+    section_authority_plan: FarmOsProductionIdentityQueryV3AuthorityAgreementPlan;
   }>): Promise<FarmOsProductionIdentityQualificationSession> {
     const client = new Client(clientConfig(
       input.container, input.credential, input.credential.qualification_user));
-    const session = new PgQualificationSession(client);
+    const session = new PgQualificationSession(
+      client, input.section_authority_plan);
     try {
       await client.connect();
       return session;

@@ -17,6 +17,23 @@ Executor v2 is a source-only successor to executor v1. It changes only the
 fixed query candidate and its lineage contract. It does not modify or select
 the production runtime authority.
 
+The executor derives an immutable statement-authority agreement plan from the
+verified v3 artifact. Every agreement binds the query authority ID and digest,
+section ID and ordinal, statement digest, and exact statement bytes. The real
+PostgreSQL adapter validates the complete supplied plan against the same formal
+v3 artifact before opening a session, then accepts section execution only when
+the individual immutable agreement exactly matches that plan. Auxiliary
+bootstrap, capability, and principal queries retain their separate exact-string
+allowlist. The adapter does not load v2 statements as current execution
+authority and does not accept caller SQL, prefix matches, or wildcard matches.
+
+The shared pure agreement validator is also used by the fake executor session.
+Source-only tests instantiate the real adapter validation layer without Docker
+and prove that all v3 statements are accepted while historical v2 Section A,
+wrong authority/digest/section values, mutated statements, and arbitrary SQL are
+rejected. Historical executor v1 and query v2 evidence parsers remain separate
+and immutable; no historical execution path is silently rebound to v3.
+
 ## Fixed authority lineage
 
 The executor accepts no caller-supplied query ID, path, digest, SQL, host,
