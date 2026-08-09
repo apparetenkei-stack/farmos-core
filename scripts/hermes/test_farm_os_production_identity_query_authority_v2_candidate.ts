@@ -17,7 +17,7 @@ import {
   transformFarmOsProductionIdentityQueryV2CandidateResultSets,
   validateFarmOsProductionIdentityQueryV2CandidateResultSets,
   validateFarmOsProductionIdentitySanitizedEvidenceCandidate,
-} from "./lib/farm_os_production_identity_query_v2_candidate_contract";
+} from "../../src/lib/hermes/farm_os_production_identity_query_v2_contract";
 
 const ARTIFACT_PATH = "scripts/sql/farm_os_production_identity_readonly_v2.sql";
 const PREVIOUS_REVIEW_SHA256 = "sha256:9d0f2cc06474fb30a20be879001ac12a0d0e710927e870eaac611e0ff117dc1f";
@@ -284,6 +284,7 @@ assert.equal(farmOsAclDefaultClassForRelkind("unknown"), null);
 
 const transformed = transformFarmOsProductionIdentityQueryV2CandidateResultSets(positive);
 assert.ok(transformed);
+export const FARM_OS_PRODUCTION_IDENTITY_V2_SANITIZED_TEST_FIXTURE = transformed;
 assert.equal(validateFarmOsProductionIdentitySanitizedEvidenceCandidate(transformed), true);
 const malformedFinal = structuredClone(transformed) as unknown as { sections: Array<{ section_id: string; rows: Array<{ payload: Record<string, unknown> }> }> };
 malformedFinal.sections.find((candidate) => candidate.section_id === "A_TRANSACTION_SERVER_GATE")!.rows[0]!.payload.extra = "business-value";
