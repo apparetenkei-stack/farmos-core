@@ -45,6 +45,18 @@ deprecated, wrong-purpose, or differently hashed query is insufficient.
 This production reconciliation contract rejects staging and development
 manifests even when every other identity field agrees.
 
+The Repository authority registry now records v2 as the reviewed, adopted
+authority for `production_target_identity_collection`, with exact artifact
+digest
+`sha256:202053dadf34063c3ccfc69ede01197a217b968916936f33b7185090659faf95`.
+It preserves v1, its original digest, and its
+`LEGACY_UNMATERIALIZED_AUTHORITY` history, and records an auditable v1-to-v2
+supersession relationship. Formal adoption and runtime binding are orthogonal:
+the live-evidence parser remains bound to v1 and its original digest. v2 does
+not authorize a connection, credential resolution, collector execution,
+production access, or migration execution. Runtime adoption requires a
+separate future approval.
+
 Before the next live preflight, an authenticated human must approve the target
 manifest. The live collector is deliberately outside this implementation. It
 must use one repeatable-read/read-only transaction, output only the sanitized

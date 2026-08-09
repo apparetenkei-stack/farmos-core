@@ -28,6 +28,66 @@ export const FARM_OS_STABLE_CHANGES_PRODUCTION_IDENTITY_QUERY_AUTHORITY = {
     "sha256:dbfb404355fd7c09f6d712d5e143d4fa53f53b3bcfd040c063733ef134a14ce8",
 } as const;
 
+const productionIdentityQueryAuthorityV1 = Object.freeze({
+  authority_id: FARM_OS_STABLE_CHANGES_PRODUCTION_IDENTITY_QUERY_AUTHORITY.query_authority_id,
+  version: "v1",
+  purpose: FARM_OS_STABLE_CHANGES_PRODUCTION_IDENTITY_QUERY_AUTHORITY.purpose,
+  contract_version:
+    FARM_OS_STABLE_CHANGES_PRODUCTION_IDENTITY_QUERY_AUTHORITY.target_identity_contract_version,
+  adoption_status: "ADOPTED",
+  runtime_binding_status: "ACTIVE_RUNTIME_BINDING",
+  historical_status: "LEGACY_UNMATERIALIZED_AUTHORITY",
+  query_artifact_path: null,
+  query_sha256:
+    FARM_OS_STABLE_CHANGES_PRODUCTION_IDENTITY_QUERY_AUTHORITY.expected_query_sha256,
+  tracked_preimage_available: false,
+  review_status: "HISTORICAL_AUTHORITY",
+  approval_review_reference: "repository-authority/production-target-identity-query/v1",
+  supersedes: null,
+  superseded_by: "farmos.production-target-identity-query.v2",
+} as const);
+
+const productionIdentityQueryAuthorityV2 = Object.freeze({
+  authority_id: "farmos.production-target-identity-query.v2",
+  version: "v2",
+  purpose: "production_target_identity_collection",
+  contract_version: FARM_OS_PRODUCTION_TARGET_LIVE_EVIDENCE_SCHEMA_VERSION,
+  adoption_status: "ADOPTED",
+  runtime_binding_status: "NOT_RUNTIME_BOUND",
+  historical_status: "CURRENT_REPOSITORY_AUTHORITY",
+  query_artifact_path: "scripts/sql/farm_os_production_identity_readonly_v2.sql",
+  query_sha256:
+    "sha256:202053dadf34063c3ccfc69ede01197a217b968916936f33b7185090659faf95",
+  tracked_preimage_available: true,
+  review_status: "APPROVED",
+  approval_review_reference: "review/production-identity-query-authority-v2/sol-go",
+  supersedes: "farmos.production-target-identity-query.v1",
+  superseded_by: null,
+} as const);
+
+export const FARM_OS_PRODUCTION_IDENTITY_QUERY_AUTHORITIES = Object.freeze([
+  productionIdentityQueryAuthorityV1,
+  productionIdentityQueryAuthorityV2,
+] as const);
+
+export const FARM_OS_PRODUCTION_IDENTITY_QUERY_SUPERSESSION = Object.freeze({
+  predecessor_authority_id: "farmos.production-target-identity-query.v1",
+  successor_authority_id: "farmos.production-target-identity-query.v2",
+  relationship: "REPOSITORY_AUTHORITY_SUPERSESSION",
+  runtime_binding_effect: "NONE",
+} as const);
+
+export type FarmOsProductionIdentityQueryAuthority =
+  typeof FARM_OS_PRODUCTION_IDENTITY_QUERY_AUTHORITIES[number];
+
+export function resolveFarmOsProductionIdentityQueryAuthority(
+  authorityId: string,
+): FarmOsProductionIdentityQueryAuthority | null {
+  return FARM_OS_PRODUCTION_IDENTITY_QUERY_AUTHORITIES.find(
+    (authority) => authority.authority_id === authorityId,
+  ) ?? null;
+}
+
 type JsonRecord = Record<string, unknown>;
 const IDENTIFIER = /^[a-z][a-z0-9._-]{0,127}$/u;
 const REFERENCE = /^[A-Za-z0-9][A-Za-z0-9._:@/-]{0,255}$/u;
