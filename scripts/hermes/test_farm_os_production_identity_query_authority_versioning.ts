@@ -6,6 +6,7 @@ import {
   FARM_OS_PRODUCTION_IDENTITY_QUERY_AUTHORITIES,
   FARM_OS_PRODUCTION_IDENTITY_QUERY_SUPERSESSION,
   FARM_OS_PRODUCTION_IDENTITY_QUERY_V3_CANDIDATE_SUPERSESSION,
+  FARM_OS_PRODUCTION_IDENTITY_QUERY_V4_CANDIDATE_SUPERSESSION,
   FARM_OS_STABLE_CHANGES_PRODUCTION_IDENTITY_QUERY_AUTHORITY,
   resolveFarmOsProductionIdentityQueryAuthority,
 } from "../../src/lib/hermes/farm_os_stable_changes_migration_reconciliation";
@@ -21,6 +22,10 @@ const V3_ID = "farmos.production-target-identity-query.v3";
 const V3_SHA256 =
   "sha256:59255333ad77cc58b043cdecd8df49f92fe184a2120b109663fefa0514ddce81";
 const V3_ARTIFACT_PATH = "scripts/sql/farm_os_production_identity_readonly_v3.sql";
+const V4_ID = "farmos.production-target-identity-query.v4";
+const V4_SHA256 =
+  "sha256:e83987c840cc941cf5e6dcff93d46345464db0019ea5beb5143b0222316e05ca";
+const V4_ARTIFACT_PATH = "scripts/sql/farm_os_production_identity_readonly_v4.sql";
 const REJECTED_SHA256 = [
   "sha256:9d0f2cc06474fb30a20be879001ac12a0d0e710927e870eaac611e0ff117dc1f",
   "sha256:e4b525a0e24a719f222536c8bf10f165f68b75ffeb2321a735119bfbd00fdc90",
@@ -30,9 +35,11 @@ const REJECTED_SHA256 = [
 const v1 = resolveFarmOsProductionIdentityQueryAuthority(V1_ID);
 const v2 = resolveFarmOsProductionIdentityQueryAuthority(V2_ID);
 const v3 = resolveFarmOsProductionIdentityQueryAuthority(V3_ID);
+const v4 = resolveFarmOsProductionIdentityQueryAuthority(V4_ID);
 assert.ok(v1);
 assert.ok(v2);
 assert.ok(v3);
+assert.ok(v4);
 
 assert.equal(v1.authority_id, V1_ID);
 assert.equal(v1.query_sha256, V1_SHA256);
@@ -60,6 +67,17 @@ assert.equal(v3.execution_enabled, false);
 assert.equal(v3.automatic_latest_selection, false);
 assert.equal(v3.query_sha256, V3_SHA256);
 assert.equal(v3.supersedes, V2_ID);
+assert.equal(v3.superseded_by, V4_ID);
+
+assert.equal(v4.authority_id, V4_ID);
+assert.equal(v4.version, "v4");
+assert.equal(v4.adoption_status, "NOT_ADOPTED");
+assert.equal(v4.review_status, "CANDIDATE_FOR_APPROVAL");
+assert.equal(v4.runtime_binding_status, "NOT_RUNTIME_BOUND");
+assert.equal(v4.execution_enabled, false);
+assert.equal(v4.automatic_latest_selection, false);
+assert.equal(v4.query_sha256, V4_SHA256);
+assert.equal(v4.supersedes, V3_ID);
 
 assert.deepEqual(FARM_OS_PRODUCTION_IDENTITY_QUERY_SUPERSESSION, {
   predecessor_authority_id: V1_ID,
@@ -70,6 +88,13 @@ assert.deepEqual(FARM_OS_PRODUCTION_IDENTITY_QUERY_SUPERSESSION, {
 assert.deepEqual(FARM_OS_PRODUCTION_IDENTITY_QUERY_V3_CANDIDATE_SUPERSESSION, {
   predecessor_authority_id: V2_ID,
   successor_candidate_id: V3_ID,
+  relationship: "CANDIDATE_SUPERSESSION_PROPOSAL",
+  runtime_binding_effect: "NONE",
+  authority_transition_effect: "NONE",
+});
+assert.deepEqual(FARM_OS_PRODUCTION_IDENTITY_QUERY_V4_CANDIDATE_SUPERSESSION, {
+  predecessor_candidate_id: V3_ID,
+  successor_candidate_id: V4_ID,
   relationship: "CANDIDATE_SUPERSESSION_PROPOSAL",
   runtime_binding_effect: "NONE",
   authority_transition_effect: "NONE",
@@ -94,6 +119,13 @@ assert.equal(v3.query_artifact_path, V3_ARTIFACT_PATH);
 assert.equal(v3ArtifactSha256, V3_SHA256);
 assert.equal(v3.query_sha256, v3ArtifactSha256);
 assert.notEqual(v3.query_sha256, v2.query_sha256);
+const v4ArtifactBytes = readFileSync(V4_ARTIFACT_PATH);
+const v4ArtifactSha256 =
+  `sha256:${createHash("sha256").update(v4ArtifactBytes).digest("hex")}`;
+assert.equal(v4.query_artifact_path, V4_ARTIFACT_PATH);
+assert.equal(v4ArtifactSha256, V4_SHA256);
+assert.equal(v4.query_sha256, v4ArtifactSha256);
+assert.notEqual(v4.query_sha256, v3.query_sha256);
 for (const rejectedSha256 of REJECTED_SHA256) {
   assert.equal(
     FARM_OS_PRODUCTION_IDENTITY_QUERY_AUTHORITIES.some(
@@ -107,11 +139,12 @@ assert.equal(FARM_OS_STABLE_CHANGES_PRODUCTION_IDENTITY_QUERY_AUTHORITY.query_au
 assert.equal(FARM_OS_STABLE_CHANGES_PRODUCTION_IDENTITY_QUERY_AUTHORITY.expected_query_sha256, V1_SHA256);
 assert.equal(resolveFarmOsProductionIdentityQueryAuthority("farmos.production-target-identity-query.v0"), null);
 assert.equal(resolveFarmOsProductionIdentityQueryAuthority("latest"), null);
+assert.equal(resolveFarmOsProductionIdentityQueryAuthority("highest"), null);
 
 console.log(JSON.stringify({
   result: "pass",
   repository_authority: V2_ID,
-  candidate_authority: V3_ID,
+  candidate_authority: V4_ID,
   runtime_binding: V1_ID,
   production_operations: 0,
 }));

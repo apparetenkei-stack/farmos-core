@@ -12,7 +12,7 @@ import {
   FarmOsProductionIdentityIsolatedPostgresPlatform,
 } from "./lib/farm_os_production_identity_postgres_qualification_docker_adapter";
 import {
-  createFarmOsProductionIdentityPostgresQualificationExecutorErrorV2,
+  createFarmOsProductionIdentityPostgresQualificationExecutorErrorV3,
 } from "./lib/farm_os_production_identity_postgres_qualification_contract";
 
 const execFileAsync = promisify(execFile);
@@ -27,10 +27,12 @@ export const FARM_OS_PRODUCTION_IDENTITY_QUALIFICATION_SOURCE_FILES = Object.fre
   "src/lib/hermes/farm_os_production_postgres_bootstrap_query_authority.ts",
   "src/lib/hermes/farm_os_production_identity_query_v2_contract.ts",
   "src/lib/hermes/farm_os_production_identity_query_v3_authority.ts",
+  "src/lib/hermes/farm_os_production_identity_query_v4_authority.ts",
   "src/lib/hermes/farm_os_production_identity_runtime_foundation.ts",
   "scripts/sql/farm_os_production_postgres_version_bootstrap_query_v1.sql",
   "scripts/sql/farm_os_production_identity_readonly_v2.sql",
   "scripts/sql/farm_os_production_identity_readonly_v3.sql",
+  "scripts/sql/farm_os_production_identity_readonly_v4.sql",
 ] as const);
 
 export function parseFarmOsProductionIdentityQualificationCli(
@@ -80,7 +82,7 @@ export async function runFarmOsProductionIdentityPostgresQualificationCli(
   const parsed = parseFarmOsProductionIdentityQualificationCli(argv);
   if (parsed === null) {
     process.stdout.write(`${JSON.stringify(
-      createFarmOsProductionIdentityPostgresQualificationExecutorErrorV2(),
+      createFarmOsProductionIdentityPostgresQualificationExecutorErrorV3(),
     )}\n`);
     return 2;
   }
@@ -104,7 +106,7 @@ if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.a
     })
     .catch(() => {
       process.stdout.write(`${JSON.stringify(
-        createFarmOsProductionIdentityPostgresQualificationExecutorErrorV2(),
+        createFarmOsProductionIdentityPostgresQualificationExecutorErrorV3(),
       )}\n`);
       process.exitCode = 1;
     });

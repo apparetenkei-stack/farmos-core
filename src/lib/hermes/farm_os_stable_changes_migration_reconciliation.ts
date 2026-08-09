@@ -80,6 +80,26 @@ const productionIdentityQueryAuthorityV3Candidate = Object.freeze({
   review_status: "CANDIDATE_FOR_APPROVAL",
   approval_review_reference: null,
   supersedes: "farmos.production-target-identity-query.v2",
+  superseded_by: "farmos.production-target-identity-query.v4",
+  execution_enabled: false,
+  automatic_latest_selection: false,
+} as const);
+
+const productionIdentityQueryAuthorityV4Candidate = Object.freeze({
+  authority_id: "farmos.production-target-identity-query.v4",
+  version: "v4",
+  purpose: "production_target_identity_collection",
+  contract_version: FARM_OS_PRODUCTION_TARGET_LIVE_EVIDENCE_SCHEMA_VERSION,
+  adoption_status: "NOT_ADOPTED",
+  runtime_binding_status: "NOT_RUNTIME_BOUND",
+  historical_status: "CANDIDATE_NOT_AUTHORITY",
+  query_artifact_path: "scripts/sql/farm_os_production_identity_readonly_v4.sql",
+  query_sha256:
+    "sha256:e83987c840cc941cf5e6dcff93d46345464db0019ea5beb5143b0222316e05ca",
+  tracked_preimage_available: true,
+  review_status: "CANDIDATE_FOR_APPROVAL",
+  approval_review_reference: null,
+  supersedes: "farmos.production-target-identity-query.v3",
   superseded_by: null,
   execution_enabled: false,
   automatic_latest_selection: false,
@@ -89,6 +109,7 @@ export const FARM_OS_PRODUCTION_IDENTITY_QUERY_AUTHORITIES = Object.freeze([
   productionIdentityQueryAuthorityV1,
   productionIdentityQueryAuthorityV2,
   productionIdentityQueryAuthorityV3Candidate,
+  productionIdentityQueryAuthorityV4Candidate,
 ] as const);
 
 export const FARM_OS_PRODUCTION_IDENTITY_QUERY_SUPERSESSION = Object.freeze({
@@ -102,6 +123,15 @@ export const FARM_OS_PRODUCTION_IDENTITY_QUERY_V3_CANDIDATE_SUPERSESSION =
   Object.freeze({
     predecessor_authority_id: "farmos.production-target-identity-query.v2",
     successor_candidate_id: "farmos.production-target-identity-query.v3",
+    relationship: "CANDIDATE_SUPERSESSION_PROPOSAL",
+    runtime_binding_effect: "NONE",
+    authority_transition_effect: "NONE",
+  } as const);
+
+export const FARM_OS_PRODUCTION_IDENTITY_QUERY_V4_CANDIDATE_SUPERSESSION =
+  Object.freeze({
+    predecessor_candidate_id: "farmos.production-target-identity-query.v3",
+    successor_candidate_id: "farmos.production-target-identity-query.v4",
     relationship: "CANDIDATE_SUPERSESSION_PROPOSAL",
     runtime_binding_effect: "NONE",
     authority_transition_effect: "NONE",
