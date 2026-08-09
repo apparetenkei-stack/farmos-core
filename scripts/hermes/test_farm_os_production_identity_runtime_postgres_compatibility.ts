@@ -36,8 +36,9 @@ import {
   FARM_OS_PRODUCTION_IDENTITY_QUERY_V2_ROLE_SCOPES,
 } from "../../src/lib/hermes/farm_os_production_identity_query_v2_contract";
 import {
-  FARM_OS_PRODUCTION_IDENTITY_QUERY_V2_SHA256,
-} from "../../src/lib/hermes/farm_os_production_identity_runtime_foundation";
+  FARM_OS_PRODUCTION_IDENTITY_QUERY_V3_CANDIDATE,
+  FARM_OS_PRODUCTION_IDENTITY_QUERY_V3_SHA256,
+} from "../../src/lib/hermes/farm_os_production_identity_query_v3_authority";
 
 const bootstrapBytes = readFileSync(FARM_OS_PRODUCTION_POSTGRES_BOOTSTRAP_QUERY_CANDIDATE.artifact_path);
 const bootstrapSql = bootstrapBytes.toString("utf8");
@@ -234,12 +235,12 @@ const baseEvidence = {
   image_repo_digest: `sha256:${"1".repeat(64)}`,
   bootstrap_authority_candidate_id: FARM_OS_PRODUCTION_POSTGRES_BOOTSTRAP_QUERY_CANDIDATE.authority_id,
   bootstrap_query_sha256: FARM_OS_PRODUCTION_POSTGRES_BOOTSTRAP_QUERY_CANDIDATE.sha256,
-  v2_query_authority_id: "farmos.production-target-identity-query.v2",
-  v2_query_sha256: FARM_OS_PRODUCTION_IDENTITY_QUERY_V2_SHA256,
+  query_authority_id: FARM_OS_PRODUCTION_IDENTITY_QUERY_V3_CANDIDATE.authority_id,
+  query_sha256: FARM_OS_PRODUCTION_IDENTITY_QUERY_V3_SHA256,
   runtime_contract_version: FARM_OS_PRODUCTION_IDENTITY_QUERY_V2_RESULT_CONTRACT_VERSION,
   section_count: 11,
   catalog_capability_columns: ["inherit_option", "set_option"],
-  full_v2_executor_call_count: 1,
+  full_query_executor_call_count: 1,
   executed_section_count: 11,
   parser_pass: true,
   sanitizer_pass: true,
@@ -304,7 +305,7 @@ for (const major of [14, 15] as const) {
     image_tag: `postgres:${major}`,
     h1_h2_case: "NOT_RUN_INCOMPATIBLE",
     catalog_capability_columns: [],
-    full_v2_executor_call_count: 0,
+    full_query_executor_call_count: 0,
     executed_section_count: 0,
     parser_pass: false,
     sanitizer_pass: false,
@@ -319,7 +320,7 @@ for (const major of [14, 15] as const) {
   assert.ok(negativeEvidence);
   assert.equal(parseFarmOsProductionIdentityPostgresQualificationEvidence({
     ...negativeEvidence,
-    full_v2_executor_call_count: 1,
+    full_query_executor_call_count: 1,
   }), null);
   assert.equal(parseFarmOsProductionIdentityPostgresQualificationEvidence({
     ...negativeEvidence,

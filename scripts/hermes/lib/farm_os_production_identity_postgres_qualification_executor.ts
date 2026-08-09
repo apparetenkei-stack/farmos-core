@@ -12,9 +12,12 @@ import {
 } from "../../../src/lib/hermes/farm_os_production_identity_query_v2_contract";
 import {
   createFarmOsProductionIdentityH2NotApplicableSentinel,
-  FARM_OS_PRODUCTION_IDENTITY_QUERY_V2_SHA256,
-  loadFarmOsProductionIdentityQueryV2Artifact,
 } from "../../../src/lib/hermes/farm_os_production_identity_runtime_foundation";
+import {
+  FARM_OS_PRODUCTION_IDENTITY_QUERY_V3_CANDIDATE,
+  FARM_OS_PRODUCTION_IDENTITY_QUERY_V3_SHA256,
+  loadFarmOsProductionIdentityQueryV3Artifact,
+} from "../../../src/lib/hermes/farm_os_production_identity_query_v3_authority";
 import {
   loadFarmOsProductionPostgresBootstrapQueryArtifact,
   parseFarmOsProductionPostgresBootstrapResultSet,
@@ -43,7 +46,7 @@ import {
 export const FARM_OS_PRODUCTION_IDENTITY_POSTGRES_ISOLATED_QUALIFICATION_EXECUTOR =
   Object.freeze({
     authority_id:
-      "farmos.production-identity-postgres-isolated-qualification-executor.v1",
+      "farmos.production-identity-postgres-isolated-qualification-executor.v2",
     purpose: "isolated_postgres_compatibility_qualification",
     allowed_postgres_majors: Object.freeze([14, 15, 16, 17] as const),
     production_target: "FORBIDDEN",
@@ -241,9 +244,9 @@ export type FarmOsProductionIdentityQualificationExecutorInput = Readonly<{
 export type FarmOsProductionIdentityQualificationRunResult = Readonly<{
   lineage: Readonly<{
     schema_version:
-      "farmos.production-identity-postgres-qualification-executor-lineage.v1";
+      "farmos.production-identity-postgres-qualification-executor-lineage.v2";
     executor_authority_id:
-      "farmos.production-identity-postgres-isolated-qualification-executor.v1";
+      "farmos.production-identity-postgres-isolated-qualification-executor.v2";
     git_commit: string;
     executor_source_sha256: `sha256:${string}`;
     repository_source_gate: "TRACKED_CLEAN_REQUIRED";
@@ -521,7 +524,7 @@ async function executePositive(
     if (capabilities === null || JSON.stringify(capabilities) !==
       JSON.stringify(CAPABILITY_COLUMNS)) fail("CAPABILITY_MISMATCH");
     assertionCount += 1;
-    const artifact = loadFarmOsProductionIdentityQueryV2Artifact();
+    const artifact = loadFarmOsProductionIdentityQueryV3Artifact();
     if (artifact.status !== "VERIFIED" || artifact.section_plan.length !== 11) {
       fail("QUERY_ARTIFACT_DRIFT");
     }
@@ -718,11 +721,11 @@ function failureEvidence(
     primary_failure_code: diagnostic.primary_failure_code,
     terminal_failure_code: diagnostic.terminal_failure_code,
     executor_authority_id:
-      "farmos.production-identity-postgres-isolated-qualification-executor.v1",
+      "farmos.production-identity-postgres-isolated-qualification-executor.v2",
     source_commit: input.git_commit,
     source_digest: input.executor_source_sha256,
-    query_authority_id: "farmos.production-target-identity-query.v2",
-    query_sha256: FARM_OS_PRODUCTION_IDENTITY_QUERY_V2_SHA256,
+    query_authority_id: FARM_OS_PRODUCTION_IDENTITY_QUERY_V3_CANDIDATE.authority_id,
+    query_sha256: FARM_OS_PRODUCTION_IDENTITY_QUERY_V3_SHA256,
     bootstrap_authority_id: FARM_OS_PRODUCTION_POSTGRES_BOOTSTRAP_QUERY_CANDIDATE.authority_id,
     bootstrap_sha256: FARM_OS_PRODUCTION_POSTGRES_BOOTSTRAP_QUERY_CANDIDATE.sha256,
     production_operations: 0,
@@ -853,12 +856,12 @@ async function runCase(
         image_repo_digest: image.repo_digest,
         bootstrap_authority_candidate_id: FARM_OS_PRODUCTION_POSTGRES_BOOTSTRAP_QUERY_CANDIDATE.authority_id,
         bootstrap_query_sha256: FARM_OS_PRODUCTION_POSTGRES_BOOTSTRAP_QUERY_CANDIDATE.sha256,
-        v2_query_authority_id: "farmos.production-target-identity-query.v2",
-        v2_query_sha256: FARM_OS_PRODUCTION_IDENTITY_QUERY_V2_SHA256,
+        query_authority_id: FARM_OS_PRODUCTION_IDENTITY_QUERY_V3_CANDIDATE.authority_id,
+        query_sha256: FARM_OS_PRODUCTION_IDENTITY_QUERY_V3_SHA256,
         runtime_contract_version: FARM_OS_PRODUCTION_IDENTITY_QUERY_V2_RESULT_CONTRACT_VERSION,
         section_count: 11,
         catalog_capability_columns: result.capability_columns,
-        full_v2_executor_call_count: 0,
+        full_query_executor_call_count: 0,
         executed_section_count: 0,
         parser_pass: false,
         sanitizer_pass: false,
@@ -901,12 +904,12 @@ async function runCase(
         image_repo_digest: image.repo_digest,
         bootstrap_authority_candidate_id: FARM_OS_PRODUCTION_POSTGRES_BOOTSTRAP_QUERY_CANDIDATE.authority_id,
         bootstrap_query_sha256: FARM_OS_PRODUCTION_POSTGRES_BOOTSTRAP_QUERY_CANDIDATE.sha256,
-        v2_query_authority_id: "farmos.production-target-identity-query.v2",
-        v2_query_sha256: FARM_OS_PRODUCTION_IDENTITY_QUERY_V2_SHA256,
+        query_authority_id: FARM_OS_PRODUCTION_IDENTITY_QUERY_V3_CANDIDATE.authority_id,
+        query_sha256: FARM_OS_PRODUCTION_IDENTITY_QUERY_V3_SHA256,
         runtime_contract_version: FARM_OS_PRODUCTION_IDENTITY_QUERY_V2_RESULT_CONTRACT_VERSION,
         section_count: 11,
         catalog_capability_columns: CAPABILITY_COLUMNS,
-        full_v2_executor_call_count: 1,
+        full_query_executor_call_count: 1,
         executed_section_count: result.executed_section_count,
         parser_pass: true,
         sanitizer_pass: true,
@@ -1000,9 +1003,9 @@ export async function executeFarmOsProductionIdentityPostgresQualificationMatrix
   return Object.freeze({
     lineage: Object.freeze({
       schema_version:
-        "farmos.production-identity-postgres-qualification-executor-lineage.v1",
+        "farmos.production-identity-postgres-qualification-executor-lineage.v2",
       executor_authority_id:
-        "farmos.production-identity-postgres-isolated-qualification-executor.v1",
+        "farmos.production-identity-postgres-isolated-qualification-executor.v2",
       git_commit: input.git_commit,
       executor_source_sha256: input.executor_source_sha256,
       repository_source_gate: "TRACKED_CLEAN_REQUIRED",
@@ -1031,9 +1034,9 @@ function executorLineageValid(
   lineage: FarmOsProductionIdentityQualificationRunResult["lineage"],
 ): boolean {
   return lineage.schema_version ===
-      "farmos.production-identity-postgres-qualification-executor-lineage.v1" &&
+      "farmos.production-identity-postgres-qualification-executor-lineage.v2" &&
     lineage.executor_authority_id ===
-      "farmos.production-identity-postgres-isolated-qualification-executor.v1" &&
+      "farmos.production-identity-postgres-isolated-qualification-executor.v2" &&
     GIT_COMMIT.test(lineage.git_commit) && DIGEST.test(lineage.executor_source_sha256) &&
     lineage.repository_source_gate === "TRACKED_CLEAN_REQUIRED" &&
     lineage.production_operations === 0 && lineage.filesystem_persistence === 0;
@@ -1065,7 +1068,7 @@ export function evaluateFarmOsProductionIdentityExecutorQualificationClosure(
 ): Readonly<{
   technical_qualification_achieved: true;
   executor_authority_id:
-    "farmos.production-identity-postgres-isolated-qualification-executor.v1";
+    "farmos.production-identity-postgres-isolated-qualification-executor.v2";
   executor_source_sha256: `sha256:${string}`;
   evidence_count: 6;
   production_operations: 0;
@@ -1079,7 +1082,7 @@ export function evaluateFarmOsProductionIdentityExecutorQualificationClosure(
   const negativePass = ([14, 15] as const).every((major) => {
     const matches = parsed.filter((entry) => entry.postgres_major === major);
     return matches.length === 1 && matches[0]?.classification === "NOT_ELIGIBLE" &&
-      matches[0].full_v2_executor_call_count === 0 &&
+      matches[0].full_query_executor_call_count === 0 &&
       matches[0].container_cleanup_performed;
   });
   const positivePass = ([16, 17] as const).every((major) => {
@@ -1103,7 +1106,7 @@ export function evaluateFarmOsProductionIdentityExecutorQualificationClosure(
   return Object.freeze({
     technical_qualification_achieved: true,
     executor_authority_id:
-      "farmos.production-identity-postgres-isolated-qualification-executor.v1",
+      "farmos.production-identity-postgres-isolated-qualification-executor.v2",
     executor_source_sha256: result.lineage.executor_source_sha256,
     evidence_count: 6,
     production_operations: 0,

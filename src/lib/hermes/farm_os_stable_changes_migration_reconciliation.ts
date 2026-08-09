@@ -65,9 +65,30 @@ const productionIdentityQueryAuthorityV2 = Object.freeze({
   superseded_by: null,
 } as const);
 
+const productionIdentityQueryAuthorityV3Candidate = Object.freeze({
+  authority_id: "farmos.production-target-identity-query.v3",
+  version: "v3",
+  purpose: "production_target_identity_collection",
+  contract_version: FARM_OS_PRODUCTION_TARGET_LIVE_EVIDENCE_SCHEMA_VERSION,
+  adoption_status: "NOT_ADOPTED",
+  runtime_binding_status: "NOT_RUNTIME_BOUND",
+  historical_status: "CANDIDATE_NOT_AUTHORITY",
+  query_artifact_path: "scripts/sql/farm_os_production_identity_readonly_v3.sql",
+  query_sha256:
+    "sha256:59255333ad77cc58b043cdecd8df49f92fe184a2120b109663fefa0514ddce81",
+  tracked_preimage_available: true,
+  review_status: "CANDIDATE_FOR_APPROVAL",
+  approval_review_reference: null,
+  supersedes: "farmos.production-target-identity-query.v2",
+  superseded_by: null,
+  execution_enabled: false,
+  automatic_latest_selection: false,
+} as const);
+
 export const FARM_OS_PRODUCTION_IDENTITY_QUERY_AUTHORITIES = Object.freeze([
   productionIdentityQueryAuthorityV1,
   productionIdentityQueryAuthorityV2,
+  productionIdentityQueryAuthorityV3Candidate,
 ] as const);
 
 export const FARM_OS_PRODUCTION_IDENTITY_QUERY_SUPERSESSION = Object.freeze({
@@ -76,6 +97,15 @@ export const FARM_OS_PRODUCTION_IDENTITY_QUERY_SUPERSESSION = Object.freeze({
   relationship: "REPOSITORY_AUTHORITY_SUPERSESSION",
   runtime_binding_effect: "NONE",
 } as const);
+
+export const FARM_OS_PRODUCTION_IDENTITY_QUERY_V3_CANDIDATE_SUPERSESSION =
+  Object.freeze({
+    predecessor_authority_id: "farmos.production-target-identity-query.v2",
+    successor_candidate_id: "farmos.production-target-identity-query.v3",
+    relationship: "CANDIDATE_SUPERSESSION_PROPOSAL",
+    runtime_binding_effect: "NONE",
+    authority_transition_effect: "NONE",
+  } as const);
 
 export type FarmOsProductionIdentityQueryAuthority =
   typeof FARM_OS_PRODUCTION_IDENTITY_QUERY_AUTHORITIES[number];

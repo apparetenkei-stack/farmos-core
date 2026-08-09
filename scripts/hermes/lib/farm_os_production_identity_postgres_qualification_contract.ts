@@ -12,6 +12,10 @@ import {
   type FarmOsProductionIdentityQueryV2CandidateSection,
 } from "../../../src/lib/hermes/farm_os_production_identity_query_v2_contract";
 import {
+  FARM_OS_PRODUCTION_IDENTITY_QUERY_V3_CANDIDATE,
+  FARM_OS_PRODUCTION_IDENTITY_QUERY_V3_SHA256,
+} from "../../../src/lib/hermes/farm_os_production_identity_query_v3_authority";
+import {
   FARM_OS_PRODUCTION_IDENTITY_QUERY_V2_SHA256,
 } from "../../../src/lib/hermes/farm_os_production_identity_runtime_foundation";
 
@@ -23,9 +27,15 @@ export { parseFarmOsProductionPostgresBootstrapResult };
 export type { FarmOsProductionPostgresBootstrapResult };
 
 export const FARM_OS_PRODUCTION_IDENTITY_POSTGRES_QUALIFICATION_EVIDENCE_VERSION =
-  "farmos.production-identity-postgres-qualification-evidence.v1" as const;
+  "farmos.production-identity-postgres-qualification-evidence.v2" as const;
 export const FARM_OS_PRODUCTION_IDENTITY_POSTGRES_QUALIFICATION_FAILURE_VERSION =
+  "farmos.production-identity-postgres-qualification-failure.v3" as const;
+export const FARM_OS_PRODUCTION_IDENTITY_POSTGRES_QUALIFICATION_LEGACY_FAILURE_VERSION =
   "farmos.production-identity-postgres-qualification-failure.v2" as const;
+export const FARM_OS_PRODUCTION_IDENTITY_POSTGRES_QUALIFICATION_EXECUTOR_ERROR_VERSION =
+  "farmos.production-identity-postgres-qualification-executor-error.v2" as const;
+export const FARM_OS_PRODUCTION_IDENTITY_POSTGRES_QUALIFICATION_LEGACY_EXECUTOR_ERROR_VERSION =
+  "farmos.production-identity-postgres-qualification-executor-error.v1" as const;
 
 export const FARM_OS_PRODUCTION_IDENTITY_POSTGRES_QUALIFICATION_FAILURE_PHASES = [
   "ADAPTER_ALLOWLIST",
@@ -99,6 +109,131 @@ const isCanonicalInstant = (value: unknown): value is string => {
   const epoch = Date.parse(value);
   return Number.isFinite(epoch) && new Date(epoch).toISOString() === value;
 };
+
+export const FARM_OS_PRODUCTION_IDENTITY_POSTGRES_QUALIFICATION_LEGACY_EXECUTOR_ERROR_V1_LINEAGE =
+  Object.freeze({
+    executor_authority_id:
+      "farmos.production-identity-postgres-isolated-qualification-executor.v1",
+    query_authority_id: "farmos.production-target-identity-query.v2",
+    query_sha256: FARM_OS_PRODUCTION_IDENTITY_QUERY_V2_SHA256,
+  } as const);
+
+export const FARM_OS_PRODUCTION_IDENTITY_POSTGRES_QUALIFICATION_EXECUTOR_ERROR_V2_LINEAGE =
+  Object.freeze({
+    executor_authority_id:
+      "farmos.production-identity-postgres-isolated-qualification-executor.v2",
+    executor_lineage_version:
+      "farmos.production-identity-postgres-qualification-executor-lineage.v2",
+    query_authority_id: FARM_OS_PRODUCTION_IDENTITY_QUERY_V3_CANDIDATE.authority_id,
+    query_sha256: FARM_OS_PRODUCTION_IDENTITY_QUERY_V3_SHA256,
+    bootstrap_authority_id:
+      FARM_OS_PRODUCTION_POSTGRES_BOOTSTRAP_QUERY_CANDIDATE.authority_id,
+    bootstrap_sha256: FARM_OS_PRODUCTION_POSTGRES_BOOTSTRAP_QUERY_CANDIDATE.sha256,
+  } as const);
+
+export type FarmOsProductionIdentityPostgresQualificationLegacyExecutorErrorV1 = Readonly<{
+  schema_version:
+    typeof FARM_OS_PRODUCTION_IDENTITY_POSTGRES_QUALIFICATION_LEGACY_EXECUTOR_ERROR_VERSION;
+  executor_authority_id:
+    "farmos.production-identity-postgres-isolated-qualification-executor.v1";
+  postgres_major: 14;
+  case: "NEGATIVE_CAPABILITY_ONLY";
+  error_code: "EVIDENCE_INVALID";
+  production_operations: 0;
+  secret_exposed: false;
+  filesystem_persistence: 0;
+}>;
+
+export type FarmOsProductionIdentityPostgresQualificationExecutorErrorV2 = Readonly<{
+  schema_version:
+    typeof FARM_OS_PRODUCTION_IDENTITY_POSTGRES_QUALIFICATION_EXECUTOR_ERROR_VERSION;
+  executor_authority_id:
+    typeof FARM_OS_PRODUCTION_IDENTITY_POSTGRES_QUALIFICATION_EXECUTOR_ERROR_V2_LINEAGE.executor_authority_id;
+  executor_lineage_version:
+    typeof FARM_OS_PRODUCTION_IDENTITY_POSTGRES_QUALIFICATION_EXECUTOR_ERROR_V2_LINEAGE.executor_lineage_version;
+  query_authority_id:
+    typeof FARM_OS_PRODUCTION_IDENTITY_POSTGRES_QUALIFICATION_EXECUTOR_ERROR_V2_LINEAGE.query_authority_id;
+  query_sha256:
+    typeof FARM_OS_PRODUCTION_IDENTITY_POSTGRES_QUALIFICATION_EXECUTOR_ERROR_V2_LINEAGE.query_sha256;
+  bootstrap_authority_id:
+    typeof FARM_OS_PRODUCTION_IDENTITY_POSTGRES_QUALIFICATION_EXECUTOR_ERROR_V2_LINEAGE.bootstrap_authority_id;
+  bootstrap_sha256:
+    typeof FARM_OS_PRODUCTION_IDENTITY_POSTGRES_QUALIFICATION_EXECUTOR_ERROR_V2_LINEAGE.bootstrap_sha256;
+  postgres_major: 14;
+  case: "NEGATIVE_CAPABILITY_ONLY";
+  error_code: "EVIDENCE_INVALID";
+  production_operations: 0;
+  secret_exposed: false;
+  filesystem_persistence: 0;
+}>;
+
+const LEGACY_EXECUTOR_ERROR_V1_KEYS = [
+  "schema_version", "executor_authority_id", "postgres_major", "case", "error_code",
+  "production_operations", "secret_exposed", "filesystem_persistence",
+] as const;
+const EXECUTOR_ERROR_V2_KEYS = [
+  "schema_version", "executor_authority_id", "executor_lineage_version",
+  "query_authority_id", "query_sha256", "bootstrap_authority_id", "bootstrap_sha256",
+  "postgres_major", "case", "error_code", "production_operations", "secret_exposed",
+  "filesystem_persistence",
+] as const;
+
+export function parseFarmOsProductionIdentityPostgresQualificationLegacyExecutorErrorV1(
+  value: unknown,
+): FarmOsProductionIdentityPostgresQualificationLegacyExecutorErrorV1 | null {
+  if (!isRecord(value) || !exactKeys(value, LEGACY_EXECUTOR_ERROR_V1_KEYS) ||
+    value.schema_version !==
+      FARM_OS_PRODUCTION_IDENTITY_POSTGRES_QUALIFICATION_LEGACY_EXECUTOR_ERROR_VERSION ||
+    value.executor_authority_id !==
+      FARM_OS_PRODUCTION_IDENTITY_POSTGRES_QUALIFICATION_LEGACY_EXECUTOR_ERROR_V1_LINEAGE.executor_authority_id ||
+    value.postgres_major !== 14 || value.case !== "NEGATIVE_CAPABILITY_ONLY" ||
+    value.error_code !== "EVIDENCE_INVALID" || value.production_operations !== 0 ||
+    value.secret_exposed !== false || value.filesystem_persistence !== 0) return null;
+  return Object.freeze(
+    value as unknown as FarmOsProductionIdentityPostgresQualificationLegacyExecutorErrorV1,
+  );
+}
+
+export function parseFarmOsProductionIdentityPostgresQualificationExecutorErrorV2(
+  value: unknown,
+): FarmOsProductionIdentityPostgresQualificationExecutorErrorV2 | null {
+  if (!isRecord(value) || !exactKeys(value, EXECUTOR_ERROR_V2_KEYS) ||
+    value.schema_version !==
+      FARM_OS_PRODUCTION_IDENTITY_POSTGRES_QUALIFICATION_EXECUTOR_ERROR_VERSION ||
+    value.executor_authority_id !==
+      FARM_OS_PRODUCTION_IDENTITY_POSTGRES_QUALIFICATION_EXECUTOR_ERROR_V2_LINEAGE.executor_authority_id ||
+    value.executor_lineage_version !==
+      FARM_OS_PRODUCTION_IDENTITY_POSTGRES_QUALIFICATION_EXECUTOR_ERROR_V2_LINEAGE.executor_lineage_version ||
+    value.query_authority_id !==
+      FARM_OS_PRODUCTION_IDENTITY_POSTGRES_QUALIFICATION_EXECUTOR_ERROR_V2_LINEAGE.query_authority_id ||
+    value.query_sha256 !==
+      FARM_OS_PRODUCTION_IDENTITY_POSTGRES_QUALIFICATION_EXECUTOR_ERROR_V2_LINEAGE.query_sha256 ||
+    value.bootstrap_authority_id !==
+      FARM_OS_PRODUCTION_IDENTITY_POSTGRES_QUALIFICATION_EXECUTOR_ERROR_V2_LINEAGE.bootstrap_authority_id ||
+    value.bootstrap_sha256 !==
+      FARM_OS_PRODUCTION_IDENTITY_POSTGRES_QUALIFICATION_EXECUTOR_ERROR_V2_LINEAGE.bootstrap_sha256 ||
+    value.postgres_major !== 14 || value.case !== "NEGATIVE_CAPABILITY_ONLY" ||
+    value.error_code !== "EVIDENCE_INVALID" || value.production_operations !== 0 ||
+    value.secret_exposed !== false || value.filesystem_persistence !== 0) return null;
+  return Object.freeze(
+    value as unknown as FarmOsProductionIdentityPostgresQualificationExecutorErrorV2,
+  );
+}
+
+export function createFarmOsProductionIdentityPostgresQualificationExecutorErrorV2():
+  FarmOsProductionIdentityPostgresQualificationExecutorErrorV2 {
+  return Object.freeze({
+    schema_version:
+      FARM_OS_PRODUCTION_IDENTITY_POSTGRES_QUALIFICATION_EXECUTOR_ERROR_VERSION,
+    ...FARM_OS_PRODUCTION_IDENTITY_POSTGRES_QUALIFICATION_EXECUTOR_ERROR_V2_LINEAGE,
+    postgres_major: 14,
+    case: "NEGATIVE_CAPABILITY_ONLY",
+    error_code: "EVIDENCE_INVALID",
+    production_operations: 0,
+    secret_exposed: false,
+    filesystem_persistence: 0,
+  });
+}
 
 export const FARM_OS_PRODUCTION_IDENTITY_POSTGRES_COMPATIBILITY_QUALIFICATION_POLICY = Object.freeze({
   minimum_proposed_postgres_major: 16,
@@ -175,12 +310,12 @@ export type FarmOsProductionIdentityPostgresQualificationEvidence = Readonly<{
   image_repo_digest: `sha256:${string}`;
   bootstrap_authority_candidate_id: typeof FARM_OS_PRODUCTION_POSTGRES_BOOTSTRAP_QUERY_CANDIDATE.authority_id;
   bootstrap_query_sha256: typeof FARM_OS_PRODUCTION_POSTGRES_BOOTSTRAP_QUERY_CANDIDATE.sha256;
-  v2_query_authority_id: "farmos.production-target-identity-query.v2";
-  v2_query_sha256: typeof FARM_OS_PRODUCTION_IDENTITY_QUERY_V2_SHA256;
+  query_authority_id: typeof FARM_OS_PRODUCTION_IDENTITY_QUERY_V3_CANDIDATE.authority_id;
+  query_sha256: typeof FARM_OS_PRODUCTION_IDENTITY_QUERY_V3_SHA256;
   runtime_contract_version: typeof FARM_OS_PRODUCTION_IDENTITY_QUERY_V2_RESULT_CONTRACT_VERSION;
   section_count: 11;
   catalog_capability_columns: readonly ("inherit_option" | "set_option")[];
-  full_v2_executor_call_count: 0 | 1;
+  full_query_executor_call_count: 0 | 1;
   executed_section_count: number;
   parser_pass: boolean;
   sanitizer_pass: boolean;
@@ -220,17 +355,29 @@ export type FarmOsProductionIdentityPostgresQualificationFailure = Readonly<{
   primary_failure_code: FarmOsProductionIdentityPostgresQualificationFailureCode;
   terminal_failure_code: FarmOsProductionIdentityPostgresQualificationFailureCode;
   executor_authority_id:
-    "farmos.production-identity-postgres-isolated-qualification-executor.v1";
+    "farmos.production-identity-postgres-isolated-qualification-executor.v2";
   source_commit: string;
   source_digest: `sha256:${string}`;
-  query_authority_id: "farmos.production-target-identity-query.v2";
-  query_sha256: typeof FARM_OS_PRODUCTION_IDENTITY_QUERY_V2_SHA256;
+  query_authority_id: typeof FARM_OS_PRODUCTION_IDENTITY_QUERY_V3_CANDIDATE.authority_id;
+  query_sha256: typeof FARM_OS_PRODUCTION_IDENTITY_QUERY_V3_SHA256;
   bootstrap_authority_id: typeof FARM_OS_PRODUCTION_POSTGRES_BOOTSTRAP_QUERY_CANDIDATE.authority_id;
   bootstrap_sha256: typeof FARM_OS_PRODUCTION_POSTGRES_BOOTSTRAP_QUERY_CANDIDATE.sha256;
   production_operations: 0;
   secret_exposed: false;
   filesystem_persistence: 0;
 }>;
+
+export type FarmOsProductionIdentityPostgresQualificationLegacyFailureV2 = Readonly<
+  Omit<FarmOsProductionIdentityPostgresQualificationFailure,
+  "schema_version" | "executor_authority_id" | "query_authority_id" | "query_sha256"> & {
+    schema_version:
+      typeof FARM_OS_PRODUCTION_IDENTITY_POSTGRES_QUALIFICATION_LEGACY_FAILURE_VERSION;
+    executor_authority_id:
+      "farmos.production-identity-postgres-isolated-qualification-executor.v1";
+    query_authority_id: "farmos.production-target-identity-query.v2";
+    query_sha256: typeof FARM_OS_PRODUCTION_IDENTITY_QUERY_V2_SHA256;
+  }
+>;
 
 const FAILURE_KEYS = [
   "schema_version", "failure_code", "failure_phase", "section_id", "statement_ordinal",
@@ -285,11 +432,11 @@ export function parseFarmOsProductionIdentityPostgresQualificationFailure(
       value.terminal_failure_code as FarmOsProductionIdentityPostgresQualificationFailureCode) ||
     value.failure_code !== value.terminal_failure_code ||
     value.executor_authority_id !==
-      "farmos.production-identity-postgres-isolated-qualification-executor.v1" ||
+      "farmos.production-identity-postgres-isolated-qualification-executor.v2" ||
     typeof value.source_commit !== "string" || !/^[a-f0-9]{40}$/u.test(value.source_commit) ||
     !isDigest(value.source_digest) ||
-    value.query_authority_id !== "farmos.production-target-identity-query.v2" ||
-    value.query_sha256 !== FARM_OS_PRODUCTION_IDENTITY_QUERY_V2_SHA256 ||
+    value.query_authority_id !== FARM_OS_PRODUCTION_IDENTITY_QUERY_V3_CANDIDATE.authority_id ||
+    value.query_sha256 !== FARM_OS_PRODUCTION_IDENTITY_QUERY_V3_SHA256 ||
     value.bootstrap_authority_id !==
       FARM_OS_PRODUCTION_POSTGRES_BOOTSTRAP_QUERY_CANDIDATE.authority_id ||
     value.bootstrap_sha256 !== FARM_OS_PRODUCTION_POSTGRES_BOOTSTRAP_QUERY_CANDIDATE.sha256 ||
@@ -339,12 +486,36 @@ export function parseFarmOsProductionIdentityPostgresQualificationFailure(
   return Object.freeze(value as unknown as FarmOsProductionIdentityPostgresQualificationFailure);
 }
 
+export function parseFarmOsProductionIdentityPostgresQualificationLegacyFailureV2(
+  value: unknown,
+): FarmOsProductionIdentityPostgresQualificationLegacyFailureV2 | null {
+  if (!isRecord(value) || !exactKeys(value, FAILURE_KEYS) ||
+    value.schema_version !==
+      FARM_OS_PRODUCTION_IDENTITY_POSTGRES_QUALIFICATION_LEGACY_FAILURE_VERSION ||
+    value.executor_authority_id !==
+      "farmos.production-identity-postgres-isolated-qualification-executor.v1" ||
+    value.query_authority_id !== "farmos.production-target-identity-query.v2" ||
+    value.query_sha256 !== FARM_OS_PRODUCTION_IDENTITY_QUERY_V2_SHA256) return null;
+  const remapped = {
+    ...value,
+    schema_version: FARM_OS_PRODUCTION_IDENTITY_POSTGRES_QUALIFICATION_FAILURE_VERSION,
+    executor_authority_id:
+      "farmos.production-identity-postgres-isolated-qualification-executor.v2",
+    query_authority_id: FARM_OS_PRODUCTION_IDENTITY_QUERY_V3_CANDIDATE.authority_id,
+    query_sha256: FARM_OS_PRODUCTION_IDENTITY_QUERY_V3_SHA256,
+  };
+  if (parseFarmOsProductionIdentityPostgresQualificationFailure(remapped) === null) return null;
+  return Object.freeze(
+    value as unknown as FarmOsProductionIdentityPostgresQualificationLegacyFailureV2,
+  );
+}
+
 const EVIDENCE_KEYS = [
   "schema_version", "qualification_id", "git_commit", "observed_at", "postgres_major",
   "server_version_num", "image_tag", "image_id", "image_repo_digest",
-  "bootstrap_authority_candidate_id", "bootstrap_query_sha256", "v2_query_authority_id",
-  "v2_query_sha256", "runtime_contract_version", "section_count", "catalog_capability_columns",
-  "full_v2_executor_call_count", "executed_section_count", "parser_pass", "sanitizer_pass",
+  "bootstrap_authority_candidate_id", "bootstrap_query_sha256", "query_authority_id",
+  "query_sha256", "runtime_contract_version", "section_count", "catalog_capability_columns",
+  "full_query_executor_call_count", "executed_section_count", "parser_pass", "sanitizer_pass",
   "sensitive_marker_occurrences", "cluster_identifier_exposure_count", "h1_h2_case",
   "h2_invocation_count", "h2_row_count", "fixture_digest", "assertion_count", "classification", "transaction_mode",
   "rollback_performed", "container_cleanup_performed", "production_operations", "secret_exposed",
@@ -365,14 +536,14 @@ export function parseFarmOsProductionIdentityPostgresQualificationEvidence(
     !isBoundedString(value.image_id) || !isDigest(value.image_repo_digest) ||
     value.bootstrap_authority_candidate_id !== FARM_OS_PRODUCTION_POSTGRES_BOOTSTRAP_QUERY_CANDIDATE.authority_id ||
     value.bootstrap_query_sha256 !== FARM_OS_PRODUCTION_POSTGRES_BOOTSTRAP_QUERY_CANDIDATE.sha256 ||
-    value.v2_query_authority_id !== "farmos.production-target-identity-query.v2" ||
-    value.v2_query_sha256 !== FARM_OS_PRODUCTION_IDENTITY_QUERY_V2_SHA256 ||
+    value.query_authority_id !== FARM_OS_PRODUCTION_IDENTITY_QUERY_V3_CANDIDATE.authority_id ||
+    value.query_sha256 !== FARM_OS_PRODUCTION_IDENTITY_QUERY_V3_SHA256 ||
     value.runtime_contract_version !== FARM_OS_PRODUCTION_IDENTITY_QUERY_V2_RESULT_CONTRACT_VERSION ||
     value.section_count !== 11 ||
     !Array.isArray(value.catalog_capability_columns) ||
     !value.catalog_capability_columns.every((column) => column === "inherit_option" || column === "set_option") ||
     new Set(value.catalog_capability_columns).size !== value.catalog_capability_columns.length ||
-    (value.full_v2_executor_call_count !== 0 && value.full_v2_executor_call_count !== 1) ||
+    (value.full_query_executor_call_count !== 0 && value.full_query_executor_call_count !== 1) ||
     typeof value.executed_section_count !== "number" || !Number.isSafeInteger(value.executed_section_count) ||
     value.executed_section_count < 0 || value.executed_section_count > 11 ||
     typeof value.parser_pass !== "boolean" || typeof value.sanitizer_pass !== "boolean" ||
@@ -388,13 +559,13 @@ export function parseFarmOsProductionIdentityPostgresQualificationEvidence(
     value.production_operations !== 0 || value.secret_exposed !== false) return null;
   if ((value.postgres_major === 14 || value.postgres_major === 15) &&
     (value.classification !== "NOT_ELIGIBLE" || value.catalog_capability_columns.length !== 0 ||
-      value.full_v2_executor_call_count !== 0 || value.executed_section_count !== 0 || value.parser_pass ||
+      value.full_query_executor_call_count !== 0 || value.executed_section_count !== 0 || value.parser_pass ||
       value.sanitizer_pass || value.h1_h2_case !== "NOT_RUN_INCOMPATIBLE" || value.h2_invocation_count !== 0 ||
       value.h2_row_count !== 0 || value.transaction_mode !== "NOT_STARTED_INCOMPATIBLE" || value.rollback_performed ||
       !value.container_cleanup_performed)) return null;
   if ((value.postgres_major === 16 || value.postgres_major === 17) && value.classification === "QUALIFIED" &&
     (value.catalog_capability_columns.length !== 2 || value.catalog_capability_columns[0] !== "inherit_option" ||
-      value.catalog_capability_columns[1] !== "set_option" || value.full_v2_executor_call_count !== 1 ||
+      value.catalog_capability_columns[1] !== "set_option" || value.full_query_executor_call_count !== 1 ||
       !value.parser_pass || !value.sanitizer_pass || value.h1_h2_case === "NOT_RUN_INCOMPATIBLE" ||
       value.transaction_mode !== "REPEATABLE READ READ ONLY" || !value.rollback_performed ||
       !value.container_cleanup_performed ||

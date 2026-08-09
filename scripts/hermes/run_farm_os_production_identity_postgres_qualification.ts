@@ -11,6 +11,9 @@ import {
 import {
   FarmOsProductionIdentityIsolatedPostgresPlatform,
 } from "./lib/farm_os_production_identity_postgres_qualification_docker_adapter";
+import {
+  createFarmOsProductionIdentityPostgresQualificationExecutorErrorV2,
+} from "./lib/farm_os_production_identity_postgres_qualification_contract";
 
 const execFileAsync = promisify(execFile);
 const REPOSITORY_ROOT_URL = new URL("../../", import.meta.url);
@@ -23,9 +26,11 @@ export const FARM_OS_PRODUCTION_IDENTITY_QUALIFICATION_SOURCE_FILES = Object.fre
   "scripts/hermes/lib/farm_os_production_identity_isolated_postgres_fixture.ts",
   "src/lib/hermes/farm_os_production_postgres_bootstrap_query_authority.ts",
   "src/lib/hermes/farm_os_production_identity_query_v2_contract.ts",
+  "src/lib/hermes/farm_os_production_identity_query_v3_authority.ts",
   "src/lib/hermes/farm_os_production_identity_runtime_foundation.ts",
   "scripts/sql/farm_os_production_postgres_version_bootstrap_query_v1.sql",
   "scripts/sql/farm_os_production_identity_readonly_v2.sql",
+  "scripts/sql/farm_os_production_identity_readonly_v3.sql",
 ] as const);
 
 export function parseFarmOsProductionIdentityQualificationCli(
@@ -74,18 +79,9 @@ export async function runFarmOsProductionIdentityPostgresQualificationCli(
 ): Promise<number> {
   const parsed = parseFarmOsProductionIdentityQualificationCli(argv);
   if (parsed === null) {
-    process.stdout.write(`${JSON.stringify({
-      schema_version:
-        "farmos.production-identity-postgres-qualification-executor-error.v1",
-      executor_authority_id:
-        "farmos.production-identity-postgres-isolated-qualification-executor.v1",
-      postgres_major: 14,
-      case: "NEGATIVE_CAPABILITY_ONLY",
-      error_code: "EVIDENCE_INVALID",
-      production_operations: 0,
-      secret_exposed: false,
-      filesystem_persistence: 0,
-    })}\n`);
+    process.stdout.write(`${JSON.stringify(
+      createFarmOsProductionIdentityPostgresQualificationExecutorErrorV2(),
+    )}\n`);
     return 2;
   }
   const lineage = await readFixedRepositoryLineage();
@@ -107,18 +103,9 @@ if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.a
       process.exitCode = exitCode;
     })
     .catch(() => {
-      process.stdout.write(`${JSON.stringify({
-        schema_version:
-          "farmos.production-identity-postgres-qualification-executor-error.v1",
-        executor_authority_id:
-          "farmos.production-identity-postgres-isolated-qualification-executor.v1",
-        postgres_major: 14,
-        case: "NEGATIVE_CAPABILITY_ONLY",
-        error_code: "EVIDENCE_INVALID",
-        production_operations: 0,
-        secret_exposed: false,
-        filesystem_persistence: 0,
-      })}\n`);
+      process.stdout.write(`${JSON.stringify(
+        createFarmOsProductionIdentityPostgresQualificationExecutorErrorV2(),
+      )}\n`);
       process.exitCode = 1;
     });
 }
