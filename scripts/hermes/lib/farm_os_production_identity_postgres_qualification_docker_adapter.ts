@@ -8,22 +8,22 @@ import {
   FarmOsProductionIdentityPostgresQualificationError,
   FarmOsProductionIdentitySafeSectionQueryError,
   buildFarmOsProductionIdentityRuntimeFixtureStatements,
-  validateFarmOsProductionIdentityQueryV4AuthorityAgreementPlan,
-  validateFarmOsProductionIdentityQueryV4StatementAuthorityAgreement,
+  validateFarmOsProductionIdentityQueryV5AuthorityAgreementPlan,
+  validateFarmOsProductionIdentityQueryV5StatementAuthorityAgreement,
   type FarmOsProductionIdentityFixtureCredential,
   type FarmOsProductionIdentityImageAuthority,
   type FarmOsProductionIdentityOwnedContainer,
   type FarmOsProductionIdentityPostgresQualificationPlatform,
-  type FarmOsProductionIdentityQueryV4AuthorityAgreementPlan,
-  type FarmOsProductionIdentityQueryV4StatementAuthorityAgreement,
+  type FarmOsProductionIdentityQueryV5AuthorityAgreementPlan,
+  type FarmOsProductionIdentityQueryV5StatementAuthorityAgreement,
   type FarmOsProductionIdentityQualificationSession,
 } from "./farm_os_production_identity_postgres_qualification_executor";
 import {
   FARM_OS_PRODUCTION_IDENTITY_CAPABILITY_PROBE_SQL,
 } from "./farm_os_production_identity_isolated_postgres_fixture";
 import {
-  loadFarmOsProductionIdentityQueryV4Artifact,
-} from "../../../src/lib/hermes/farm_os_production_identity_query_v4_authority";
+  loadFarmOsProductionIdentityQueryV5Artifact,
+} from "../../../src/lib/hermes/farm_os_production_identity_query_v5_authority";
 import {
   loadFarmOsProductionPostgresBootstrapQueryArtifact,
 } from "../../../src/lib/hermes/farm_os_production_postgres_bootstrap_query_authority";
@@ -272,19 +272,19 @@ function clientConfig(
 
 export class FarmOsProductionIdentityRealAdapterSectionAuthority {
   constructor(
-    private readonly plan: FarmOsProductionIdentityQueryV4AuthorityAgreementPlan,
+    private readonly plan: FarmOsProductionIdentityQueryV5AuthorityAgreementPlan,
   ) {
-    const artifact = loadFarmOsProductionIdentityQueryV4Artifact();
-    if (!validateFarmOsProductionIdentityQueryV4AuthorityAgreementPlan(plan, artifact)) {
+    const artifact = loadFarmOsProductionIdentityQueryV5Artifact();
+    if (!validateFarmOsProductionIdentityQueryV5AuthorityAgreementPlan(plan, artifact)) {
       throw new FarmOsProductionIdentityPostgresQualificationError(
         "QUERY_ARTIFACT_DRIFT");
     }
   }
 
   accepts(
-    agreement: FarmOsProductionIdentityQueryV4StatementAuthorityAgreement,
+    agreement: FarmOsProductionIdentityQueryV5StatementAuthorityAgreement,
   ): boolean {
-    return validateFarmOsProductionIdentityQueryV4StatementAuthorityAgreement(
+    return validateFarmOsProductionIdentityQueryV5StatementAuthorityAgreement(
       agreement, this.plan);
   }
 }
@@ -295,7 +295,7 @@ class PgQualificationSession implements FarmOsProductionIdentityQualificationSes
 
   constructor(
     private readonly client: Client,
-    sectionAuthorityPlan: FarmOsProductionIdentityQueryV4AuthorityAgreementPlan,
+    sectionAuthorityPlan: FarmOsProductionIdentityQueryV5AuthorityAgreementPlan,
   ) {
     const bootstrap = loadFarmOsProductionPostgresBootstrapQueryArtifact();
     if (bootstrap.status !== "VERIFIED") {
@@ -347,7 +347,7 @@ class PgQualificationSession implements FarmOsProductionIdentityQualificationSes
   }
 
   async querySection(
-    agreement: FarmOsProductionIdentityQueryV4StatementAuthorityAgreement,
+    agreement: FarmOsProductionIdentityQueryV5StatementAuthorityAgreement,
   ): Promise<readonly Record<string, unknown>[]> {
     if (!this.sectionAuthority.accepts(agreement)) {
       throw new FarmOsProductionIdentitySafeSectionQueryError(
@@ -579,7 +579,7 @@ implements FarmOsProductionIdentityPostgresQualificationPlatform {
   async openQualificationSession(input: Readonly<{
     container: FarmOsProductionIdentityOwnedContainer;
     credential: FarmOsProductionIdentityFixtureCredential;
-    section_authority_plan: FarmOsProductionIdentityQueryV4AuthorityAgreementPlan;
+    section_authority_plan: FarmOsProductionIdentityQueryV5AuthorityAgreementPlan;
   }>): Promise<FarmOsProductionIdentityQualificationSession> {
     const client = new Client(clientConfig(
       input.container, input.credential, input.credential.qualification_user));

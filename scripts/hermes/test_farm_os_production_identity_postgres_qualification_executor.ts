@@ -9,20 +9,20 @@ import {
   FARM_OS_PRODUCTION_IDENTITY_QUALIFICATION_PRINCIPAL_SQL,
   FarmOsProductionIdentityPostgresQualificationError,
   FarmOsProductionIdentitySafeSectionQueryError,
-  createFarmOsProductionIdentityQueryV4AuthorityAgreementPlan,
+  createFarmOsProductionIdentityQueryV5AuthorityAgreementPlan,
   createFarmOsProductionIdentityFixtureCredential,
   evaluateFarmOsProductionIdentityExecutorQualificationClosure,
   executeFarmOsProductionIdentityPostgresQualificationMatrix,
   parseFarmOsProductionIdentityExecutorBoundFailure,
   serializeFarmOsProductionIdentityQualificationStdout,
-  validateFarmOsProductionIdentityQueryV4AuthorityAgreementPlan,
-  validateFarmOsProductionIdentityQueryV4StatementAuthorityAgreement,
+  validateFarmOsProductionIdentityQueryV5AuthorityAgreementPlan,
+  validateFarmOsProductionIdentityQueryV5StatementAuthorityAgreement,
   type FarmOsProductionIdentityFixtureCredential,
   type FarmOsProductionIdentityImageAuthority,
   type FarmOsProductionIdentityOwnedContainer,
   type FarmOsProductionIdentityPostgresQualificationPlatform,
-  type FarmOsProductionIdentityQueryV4AuthorityAgreementPlan,
-  type FarmOsProductionIdentityQueryV4StatementAuthorityAgreement,
+  type FarmOsProductionIdentityQueryV5AuthorityAgreementPlan,
+  type FarmOsProductionIdentityQueryV5StatementAuthorityAgreement,
   type FarmOsProductionIdentityQualificationSession,
 } from "./lib/farm_os_production_identity_postgres_qualification_executor";
 import {
@@ -33,23 +33,29 @@ import {
   type FarmOsProductionIdentityDockerCommandRunner,
 } from "./lib/farm_os_production_identity_postgres_qualification_docker_adapter";
 import {
-  createFarmOsProductionIdentityPostgresQualificationExecutorErrorV3,
+  createFarmOsProductionIdentityPostgresQualificationExecutorErrorV4,
   FARM_OS_PRODUCTION_IDENTITY_POSTGRES_QUALIFICATION_EXECUTOR_ERROR_V2_LINEAGE,
-  FARM_OS_PRODUCTION_IDENTITY_POSTGRES_QUALIFICATION_EXECUTOR_ERROR_V3_LINEAGE,
+  FARM_OS_PRODUCTION_IDENTITY_POSTGRES_QUALIFICATION_EXECUTOR_ERROR_V4_LINEAGE,
   FARM_OS_PRODUCTION_IDENTITY_POSTGRES_QUALIFICATION_LEGACY_EXECUTOR_ERROR_V1_LINEAGE,
   parseFarmOsProductionIdentityPostgresQualificationExecutorErrorV2,
   parseFarmOsProductionIdentityPostgresQualificationExecutorErrorV3,
+  parseFarmOsProductionIdentityPostgresQualificationExecutorErrorV4,
   parseFarmOsProductionIdentityPostgresQualificationEvidence,
   parseFarmOsProductionIdentityPostgresQualificationFailure,
   parseFarmOsProductionIdentityPostgresQualificationLegacyExecutorErrorV1,
   parseFarmOsProductionIdentityPostgresQualificationLegacyEvidenceV2,
+  parseFarmOsProductionIdentityPostgresQualificationLegacyEvidenceV3,
   parseFarmOsProductionIdentityPostgresQualificationLegacyFailureV2,
   parseFarmOsProductionIdentityPostgresQualificationLegacyFailureV3,
+  parseFarmOsProductionIdentityPostgresQualificationLegacyFailureV4,
   type FarmOsProductionIdentityPostgresMajor,
 } from "./lib/farm_os_production_identity_postgres_qualification_contract";
 import {
-  FARM_OS_PRODUCTION_IDENTITY_QUERY_V4_CANDIDATE,
-  FARM_OS_PRODUCTION_IDENTITY_QUERY_V4_SHA256,
+  FARM_OS_PRODUCTION_IDENTITY_QUERY_V5_CANDIDATE,
+  FARM_OS_PRODUCTION_IDENTITY_QUERY_V5_SHA256,
+  loadFarmOsProductionIdentityQueryV5Artifact,
+} from "../../src/lib/hermes/farm_os_production_identity_query_v5_authority";
+import {
   loadFarmOsProductionIdentityQueryV4Artifact,
 } from "../../src/lib/hermes/farm_os_production_identity_query_v4_authority";
 import {
@@ -66,13 +72,17 @@ import {
   buildFarmOsProductionIdentityPositiveExecutorTestFixture,
 } from "./lib/farm_os_production_identity_postgres_qualification_test_fixture";
 import {
+  FARM_OS_PRODUCTION_IDENTITY_QUALIFICATION_SOURCE_FILES,
   parseFarmOsProductionIdentityQualificationCli,
   runFarmOsProductionIdentityPostgresQualificationCli,
 } from "./run_farm_os_production_identity_postgres_qualification";
 
+assert.equal(FARM_OS_PRODUCTION_IDENTITY_QUALIFICATION_SOURCE_FILES.includes(
+  "scripts/hermes/lib/farm_os_production_identity_isolated_postgres_fixture.ts"), true);
+
 assert.deepEqual(FARM_OS_PRODUCTION_IDENTITY_POSTGRES_ISOLATED_QUALIFICATION_EXECUTOR, {
   authority_id:
-    "farmos.production-identity-postgres-isolated-qualification-executor.v3",
+    "farmos.production-identity-postgres-isolated-qualification-executor.v4",
   purpose: "isolated_postgres_compatibility_qualification",
   allowed_postgres_majors: [14, 15, 16, 17],
   production_target: "FORBIDDEN",
@@ -135,8 +145,20 @@ const legacyExecutorErrorV2 = Object.freeze({
   secret_exposed: false,
   filesystem_persistence: 0,
 } as const);
-const currentExecutorErrorV3 =
-  createFarmOsProductionIdentityPostgresQualificationExecutorErrorV3();
+const currentExecutorErrorV4 =
+  createFarmOsProductionIdentityPostgresQualificationExecutorErrorV4();
+const legacyExecutorErrorV3 = Object.freeze({
+  ...currentExecutorErrorV4,
+  schema_version:
+    "farmos.production-identity-postgres-qualification-executor-error.v3",
+  executor_authority_id:
+    "farmos.production-identity-postgres-isolated-qualification-executor.v3",
+  executor_lineage_version:
+    "farmos.production-identity-postgres-qualification-executor-lineage.v3",
+  query_authority_id: "farmos.production-target-identity-query.v4",
+  query_sha256:
+    "sha256:e83987c840cc941cf5e6dcff93d46345464db0019ea5beb5143b0222316e05ca",
+} as const);
 assert.deepEqual(
   FARM_OS_PRODUCTION_IDENTITY_POSTGRES_QUALIFICATION_EXECUTOR_ERROR_V2_LINEAGE,
   {
@@ -154,15 +176,15 @@ assert.deepEqual(
   },
 );
 assert.deepEqual(
-  FARM_OS_PRODUCTION_IDENTITY_POSTGRES_QUALIFICATION_EXECUTOR_ERROR_V3_LINEAGE,
+  FARM_OS_PRODUCTION_IDENTITY_POSTGRES_QUALIFICATION_EXECUTOR_ERROR_V4_LINEAGE,
   {
     executor_authority_id:
-      "farmos.production-identity-postgres-isolated-qualification-executor.v3",
+      "farmos.production-identity-postgres-isolated-qualification-executor.v4",
     executor_lineage_version:
-      "farmos.production-identity-postgres-qualification-executor-lineage.v3",
-    query_authority_id: "farmos.production-target-identity-query.v4",
+      "farmos.production-identity-postgres-qualification-executor-lineage.v4",
+    query_authority_id: "farmos.production-target-identity-query.v5",
     query_sha256:
-      "sha256:e83987c840cc941cf5e6dcff93d46345464db0019ea5beb5143b0222316e05ca",
+      "sha256:a76f939ab9deb8351aecb42c96be9ed2f71cab7c292a0685db708f603e076f52",
     bootstrap_authority_id:
       "farmos.production-postgres-version-bootstrap-query.v1",
     bootstrap_sha256:
@@ -181,8 +203,14 @@ assert.equal(
   ),
   legacyExecutorErrorV2,
 );
+assert.equal(parseFarmOsProductionIdentityPostgresQualificationExecutorErrorV4(
+  currentExecutorErrorV4), currentExecutorErrorV4);
 assert.equal(parseFarmOsProductionIdentityPostgresQualificationExecutorErrorV3(
-  currentExecutorErrorV3), currentExecutorErrorV3);
+  legacyExecutorErrorV3), legacyExecutorErrorV3);
+assert.equal(parseFarmOsProductionIdentityPostgresQualificationExecutorErrorV4(
+  legacyExecutorErrorV3), null);
+assert.equal(parseFarmOsProductionIdentityPostgresQualificationExecutorErrorV3(
+  currentExecutorErrorV4), null);
 assert.equal(
   parseFarmOsProductionIdentityPostgresQualificationExecutorErrorV2(legacyExecutorErrorV1),
   null,
@@ -218,8 +246,8 @@ assert.equal(parseFarmOsProductionIdentityPostgresQualificationExecutorErrorV2({
   unexpected: true,
 }), null);
 assert.equal(parseFarmOsProductionIdentityPostgresQualificationExecutorErrorV2(
-  currentExecutorErrorV3), null);
-assert.equal(parseFarmOsProductionIdentityPostgresQualificationExecutorErrorV3(
+  currentExecutorErrorV4), null);
+assert.equal(parseFarmOsProductionIdentityPostgresQualificationExecutorErrorV4(
   legacyExecutorErrorV2), null);
 
 const capturedCliStdout: string[] = [];
@@ -235,7 +263,7 @@ try {
 }
 assert.equal(capturedCliStdout.length, 1);
 const emittedExecutorError = JSON.parse(capturedCliStdout[0]!) as unknown;
-assert.ok(parseFarmOsProductionIdentityPostgresQualificationExecutorErrorV3(emittedExecutorError));
+assert.ok(parseFarmOsProductionIdentityPostgresQualificationExecutorErrorV4(emittedExecutorError));
 assert.equal(parseFarmOsProductionIdentityPostgresQualificationExecutorErrorV2(
   emittedExecutorError), null);
 assert.equal(
@@ -255,15 +283,15 @@ const credential = createFarmOsProductionIdentityFixtureCredential(fixedRandom);
 assert.equal(credential.password, `fq_${"ab".repeat(32)}`);
 assert.doesNotMatch(JSON.stringify({ ...credential, password: "[omitted]" }), /SYNTHETIC_FIXTURE_PASSWORD/u);
 
-const artifact = loadFarmOsProductionIdentityQueryV4Artifact();
+const artifact = loadFarmOsProductionIdentityQueryV5Artifact();
 assert.equal(artifact.status, "VERIFIED");
 if (artifact.status !== "VERIFIED") throw new Error("artifact_not_verified");
 assert.doesNotMatch(artifact.section_plan[0]!.statement_sql, /\border\s+by\b/iu);
 assert.match(artifact.section_plan[0]!.statement_sql, /'server'::text\s+as\s+row_key/iu);
 const sectionAuthorityPlan =
-  createFarmOsProductionIdentityQueryV4AuthorityAgreementPlan(artifact);
+  createFarmOsProductionIdentityQueryV5AuthorityAgreementPlan(artifact);
 assert.ok(sectionAuthorityPlan);
-assert.equal(validateFarmOsProductionIdentityQueryV4AuthorityAgreementPlan(
+assert.equal(validateFarmOsProductionIdentityQueryV5AuthorityAgreementPlan(
   sectionAuthorityPlan, artifact), true);
 assert.equal(sectionAuthorityPlan.length, 11);
 assert.equal(Object.isFrozen(sectionAuthorityPlan), true);
@@ -273,6 +301,9 @@ const v4SectionBAgreement = sectionAuthorityPlan[1]!;
 const historicalV3 = loadFarmOsProductionIdentityQueryV3Artifact();
 assert.equal(historicalV3.status, "VERIFIED");
 if (historicalV3.status !== "VERIFIED") throw new Error("v3_artifact_not_verified");
+const historicalV4 = loadFarmOsProductionIdentityQueryV4Artifact();
+assert.equal(historicalV4.status, "VERIFIED");
+if (historicalV4.status !== "VERIFIED") throw new Error("v4_artifact_not_verified");
 const historicalV2 = loadFarmOsProductionIdentityQueryV2Artifact();
 assert.equal(historicalV2.status, "VERIFIED");
 if (historicalV2.status !== "VERIFIED") throw new Error("v2_artifact_not_verified");
@@ -282,53 +313,53 @@ const testStatementSha256 = (statementSql: string): `sha256:${string}` =>
   `sha256:${createHash("sha256").update(statementSql, "utf8").digest("hex")}`;
 
 const agreementCandidate = (
-  base: FarmOsProductionIdentityQueryV4StatementAuthorityAgreement,
+  base: FarmOsProductionIdentityQueryV5StatementAuthorityAgreement,
   overrides: Readonly<Record<string, unknown>>,
-): FarmOsProductionIdentityQueryV4StatementAuthorityAgreement => Object.freeze({
+): FarmOsProductionIdentityQueryV5StatementAuthorityAgreement => Object.freeze({
   ...base,
   ...overrides,
-}) as FarmOsProductionIdentityQueryV4StatementAuthorityAgreement;
+}) as FarmOsProductionIdentityQueryV5StatementAuthorityAgreement;
 
-assert.equal(validateFarmOsProductionIdentityQueryV4StatementAuthorityAgreement(
+assert.equal(validateFarmOsProductionIdentityQueryV5StatementAuthorityAgreement(
   v4SectionAAgreement, sectionAuthorityPlan), true);
-assert.equal(validateFarmOsProductionIdentityQueryV4StatementAuthorityAgreement(
+assert.equal(validateFarmOsProductionIdentityQueryV5StatementAuthorityAgreement(
   agreementCandidate(v4SectionAAgreement, {
     statement_sql: historicalV2SectionA,
     statement_sha256: testStatementSha256(historicalV2SectionA),
   }), sectionAuthorityPlan), false);
-assert.equal(validateFarmOsProductionIdentityQueryV4StatementAuthorityAgreement(
+assert.equal(validateFarmOsProductionIdentityQueryV5StatementAuthorityAgreement(
   v4SectionBAgreement, sectionAuthorityPlan), true);
-assert.equal(validateFarmOsProductionIdentityQueryV4StatementAuthorityAgreement(
+assert.equal(validateFarmOsProductionIdentityQueryV5StatementAuthorityAgreement(
   agreementCandidate(v4SectionBAgreement, {
     query_authority_id: "farmos.production-target-identity-query.v2",
   }), sectionAuthorityPlan), false);
-assert.equal(validateFarmOsProductionIdentityQueryV4StatementAuthorityAgreement(
+assert.equal(validateFarmOsProductionIdentityQueryV5StatementAuthorityAgreement(
   agreementCandidate(v4SectionAAgreement, {
     statement_sql: `${v4SectionAAgreement.statement_sql} `,
   }), sectionAuthorityPlan), false);
-assert.equal(validateFarmOsProductionIdentityQueryV4StatementAuthorityAgreement(
+assert.equal(validateFarmOsProductionIdentityQueryV5StatementAuthorityAgreement(
   agreementCandidate(v4SectionAAgreement, {
     statement_sha256: `sha256:${"f".repeat(64)}`,
   }), sectionAuthorityPlan), false);
-assert.equal(validateFarmOsProductionIdentityQueryV4StatementAuthorityAgreement(
+assert.equal(validateFarmOsProductionIdentityQueryV5StatementAuthorityAgreement(
   agreementCandidate(v4SectionAAgreement, {
     query_sha256: `sha256:${"0".repeat(64)}`,
   }), sectionAuthorityPlan), false);
-assert.equal(validateFarmOsProductionIdentityQueryV4StatementAuthorityAgreement(
+assert.equal(validateFarmOsProductionIdentityQueryV5StatementAuthorityAgreement(
   agreementCandidate(v4SectionAAgreement, {
     section_id: "B_CLUSTER_IDENTITY_SOURCE",
   }), sectionAuthorityPlan), false);
-assert.equal(validateFarmOsProductionIdentityQueryV4StatementAuthorityAgreement(
+assert.equal(validateFarmOsProductionIdentityQueryV5StatementAuthorityAgreement(
   agreementCandidate(v4SectionAAgreement, {
     statement_sql: "SELECT 1;",
     statement_sha256: testStatementSha256("SELECT 1;"),
   }), sectionAuthorityPlan), false);
-assert.equal(validateFarmOsProductionIdentityQueryV4StatementAuthorityAgreement(
+assert.equal(validateFarmOsProductionIdentityQueryV5StatementAuthorityAgreement(
   agreementCandidate(v4SectionAAgreement, {
     section_id: "UNKNOWN_SECTION",
   }), sectionAuthorityPlan), false);
 assert.equal(sectionAuthorityPlan.every((agreement) =>
-  validateFarmOsProductionIdentityQueryV4StatementAuthorityAgreement(
+  validateFarmOsProductionIdentityQueryV5StatementAuthorityAgreement(
     agreement, sectionAuthorityPlan)), true);
 
 const realAdapterAuthority =
@@ -372,6 +403,21 @@ assert.throws(
   (error: unknown) => error instanceof FarmOsProductionIdentityPostgresQualificationError &&
     error.code === "QUERY_ARTIFACT_DRIFT",
 );
+const historicalV4Plan = Object.freeze(sectionAuthorityPlan.map((agreement, index) => {
+  const historicalStatement = historicalV4.section_plan[index]!.statement_sql;
+  return agreementCandidate(agreement, {
+    query_authority_id: "farmos.production-target-identity-query.v4",
+    query_sha256:
+      "sha256:e83987c840cc941cf5e6dcff93d46345464db0019ea5beb5143b0222316e05ca",
+    statement_sha256: testStatementSha256(historicalStatement),
+    statement_sql: historicalStatement,
+  });
+}));
+assert.throws(
+  () => new FarmOsProductionIdentityRealAdapterSectionAuthority(historicalV4Plan),
+  (error: unknown) => error instanceof FarmOsProductionIdentityPostgresQualificationError &&
+    error.code === "QUERY_ARTIFACT_DRIFT",
+);
 const sectionBySql = new Map(artifact.section_plan.map((entry) =>
   [entry.statement_sql, entry.section_id]));
 
@@ -395,7 +441,7 @@ class FakeSession implements FarmOsProductionIdentityQualificationSession {
       sqlstate: string | null;
     }> | null,
     private readonly h1StateOverride: "absent" | "present" | "invalid" | null,
-    private readonly authorityPlan: FarmOsProductionIdentityQueryV4AuthorityAgreementPlan,
+    private readonly authorityPlan: FarmOsProductionIdentityQueryV5AuthorityAgreementPlan,
   ) {}
 
   async beginRepeatableReadOnly(): Promise<void> {
@@ -477,9 +523,9 @@ class FakeSession implements FarmOsProductionIdentityQualificationSession {
   }
 
   async querySection(
-    agreement: FarmOsProductionIdentityQueryV4StatementAuthorityAgreement,
+    agreement: FarmOsProductionIdentityQueryV5StatementAuthorityAgreement,
   ): Promise<readonly Record<string, unknown>[]> {
-    if (!validateFarmOsProductionIdentityQueryV4StatementAuthorityAgreement(
+    if (!validateFarmOsProductionIdentityQueryV5StatementAuthorityAgreement(
       agreement, this.authorityPlan)) {
       throw new FarmOsProductionIdentitySafeSectionQueryError(
         "ADAPTER_ALLOWLIST", null);
@@ -576,7 +622,7 @@ class FakePlatform implements FarmOsProductionIdentityPostgresQualificationPlatf
   async openQualificationSession(input: Readonly<{
     container: FarmOsProductionIdentityOwnedContainer;
     credential: FarmOsProductionIdentityFixtureCredential;
-    section_authority_plan: FarmOsProductionIdentityQueryV4AuthorityAgreementPlan;
+    section_authority_plan: FarmOsProductionIdentityQueryV5AuthorityAgreementPlan;
   }>): Promise<FarmOsProductionIdentityQualificationSession> {
     const major = Number(input.container.container_name.match(/pg(14|15|16|17)-/u)?.[1]);
     assert.equal([14, 15, 16, 17].includes(major), true);
@@ -679,9 +725,9 @@ assert.equal(positiveMatrix.failures.length, 0);
 assert.equal(positiveMatrix.evidence.length, 6);
 assert.equal(positiveMatrix.evidence.every((entry) =>
   entry.schema_version ===
-    "farmos.production-identity-postgres-qualification-evidence.v3" &&
-  entry.query_authority_id === FARM_OS_PRODUCTION_IDENTITY_QUERY_V4_CANDIDATE.authority_id &&
-  entry.query_sha256 === FARM_OS_PRODUCTION_IDENTITY_QUERY_V4_SHA256), true);
+    "farmos.production-identity-postgres-qualification-evidence.v4" &&
+  entry.query_authority_id === FARM_OS_PRODUCTION_IDENTITY_QUERY_V5_CANDIDATE.authority_id &&
+  entry.query_sha256 === FARM_OS_PRODUCTION_IDENTITY_QUERY_V5_SHA256), true);
 const legacyEvidenceV2 = {
   ...positiveMatrix.evidence[0]!,
   schema_version: "farmos.production-identity-postgres-qualification-evidence.v2",
@@ -696,10 +742,24 @@ assert.deepEqual(
 );
 assert.equal(parseFarmOsProductionIdentityPostgresQualificationLegacyEvidenceV2(
   positiveMatrix.evidence[0]), null);
+const legacyEvidenceV3 = {
+  ...positiveMatrix.evidence[0]!,
+  schema_version: "farmos.production-identity-postgres-qualification-evidence.v3",
+  query_authority_id: "farmos.production-target-identity-query.v4",
+  query_sha256:
+    "sha256:e83987c840cc941cf5e6dcff93d46345464db0019ea5beb5143b0222316e05ca",
+} as const;
+assert.equal(parseFarmOsProductionIdentityPostgresQualificationEvidence(legacyEvidenceV3), null);
+assert.deepEqual(
+  parseFarmOsProductionIdentityPostgresQualificationLegacyEvidenceV3(legacyEvidenceV3),
+  legacyEvidenceV3,
+);
+assert.equal(parseFarmOsProductionIdentityPostgresQualificationLegacyEvidenceV3(
+  positiveMatrix.evidence[0]), null);
 assert.equal(JSON.stringify(positiveMatrix).includes("farmos.production-target-identity-query.v2"), false);
 assert.equal(JSON.stringify(positiveMatrix).includes("farmos.production-target-identity-query.v3"), false);
 assert.equal(positiveMatrix.lineage.schema_version,
-  "farmos.production-identity-postgres-qualification-executor-lineage.v3");
+  "farmos.production-identity-postgres-qualification-executor-lineage.v4");
 assert.deepEqual(positiveMatrix.evidence.map((entry) => entry.classification),
   ["NOT_ELIGIBLE", "NOT_ELIGIBLE", "QUALIFIED", "QUALIFIED", "QUALIFIED", "QUALIFIED"]);
 assert.equal(positiveMatrix.evidence.filter((entry) => entry.classification === "QUALIFIED")
@@ -720,7 +780,7 @@ assert.deepEqual(evaluateFarmOsProductionIdentityExecutorQualificationClosure(
   positiveMatrix), {
   technical_qualification_achieved: true,
   executor_authority_id:
-    "farmos.production-identity-postgres-isolated-qualification-executor.v3",
+    "farmos.production-identity-postgres-isolated-qualification-executor.v4",
   executor_source_sha256: TEST_SOURCE_DIGEST,
   evidence_count: 6,
   production_operations: 0,
@@ -776,10 +836,10 @@ for (const [sectionId, ordinal, completed] of sectionCases) {
   assert.equal(diagnostic.rollback_status, "SUCCEEDED");
   assert.equal(diagnostic.cleanup_status, "SUCCEEDED");
   assert.equal(diagnostic.query_authority_id,
-    FARM_OS_PRODUCTION_IDENTITY_QUERY_V4_CANDIDATE.authority_id);
-  assert.equal(diagnostic.query_sha256, FARM_OS_PRODUCTION_IDENTITY_QUERY_V4_SHA256);
+    FARM_OS_PRODUCTION_IDENTITY_QUERY_V5_CANDIDATE.authority_id);
+  assert.equal(diagnostic.query_sha256, FARM_OS_PRODUCTION_IDENTITY_QUERY_V5_SHA256);
   assert.equal(diagnostic.schema_version,
-    "farmos.production-identity-postgres-qualification-failure.v4");
+    "farmos.production-identity-postgres-qualification-failure.v5");
   assert.equal(parseFarmOsProductionIdentityPostgresQualificationFailure(diagnostic), diagnostic);
   assert.equal(parseFarmOsProductionIdentityExecutorBoundFailure(diagnostic, failed.lineage), diagnostic);
   if (sectionId === "J_DATABASE_SIZE") {
@@ -959,6 +1019,15 @@ const legacyFailureV3 = {
   query_sha256:
     "sha256:59255333ad77cc58b043cdecd8df49f92fe184a2120b109663fefa0514ddce81",
 } as const;
+const legacyFailureV4 = {
+  ...lineageFailure,
+  schema_version: "farmos.production-identity-postgres-qualification-failure.v4",
+  executor_authority_id:
+    "farmos.production-identity-postgres-isolated-qualification-executor.v3",
+  query_authority_id: "farmos.production-target-identity-query.v4",
+  query_sha256:
+    "sha256:e83987c840cc941cf5e6dcff93d46345464db0019ea5beb5143b0222316e05ca",
+} as const;
 assert.equal(parseFarmOsProductionIdentityPostgresQualificationFailure(legacyFailureV2), null);
 assert.deepEqual(
   parseFarmOsProductionIdentityPostgresQualificationLegacyFailureV2(legacyFailureV2),
@@ -971,6 +1040,12 @@ assert.deepEqual(
   legacyFailureV3,
 );
 assert.equal(parseFarmOsProductionIdentityPostgresQualificationLegacyFailureV3(lineageFailure), null);
+assert.equal(parseFarmOsProductionIdentityPostgresQualificationFailure(legacyFailureV4), null);
+assert.deepEqual(
+  parseFarmOsProductionIdentityPostgresQualificationLegacyFailureV4(legacyFailureV4),
+  legacyFailureV4,
+);
+assert.equal(parseFarmOsProductionIdentityPostgresQualificationLegacyFailureV4(lineageFailure), null);
 assert.equal(parseFarmOsProductionIdentityPostgresQualificationFailure({
   ...lineageFailure, unexpected: true,
 }), null);
@@ -990,9 +1065,9 @@ assert.equal(parseFarmOsProductionIdentityPostgresQualificationFailure({
   ...h2PresentFailure, fixture_case: "MIGRATION_HISTORY_ABSENT",
 }), null);
 assert.equal(parseFarmOsProductionIdentityExecutorBoundFailure(lineageFailure, {
-  schema_version: "farmos.production-identity-postgres-qualification-executor-lineage.v3",
+  schema_version: "farmos.production-identity-postgres-qualification-executor-lineage.v4",
   executor_authority_id:
-    "farmos.production-identity-postgres-isolated-qualification-executor.v3",
+    "farmos.production-identity-postgres-isolated-qualification-executor.v4",
   git_commit: "6".repeat(40),
   executor_source_sha256: `sha256:${"8".repeat(64)}`,
   repository_source_gate: "TRACKED_CLEAN_REQUIRED",

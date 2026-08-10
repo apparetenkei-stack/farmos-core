@@ -14,11 +14,11 @@ import {
   createFarmOsProductionIdentityH2NotApplicableSentinel,
 } from "../../../src/lib/hermes/farm_os_production_identity_runtime_foundation";
 import {
-  FARM_OS_PRODUCTION_IDENTITY_QUERY_V4_CANDIDATE,
-  FARM_OS_PRODUCTION_IDENTITY_QUERY_V4_SHA256,
-  loadFarmOsProductionIdentityQueryV4Artifact,
-  type FarmOsProductionIdentityQueryV4ArtifactVerification,
-} from "../../../src/lib/hermes/farm_os_production_identity_query_v4_authority";
+  FARM_OS_PRODUCTION_IDENTITY_QUERY_V5_CANDIDATE,
+  FARM_OS_PRODUCTION_IDENTITY_QUERY_V5_SHA256,
+  loadFarmOsProductionIdentityQueryV5Artifact,
+  type FarmOsProductionIdentityQueryV5ArtifactVerification,
+} from "../../../src/lib/hermes/farm_os_production_identity_query_v5_authority";
 import {
   loadFarmOsProductionPostgresBootstrapQueryArtifact,
   parseFarmOsProductionPostgresBootstrapResultSet,
@@ -47,7 +47,7 @@ import {
 export const FARM_OS_PRODUCTION_IDENTITY_POSTGRES_ISOLATED_QUALIFICATION_EXECUTOR =
   Object.freeze({
     authority_id:
-      "farmos.production-identity-postgres-isolated-qualification-executor.v3",
+      "farmos.production-identity-postgres-isolated-qualification-executor.v4",
     purpose: "isolated_postgres_compatibility_qualification",
     allowed_postgres_majors: Object.freeze([14, 15, 16, 17] as const),
     production_target: "FORBIDDEN",
@@ -66,28 +66,28 @@ export const FARM_OS_PRODUCTION_IDENTITY_POSTGRES_QUALIFICATION_ERRORS =
 export type FarmOsProductionIdentityPostgresQualificationErrorCode =
   FarmOsProductionIdentityPostgresQualificationFailureCode;
 
-export type FarmOsProductionIdentityQueryV4StatementAuthorityAgreement = Readonly<{
-  query_authority_id: typeof FARM_OS_PRODUCTION_IDENTITY_QUERY_V4_CANDIDATE.authority_id;
-  query_sha256: typeof FARM_OS_PRODUCTION_IDENTITY_QUERY_V4_SHA256;
+export type FarmOsProductionIdentityQueryV5StatementAuthorityAgreement = Readonly<{
+  query_authority_id: typeof FARM_OS_PRODUCTION_IDENTITY_QUERY_V5_CANDIDATE.authority_id;
+  query_sha256: typeof FARM_OS_PRODUCTION_IDENTITY_QUERY_V5_SHA256;
   section_id: FarmOsProductionIdentityQueryV2CandidateSection;
   statement_ordinal: number;
   statement_sha256: `sha256:${string}`;
   statement_sql: string;
 }>;
 
-export type FarmOsProductionIdentityQueryV4AuthorityAgreementPlan =
-  readonly FarmOsProductionIdentityQueryV4StatementAuthorityAgreement[];
+export type FarmOsProductionIdentityQueryV5AuthorityAgreementPlan =
+  readonly FarmOsProductionIdentityQueryV5StatementAuthorityAgreement[];
 
 const statementSha256 = (statementSql: string): `sha256:${string}` =>
   `sha256:${createHash("sha256").update(statementSql, "utf8").digest("hex")}`;
 
-export function createFarmOsProductionIdentityQueryV4AuthorityAgreementPlan(
-  artifact: FarmOsProductionIdentityQueryV4ArtifactVerification,
-): FarmOsProductionIdentityQueryV4AuthorityAgreementPlan | null {
+export function createFarmOsProductionIdentityQueryV5AuthorityAgreementPlan(
+  artifact: FarmOsProductionIdentityQueryV5ArtifactVerification,
+): FarmOsProductionIdentityQueryV5AuthorityAgreementPlan | null {
   if (artifact.status !== "VERIFIED" || artifact.section_plan.length !== 11) return null;
   return Object.freeze(artifact.section_plan.map((section) => Object.freeze({
-    query_authority_id: FARM_OS_PRODUCTION_IDENTITY_QUERY_V4_CANDIDATE.authority_id,
-    query_sha256: FARM_OS_PRODUCTION_IDENTITY_QUERY_V4_SHA256,
+    query_authority_id: FARM_OS_PRODUCTION_IDENTITY_QUERY_V5_CANDIDATE.authority_id,
+    query_sha256: FARM_OS_PRODUCTION_IDENTITY_QUERY_V5_SHA256,
     section_id: section.section_id,
     statement_ordinal: section.ordinal,
     statement_sha256: statementSha256(section.statement_sql),
@@ -95,11 +95,11 @@ export function createFarmOsProductionIdentityQueryV4AuthorityAgreementPlan(
   })));
 }
 
-export function validateFarmOsProductionIdentityQueryV4AuthorityAgreementPlan(
-  candidate: FarmOsProductionIdentityQueryV4AuthorityAgreementPlan,
-  artifact: FarmOsProductionIdentityQueryV4ArtifactVerification,
+export function validateFarmOsProductionIdentityQueryV5AuthorityAgreementPlan(
+  candidate: FarmOsProductionIdentityQueryV5AuthorityAgreementPlan,
+  artifact: FarmOsProductionIdentityQueryV5ArtifactVerification,
 ): boolean {
-  const expected = createFarmOsProductionIdentityQueryV4AuthorityAgreementPlan(artifact);
+  const expected = createFarmOsProductionIdentityQueryV5AuthorityAgreementPlan(artifact);
   return expected !== null && Object.isFrozen(candidate) &&
     candidate.length === expected.length && candidate.every((entry, index) => {
       const reviewed = expected[index];
@@ -113,9 +113,9 @@ export function validateFarmOsProductionIdentityQueryV4AuthorityAgreementPlan(
     });
 }
 
-export function validateFarmOsProductionIdentityQueryV4StatementAuthorityAgreement(
-  candidate: FarmOsProductionIdentityQueryV4StatementAuthorityAgreement,
-  plan: FarmOsProductionIdentityQueryV4AuthorityAgreementPlan,
+export function validateFarmOsProductionIdentityQueryV5StatementAuthorityAgreement(
+  candidate: FarmOsProductionIdentityQueryV5StatementAuthorityAgreement,
+  plan: FarmOsProductionIdentityQueryV5AuthorityAgreementPlan,
 ): boolean {
   if (!Object.isFrozen(plan) || !Object.isFrozen(candidate)) return false;
   const reviewed = plan.find((entry) => entry.section_id === candidate.section_id);
@@ -255,7 +255,7 @@ export interface FarmOsProductionIdentityQualificationSession {
   setLocalTimeouts(): Promise<void>;
   query(statementSql: string): Promise<readonly Record<string, unknown>[]>;
   querySection(
-    agreement: FarmOsProductionIdentityQueryV4StatementAuthorityAgreement,
+    agreement: FarmOsProductionIdentityQueryV5StatementAuthorityAgreement,
   ): Promise<readonly Record<string, unknown>[]>;
   rollback(): Promise<void>;
   close(): Promise<void>;
@@ -293,7 +293,7 @@ export interface FarmOsProductionIdentityPostgresQualificationPlatform {
   openQualificationSession(input: Readonly<{
     container: FarmOsProductionIdentityOwnedContainer;
     credential: FarmOsProductionIdentityFixtureCredential;
-    section_authority_plan: FarmOsProductionIdentityQueryV4AuthorityAgreementPlan;
+    section_authority_plan: FarmOsProductionIdentityQueryV5AuthorityAgreementPlan;
   }>): Promise<FarmOsProductionIdentityQualificationSession>;
   cleanupExactOwnedContainer(
     container: FarmOsProductionIdentityOwnedContainer,
@@ -312,9 +312,9 @@ export type FarmOsProductionIdentityQualificationExecutorInput = Readonly<{
 export type FarmOsProductionIdentityQualificationRunResult = Readonly<{
   lineage: Readonly<{
     schema_version:
-      "farmos.production-identity-postgres-qualification-executor-lineage.v3";
+      "farmos.production-identity-postgres-qualification-executor-lineage.v4";
     executor_authority_id:
-      "farmos.production-identity-postgres-isolated-qualification-executor.v3";
+      "farmos.production-identity-postgres-isolated-qualification-executor.v4";
     git_commit: string;
     executor_source_sha256: `sha256:${string}`;
     repository_source_gate: "TRACKED_CLEAN_REQUIRED";
@@ -565,7 +565,7 @@ async function executePositive(
   session: FarmOsProductionIdentityQualificationSession,
   bootstrapSql: string,
   credential: FarmOsProductionIdentityFixtureCredential,
-  sectionAuthorityPlan: FarmOsProductionIdentityQueryV4AuthorityAgreementPlan,
+  sectionAuthorityPlan: FarmOsProductionIdentityQueryV5AuthorityAgreementPlan,
 ): Promise<Readonly<{
   server_version_num: number;
   executed_section_count: 10 | 11;
@@ -787,11 +787,11 @@ function failureEvidence(
     primary_failure_code: diagnostic.primary_failure_code,
     terminal_failure_code: diagnostic.terminal_failure_code,
     executor_authority_id:
-      "farmos.production-identity-postgres-isolated-qualification-executor.v3",
+      "farmos.production-identity-postgres-isolated-qualification-executor.v4",
     source_commit: input.git_commit,
     source_digest: input.executor_source_sha256,
-    query_authority_id: FARM_OS_PRODUCTION_IDENTITY_QUERY_V4_CANDIDATE.authority_id,
-    query_sha256: FARM_OS_PRODUCTION_IDENTITY_QUERY_V4_SHA256,
+    query_authority_id: FARM_OS_PRODUCTION_IDENTITY_QUERY_V5_CANDIDATE.authority_id,
+    query_sha256: FARM_OS_PRODUCTION_IDENTITY_QUERY_V5_SHA256,
     bootstrap_authority_id: FARM_OS_PRODUCTION_POSTGRES_BOOTSTRAP_QUERY_CANDIDATE.authority_id,
     bootstrap_sha256: FARM_OS_PRODUCTION_POSTGRES_BOOTSTRAP_QUERY_CANDIDATE.sha256,
     production_operations: 0,
@@ -836,7 +836,7 @@ async function runCase(
   fixtureCase: FarmOsProductionIdentityFixtureCase | "NEGATIVE_CAPABILITY_ONLY",
   image: FarmOsProductionIdentityImageAuthority,
   bootstrapSql: string,
-  sectionAuthorityPlan: FarmOsProductionIdentityQueryV4AuthorityAgreementPlan,
+  sectionAuthorityPlan: FarmOsProductionIdentityQueryV5AuthorityAgreementPlan,
 ): Promise<FarmOsProductionIdentityPostgresQualificationEvidence> {
   const random = input.random_bytes ?? randomBytes;
   const credential = createFarmOsProductionIdentityFixtureCredential(random);
@@ -925,8 +925,8 @@ async function runCase(
         image_repo_digest: image.repo_digest,
         bootstrap_authority_candidate_id: FARM_OS_PRODUCTION_POSTGRES_BOOTSTRAP_QUERY_CANDIDATE.authority_id,
         bootstrap_query_sha256: FARM_OS_PRODUCTION_POSTGRES_BOOTSTRAP_QUERY_CANDIDATE.sha256,
-        query_authority_id: FARM_OS_PRODUCTION_IDENTITY_QUERY_V4_CANDIDATE.authority_id,
-        query_sha256: FARM_OS_PRODUCTION_IDENTITY_QUERY_V4_SHA256,
+        query_authority_id: FARM_OS_PRODUCTION_IDENTITY_QUERY_V5_CANDIDATE.authority_id,
+        query_sha256: FARM_OS_PRODUCTION_IDENTITY_QUERY_V5_SHA256,
         runtime_contract_version: FARM_OS_PRODUCTION_IDENTITY_QUERY_V2_RESULT_CONTRACT_VERSION,
         section_count: 11,
         catalog_capability_columns: result.capability_columns,
@@ -973,8 +973,8 @@ async function runCase(
         image_repo_digest: image.repo_digest,
         bootstrap_authority_candidate_id: FARM_OS_PRODUCTION_POSTGRES_BOOTSTRAP_QUERY_CANDIDATE.authority_id,
         bootstrap_query_sha256: FARM_OS_PRODUCTION_POSTGRES_BOOTSTRAP_QUERY_CANDIDATE.sha256,
-        query_authority_id: FARM_OS_PRODUCTION_IDENTITY_QUERY_V4_CANDIDATE.authority_id,
-        query_sha256: FARM_OS_PRODUCTION_IDENTITY_QUERY_V4_SHA256,
+        query_authority_id: FARM_OS_PRODUCTION_IDENTITY_QUERY_V5_CANDIDATE.authority_id,
+        query_sha256: FARM_OS_PRODUCTION_IDENTITY_QUERY_V5_SHA256,
         runtime_contract_version: FARM_OS_PRODUCTION_IDENTITY_QUERY_V2_RESULT_CONTRACT_VERSION,
         section_count: 11,
         catalog_capability_columns: CAPABILITY_COLUMNS,
@@ -1045,11 +1045,11 @@ export async function executeFarmOsProductionIdentityPostgresQualificationMatrix
   const bootstrap = loadFarmOsProductionPostgresBootstrapQueryArtifact();
   if (bootstrap.status !== "VERIFIED") fail("BOOTSTRAP_MISMATCH");
   const bootstrapSql = Buffer.from(bootstrap.raw_bytes).toString("utf8");
-  const queryArtifact = loadFarmOsProductionIdentityQueryV4Artifact();
+  const queryArtifact = loadFarmOsProductionIdentityQueryV5Artifact();
   const sectionAuthorityPlan =
-    createFarmOsProductionIdentityQueryV4AuthorityAgreementPlan(queryArtifact);
+    createFarmOsProductionIdentityQueryV5AuthorityAgreementPlan(queryArtifact);
   if (sectionAuthorityPlan === null ||
-    !validateFarmOsProductionIdentityQueryV4AuthorityAgreementPlan(
+    !validateFarmOsProductionIdentityQueryV5AuthorityAgreementPlan(
       sectionAuthorityPlan, queryArtifact)) fail("QUERY_ARTIFACT_DRIFT");
   const evidence: FarmOsProductionIdentityPostgresQualificationEvidence[] = [];
   const failures: FarmOsProductionIdentityPostgresQualificationFailure[] = [];
@@ -1079,9 +1079,9 @@ export async function executeFarmOsProductionIdentityPostgresQualificationMatrix
   return Object.freeze({
     lineage: Object.freeze({
       schema_version:
-        "farmos.production-identity-postgres-qualification-executor-lineage.v3",
+        "farmos.production-identity-postgres-qualification-executor-lineage.v4",
       executor_authority_id:
-        "farmos.production-identity-postgres-isolated-qualification-executor.v3",
+        "farmos.production-identity-postgres-isolated-qualification-executor.v4",
       git_commit: input.git_commit,
       executor_source_sha256: input.executor_source_sha256,
       repository_source_gate: "TRACKED_CLEAN_REQUIRED",
@@ -1110,9 +1110,9 @@ function executorLineageValid(
   lineage: FarmOsProductionIdentityQualificationRunResult["lineage"],
 ): boolean {
   return lineage.schema_version ===
-      "farmos.production-identity-postgres-qualification-executor-lineage.v3" &&
+      "farmos.production-identity-postgres-qualification-executor-lineage.v4" &&
     lineage.executor_authority_id ===
-      "farmos.production-identity-postgres-isolated-qualification-executor.v3" &&
+      "farmos.production-identity-postgres-isolated-qualification-executor.v4" &&
     GIT_COMMIT.test(lineage.git_commit) && DIGEST.test(lineage.executor_source_sha256) &&
     lineage.repository_source_gate === "TRACKED_CLEAN_REQUIRED" &&
     lineage.production_operations === 0 && lineage.filesystem_persistence === 0;
@@ -1144,7 +1144,7 @@ export function evaluateFarmOsProductionIdentityExecutorQualificationClosure(
 ): Readonly<{
   technical_qualification_achieved: true;
   executor_authority_id:
-    "farmos.production-identity-postgres-isolated-qualification-executor.v3";
+    "farmos.production-identity-postgres-isolated-qualification-executor.v4";
   executor_source_sha256: `sha256:${string}`;
   evidence_count: 6;
   production_operations: 0;
@@ -1182,7 +1182,7 @@ export function evaluateFarmOsProductionIdentityExecutorQualificationClosure(
   return Object.freeze({
     technical_qualification_achieved: true,
     executor_authority_id:
-      "farmos.production-identity-postgres-isolated-qualification-executor.v3",
+      "farmos.production-identity-postgres-isolated-qualification-executor.v4",
     executor_source_sha256: result.lineage.executor_source_sha256,
     evidence_count: 6,
     production_operations: 0,

@@ -36,9 +36,9 @@ import {
   FARM_OS_PRODUCTION_IDENTITY_QUERY_V2_ROLE_SCOPES,
 } from "../../src/lib/hermes/farm_os_production_identity_query_v2_contract";
 import {
-  FARM_OS_PRODUCTION_IDENTITY_QUERY_V4_CANDIDATE,
-  FARM_OS_PRODUCTION_IDENTITY_QUERY_V4_SHA256,
-} from "../../src/lib/hermes/farm_os_production_identity_query_v4_authority";
+  FARM_OS_PRODUCTION_IDENTITY_QUERY_V5_CANDIDATE,
+  FARM_OS_PRODUCTION_IDENTITY_QUERY_V5_SHA256,
+} from "../../src/lib/hermes/farm_os_production_identity_query_v5_authority";
 
 const bootstrapBytes = readFileSync(FARM_OS_PRODUCTION_POSTGRES_BOOTSTRAP_QUERY_CANDIDATE.artifact_path);
 const bootstrapSql = bootstrapBytes.toString("utf8");
@@ -205,6 +205,29 @@ assert.equal(dockerExecutionCount, 0);
 const positiveFixture = buildFarmOsProductionIdentitySyntheticFixture(16, "MIGRATION_HISTORY_PRESENT");
 const positiveAbsentFixture = buildFarmOsProductionIdentitySyntheticFixture(16, "MIGRATION_HISTORY_ABSENT");
 const fixtureSql = positiveFixture.setup_statements.join("\n");
+const absentFixtureSql = positiveAbsentFixture.setup_statements.join("\n");
+const exactSchemaUsage =
+  "GRANT USAGE ON SCHEMA core_schema TO farmos_identity_qualification;";
+const exactHistorySelect =
+  "GRANT SELECT ON TABLE core_schema.migration_history TO farmos_identity_qualification;";
+assert.equal(positiveFixture.setup_statements.filter((statement) =>
+  statement === exactSchemaUsage).length, 1);
+assert.equal(positiveFixture.setup_statements.filter((statement) =>
+  statement === exactHistorySelect).length, 1);
+assert.equal(positiveAbsentFixture.setup_statements.filter((statement) =>
+  statement === exactSchemaUsage || statement === exactHistorySelect).length, 0);
+const historyCreateIndex = positiveFixture.setup_statements.findIndex((statement) =>
+  statement.startsWith("CREATE TABLE core_schema.migration_history "));
+assert.ok(historyCreateIndex >= 0);
+assert.ok(positiveFixture.setup_statements.indexOf(exactSchemaUsage) > historyCreateIndex);
+assert.ok(positiveFixture.setup_statements.indexOf(exactHistorySelect) > historyCreateIndex);
+for (const capabilitySql of [fixtureSql, absentFixtureSql]) {
+  assert.doesNotMatch(capabilitySql,
+    /GRANT\s+(?:ALL(?:\s+PRIVILEGES)?|CREATE|INSERT|UPDATE|DELETE|TRUNCATE|REFERENCES|TRIGGER)\s+ON\s+(?:SCHEMA\s+core_schema|(?:ALL\s+TABLES\s+IN\s+SCHEMA|TABLE\s+core_schema\.migration_history))/iu);
+  assert.doesNotMatch(capabilitySql,
+    /GRANT\s+(?:pg_read_all_data|ALL(?:\s+PRIVILEGES)?)\s+TO\s+farmos_identity_qualification/iu);
+  assert.doesNotMatch(capabilitySql, /ALTER\s+ROLE\s+farmos_identity_qualification\s+SUPERUSER/iu);
+}
 for (const target of ["ai.proposal_inbox", "ai.proposal_creation_idempotency", "ai.proposal_execution_state"]) {
   assert.equal(FARM_OS_PRODUCTION_IDENTITY_QUERY_V2_RELATION_SCOPES.some((scope) => scope.endsWith(`:${target}`)), true);
   assert.equal(fixtureSql.includes(target), true);
@@ -235,8 +258,8 @@ const baseEvidence = {
   image_repo_digest: `sha256:${"1".repeat(64)}`,
   bootstrap_authority_candidate_id: FARM_OS_PRODUCTION_POSTGRES_BOOTSTRAP_QUERY_CANDIDATE.authority_id,
   bootstrap_query_sha256: FARM_OS_PRODUCTION_POSTGRES_BOOTSTRAP_QUERY_CANDIDATE.sha256,
-  query_authority_id: FARM_OS_PRODUCTION_IDENTITY_QUERY_V4_CANDIDATE.authority_id,
-  query_sha256: FARM_OS_PRODUCTION_IDENTITY_QUERY_V4_SHA256,
+  query_authority_id: FARM_OS_PRODUCTION_IDENTITY_QUERY_V5_CANDIDATE.authority_id,
+  query_sha256: FARM_OS_PRODUCTION_IDENTITY_QUERY_V5_SHA256,
   runtime_contract_version: FARM_OS_PRODUCTION_IDENTITY_QUERY_V2_RESULT_CONTRACT_VERSION,
   section_count: 11,
   catalog_capability_columns: ["inherit_option", "set_option"],

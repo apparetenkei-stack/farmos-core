@@ -187,6 +187,8 @@ const createFixtureStatements = (fixtureCase: FarmOsProductionIdentityFixtureCas
       "('202607310001_daily_operational_projection_candidate_activation', 202607310001, 'sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc'), " +
       "('202608030001_daily_operational_projection_command_ledger', 202608030001, 'sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd'), " +
       "('202608070001_stable_changes_consumer_persistence', 202608070001, 'sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee');",
+    "GRANT USAGE ON SCHEMA core_schema TO farmos_identity_qualification;",
+    "GRANT SELECT ON TABLE core_schema.migration_history TO farmos_identity_qualification;",
   ] : [];
   return Object.freeze([
     "CREATE SCHEMA ai;",
