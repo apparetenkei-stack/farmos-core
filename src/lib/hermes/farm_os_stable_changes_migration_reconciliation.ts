@@ -5,6 +5,9 @@ import {
   type FarmOsCoreMigrationManifest,
   type FarmOsStoredMigration,
 } from "./farm_os_core_db_migration_manifest";
+import {
+  FARM_OS_PRODUCTION_IDENTITY_QUERY_V5_ADOPTION,
+} from "./farm_os_production_identity_query_v5_adoption";
 
 export const FARM_OS_PRODUCTION_TARGET_IDENTITY_SCHEMA_VERSION =
   "farmos.production-target-identity.v1" as const;
@@ -54,7 +57,7 @@ const productionIdentityQueryAuthorityV2 = Object.freeze({
   contract_version: FARM_OS_PRODUCTION_TARGET_LIVE_EVIDENCE_SCHEMA_VERSION,
   adoption_status: "ADOPTED",
   runtime_binding_status: "NOT_RUNTIME_BOUND",
-  historical_status: "CURRENT_REPOSITORY_AUTHORITY",
+  historical_status: "HISTORICAL_SUPERSEDED_REPOSITORY_AUTHORITY",
   query_artifact_path: "scripts/sql/farm_os_production_identity_readonly_v2.sql",
   query_sha256:
     "sha256:202053dadf34063c3ccfc69ede01197a217b968916936f33b7185090659faf95",
@@ -62,7 +65,7 @@ const productionIdentityQueryAuthorityV2 = Object.freeze({
   review_status: "APPROVED",
   approval_review_reference: "review/production-identity-query-authority-v2/sol-go",
   supersedes: "farmos.production-target-identity-query.v1",
-  superseded_by: null,
+  superseded_by: FARM_OS_PRODUCTION_IDENTITY_QUERY_V5_ADOPTION.authority_id,
 } as const);
 
 const productionIdentityQueryAuthorityV3Candidate = Object.freeze({
@@ -72,7 +75,7 @@ const productionIdentityQueryAuthorityV3Candidate = Object.freeze({
   contract_version: FARM_OS_PRODUCTION_TARGET_LIVE_EVIDENCE_SCHEMA_VERSION,
   adoption_status: "NOT_ADOPTED",
   runtime_binding_status: "NOT_RUNTIME_BOUND",
-  historical_status: "CANDIDATE_NOT_AUTHORITY",
+  historical_status: "HISTORICAL_SUPERSEDED_CANDIDATE",
   query_artifact_path: "scripts/sql/farm_os_production_identity_readonly_v3.sql",
   query_sha256:
     "sha256:59255333ad77cc58b043cdecd8df49f92fe184a2120b109663fefa0514ddce81",
@@ -92,7 +95,7 @@ const productionIdentityQueryAuthorityV4Candidate = Object.freeze({
   contract_version: FARM_OS_PRODUCTION_TARGET_LIVE_EVIDENCE_SCHEMA_VERSION,
   adoption_status: "NOT_ADOPTED",
   runtime_binding_status: "NOT_RUNTIME_BOUND",
-  historical_status: "CANDIDATE_NOT_AUTHORITY",
+  historical_status: "HISTORICAL_SUPERSEDED_CANDIDATE",
   query_artifact_path: "scripts/sql/farm_os_production_identity_readonly_v4.sql",
   query_sha256:
     "sha256:e83987c840cc941cf5e6dcff93d46345464db0019ea5beb5143b0222316e05ca",
@@ -105,24 +108,27 @@ const productionIdentityQueryAuthorityV4Candidate = Object.freeze({
   automatic_latest_selection: false,
 } as const);
 
-const productionIdentityQueryAuthorityV5Candidate = Object.freeze({
-  authority_id: "farmos.production-target-identity-query.v5",
-  version: "v5",
-  purpose: "production_target_identity_collection",
+const productionIdentityQueryAuthorityV5 = Object.freeze({
+  authority_id: FARM_OS_PRODUCTION_IDENTITY_QUERY_V5_ADOPTION.authority_id,
+  version: FARM_OS_PRODUCTION_IDENTITY_QUERY_V5_ADOPTION.version,
+  purpose: FARM_OS_PRODUCTION_IDENTITY_QUERY_V5_ADOPTION.purpose,
   contract_version: FARM_OS_PRODUCTION_TARGET_LIVE_EVIDENCE_SCHEMA_VERSION,
-  adoption_status: "NOT_ADOPTED",
-  runtime_binding_status: "NOT_RUNTIME_BOUND",
-  historical_status: "CANDIDATE_NOT_AUTHORITY",
-  query_artifact_path: "scripts/sql/farm_os_production_identity_readonly_v5.sql",
-  query_sha256:
-    "sha256:a76f939ab9deb8351aecb42c96be9ed2f71cab7c292a0685db708f603e076f52",
+  adoption_status: FARM_OS_PRODUCTION_IDENTITY_QUERY_V5_ADOPTION.adoption_status,
+  runtime_binding_status:
+    FARM_OS_PRODUCTION_IDENTITY_QUERY_V5_ADOPTION.runtime_binding_status,
+  historical_status: FARM_OS_PRODUCTION_IDENTITY_QUERY_V5_ADOPTION.repository_status,
+  query_artifact_path: FARM_OS_PRODUCTION_IDENTITY_QUERY_V5_ADOPTION.query_artifact_path,
+  query_sha256: FARM_OS_PRODUCTION_IDENTITY_QUERY_V5_ADOPTION.artifact_sha256,
   tracked_preimage_available: true,
-  review_status: "CANDIDATE_FOR_APPROVAL",
+  review_status: FARM_OS_PRODUCTION_IDENTITY_QUERY_V5_ADOPTION.review_status,
   approval_review_reference: null,
-  supersedes: "farmos.production-target-identity-query.v4",
+  supersedes:
+    FARM_OS_PRODUCTION_IDENTITY_QUERY_V5_ADOPTION.repository_authority_supersession
+      .predecessor_authority_id,
   superseded_by: null,
-  execution_enabled: false,
-  automatic_latest_selection: false,
+  execution_enabled: FARM_OS_PRODUCTION_IDENTITY_QUERY_V5_ADOPTION.execution_enabled,
+  automatic_latest_selection:
+    FARM_OS_PRODUCTION_IDENTITY_QUERY_V5_ADOPTION.automatic_latest_selection,
 } as const);
 
 export const FARM_OS_PRODUCTION_IDENTITY_QUERY_AUTHORITIES = Object.freeze([
@@ -130,12 +136,16 @@ export const FARM_OS_PRODUCTION_IDENTITY_QUERY_AUTHORITIES = Object.freeze([
   productionIdentityQueryAuthorityV2,
   productionIdentityQueryAuthorityV3Candidate,
   productionIdentityQueryAuthorityV4Candidate,
-  productionIdentityQueryAuthorityV5Candidate,
+  productionIdentityQueryAuthorityV5,
 ] as const);
 
 export const FARM_OS_PRODUCTION_IDENTITY_QUERY_SUPERSESSION = Object.freeze({
-  predecessor_authority_id: "farmos.production-target-identity-query.v1",
-  successor_authority_id: "farmos.production-target-identity-query.v2",
+  predecessor_authority_id:
+    FARM_OS_PRODUCTION_IDENTITY_QUERY_V5_ADOPTION.repository_authority_supersession
+      .predecessor_authority_id,
+  successor_authority_id:
+    FARM_OS_PRODUCTION_IDENTITY_QUERY_V5_ADOPTION.repository_authority_supersession
+      .successor_authority_id,
   relationship: "REPOSITORY_AUTHORITY_SUPERSESSION",
   runtime_binding_effect: "NONE",
 } as const);

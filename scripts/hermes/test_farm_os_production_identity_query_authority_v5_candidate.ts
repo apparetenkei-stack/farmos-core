@@ -10,6 +10,10 @@ import {
   verifyFarmOsProductionIdentityQueryV5ArtifactBytes,
 } from "../../src/lib/hermes/farm_os_production_identity_query_v5_authority";
 import {
+  FARM_OS_PRODUCTION_IDENTITY_QUERY_V5_ADOPTION,
+  FARM_OS_PRODUCTION_IDENTITY_QUERY_V5_ADOPTION_RUNTIME_ASSERTIONS,
+} from "../../src/lib/hermes/farm_os_production_identity_query_v5_adoption";
+import {
   FARM_OS_PRODUCTION_IDENTITY_QUERY_V2_RESULT_CONTRACT_VERSION,
   FARM_OS_PRODUCTION_IDENTITY_QUERY_V2_SECTIONS,
 } from "../../src/lib/hermes/farm_os_production_identity_query_v2_contract";
@@ -41,6 +45,166 @@ assert.deepEqual(FARM_OS_PRODUCTION_IDENTITY_QUERY_V5_CANDIDATE, {
   query_artifact_path: FARM_OS_PRODUCTION_IDENTITY_QUERY_V5_ARTIFACT_PATH,
   query_sha256: FARM_OS_PRODUCTION_IDENTITY_QUERY_V5_SHA256,
 });
+
+const adoption = FARM_OS_PRODUCTION_IDENTITY_QUERY_V5_ADOPTION;
+assert.equal(adoption.authority_id, FARM_OS_PRODUCTION_IDENTITY_QUERY_V5_CANDIDATE.authority_id);
+assert.equal(adoption.version, "v5");
+assert.equal(adoption.artifact_sha256, FARM_OS_PRODUCTION_IDENTITY_QUERY_V5_SHA256);
+assert.equal(adoption.review_status, "APPROVED");
+assert.equal(adoption.adoption_status, "ADOPTED");
+assert.equal(adoption.repository_status, "CURRENT_REPOSITORY_AUTHORITY");
+assert.equal(adoption.runtime_binding_status, "NOT_RUNTIME_BOUND");
+assert.equal(adoption.execution_enabled, false);
+assert.equal(adoption.automatic_latest_selection, false);
+assert.equal(adoption.runtime_effect, "NONE");
+assert.equal(adoption.production_execution_effect, "NONE");
+assert.equal(adoption.human_approval_status, "RECEIVED");
+
+const qualification = adoption.qualification;
+assert.equal(qualification.status, "ESTABLISHED");
+assert.equal(
+  qualification.qualification_source_commit,
+  "4cfaa0455808b4197095cf2dc93f3940a8eb57c8",
+);
+assert.equal(
+  qualification.executor_authority,
+  "farmos.production-identity-postgres-isolated-qualification-executor.v4",
+);
+assert.equal(
+  qualification.executor_lineage,
+  "farmos.production-identity-postgres-qualification-executor-lineage.v4",
+);
+assert.equal(
+  qualification.executor_source_sha256,
+  "sha256:749888c7d82c587d274e270b43b0e82521064cadae3600798e8bf8b1aad96b74",
+);
+assert.equal(qualification.success_evidence_version, "v4");
+assert.equal(
+  qualification.bootstrap_authority,
+  "farmos.production-postgres-version-bootstrap-query.v1",
+);
+assert.equal(qualification.query_authority, adoption.authority_id);
+assert.equal(qualification.query_sha256, FARM_OS_PRODUCTION_IDENTITY_QUERY_V5_SHA256);
+assert.equal(qualification.six_record_count, 6);
+assert.equal(qualification.failure_count, 0);
+assert.equal(qualification.cleanup_success_count, 6);
+assert.deepEqual(qualification.targeted_regressions, { passed: 10, total: 10, status: "PASS" });
+assert.deepEqual(qualification.typechecks, { passed: 9, total: 9, status: "PASS" });
+assert.equal(qualification.sol_technical_qualification, "GO");
+assert.equal(qualification.scope, "EXACT_OBSERVED_BASELINE_ONLY");
+assert.equal(qualification.future_pg16_patches_qualified, false);
+assert.equal(qualification.future_pg17_patches_qualified, false);
+assert.equal(qualification.future_image_bytes_qualified, false);
+assert.equal(qualification.docker_tag_alone_sufficient, false);
+assert.equal(qualification.postgres_18_plus_status, "UNREVIEWED");
+
+assert.deepEqual(qualification.postgres_baselines, [
+  {
+    postgres_major: 14,
+    server_version_num: 140023,
+    status: "NOT_ELIGIBLE",
+    image_tag: "postgres:14",
+    image_id: "sha256:2f439458ab6a57a925825ae14f9d06910e4fe4a41c8d4a0ae06397e65b707e1b",
+    image_repo_digest:
+      "postgres@sha256:2f439458ab6a57a925825ae14f9d06910e4fe4a41c8d4a0ae06397e65b707e1b",
+    evidence_record_count: 1,
+  },
+  {
+    postgres_major: 15,
+    server_version_num: 150018,
+    status: "NOT_ELIGIBLE",
+    image_tag: "postgres:15",
+    image_id: "sha256:6eb0add3b77c081df18aa518ce43df58fdcc40f2e6d868a6fd08038dc7acd425",
+    image_repo_digest:
+      "postgres@sha256:6eb0add3b77c081df18aa518ce43df58fdcc40f2e6d868a6fd08038dc7acd425",
+    evidence_record_count: 1,
+  },
+  {
+    postgres_major: 16,
+    server_version_num: 160014,
+    status: "QUALIFIED_BASELINE",
+    cases: ["absent", "present"],
+    image_tag: "postgres:16",
+    image_id: "sha256:95206741a5b214807675e14165369d05b93a9cf692223b616d07cca227e74b0b",
+    image_repo_digest:
+      "postgres@sha256:95206741a5b214807675e14165369d05b93a9cf692223b616d07cca227e74b0b",
+    evidence_record_count: 2,
+  },
+  {
+    postgres_major: 17,
+    server_version_num: 170010,
+    status: "QUALIFIED_BASELINE",
+    cases: ["absent", "present"],
+    image_tag: "postgres:17",
+    image_id: "sha256:5c855ad7b85e68e48a62f34662853f38b57c1c1d80f3a927ab58034fd6d31c5e",
+    image_repo_digest:
+      "postgres@sha256:5c855ad7b85e68e48a62f34662853f38b57c1c1d80f3a927ab58034fd6d31c5e",
+    evidence_record_count: 2,
+  },
+]);
+
+assert.deepEqual(adoption.resolved_blockers, {
+  BLOCKED_POSTGRES_COMPATIBILITY: "RESOLVED",
+  BLOCKED_POSTGRES_QUALIFICATION_INTEGRITY: "RESOLVED",
+  basis: "EXACT_SIX_RECORD_QUALIFICATION_BASELINE",
+});
+assert.deepEqual(adoption.remaining_blockers, [
+  "BLOCKED_RUNTIME_EVIDENCE_ASSEMBLY",
+  "PRODUCTION_TARGET_MANIFEST_REQUIRED",
+  "BLOCKED_CONNECTION_AUTHORITY",
+  "EXECUTION_APPROVAL_LINEAGE_REQUIRED",
+  "PRODUCTION_IDENTITY_COLLECTOR_ENTRYPOINT_REQUIRED",
+  "BLOCKED_PROVIDER_CAPACITY_DESIGN",
+  "PREFIX_CATALOG_FINGERPRINT_AUTHORITY_REQUIRED",
+  "PRODUCTION_CONSUMER_ENTRYPOINT_REQUIRED",
+]);
+
+assert.equal(
+  adoption.requalification_policy.query_artifact_byte_or_sha_change,
+  "NEW_AUTHORITY_AND_FULL_REQUALIFICATION",
+);
+assert.equal(
+  adoption.requalification_policy.executor_parser_or_lineage_semantic_change,
+  "BASELINE_STALE_AND_FULL_SIX_RECORD_REQUALIFICATION",
+);
+assert.equal(
+  adoption.requalification_policy.fixture_grant_or_principal_semantic_change,
+  "FULL_SIX_RECORD_REQUALIFICATION",
+);
+assert.equal(
+  adoption.requalification_policy.digest_bound_source_change,
+  "FULL_SIX_RECORD_REQUALIFICATION",
+);
+assert.equal(
+  adoption.requalification_policy.new_postgres_major,
+  "UNREVIEWED_QUALIFICATION_REQUIRED",
+);
+assert.equal(
+  adoption.requalification_policy.image_id_or_repo_digest_change,
+  "OUT_OF_BASELINE_REVIEW_REQUIRED",
+);
+assert.equal(
+  adoption.requalification_policy.image_identity_change_automatically_revokes_repository_adoption,
+  false,
+);
+assert.deepEqual(FARM_OS_PRODUCTION_IDENTITY_QUERY_V5_ADOPTION_RUNTIME_ASSERTIONS, {
+  V5_AUTHORITY_ADOPTED: true,
+  V5_RUNTIME_BOUND: false,
+  V5_EXECUTION_ENABLED: false,
+  automatic_latest: false,
+  credential_resolver_calls: 0,
+  connection_calls: 0,
+  collector_calls: 0,
+  production_database_operations: 0,
+});
+assert.equal(adoption.executor_boundary, "ISOLATED_TECHNICAL_QUALIFICATION_ONLY");
+assert.equal(adoption.production_collector_authorized, false);
+assert.equal(adoption.production_read_client_authorized, false);
+assert.equal(adoption.fixture_privilege_semantics.history_absent.schema_usage_required, false);
+assert.equal(adoption.fixture_privilege_semantics.history_absent.history_select_required, false);
+assert.equal(adoption.fixture_privilege_semantics.history_present.schema_usage_required, true);
+assert.equal(adoption.fixture_privilege_semantics.history_present.history_select_required, true);
+assert.equal(adoption.fixture_privilege_semantics.automatic_production_provisioning, false);
 
 const v4 = loadFarmOsProductionIdentityQueryV4Artifact();
 const v5 = loadFarmOsProductionIdentityQueryV5Artifact();
@@ -90,6 +254,7 @@ assert.equal(rejected.status === "BLOCKED" && rejected.reason, "ARTIFACT_SHA_MIS
 console.log(JSON.stringify({
   result: "pass",
   authority_id: FARM_OS_PRODUCTION_IDENTITY_QUERY_V5_CANDIDATE.authority_id,
+  adoption_status: adoption.adoption_status,
   query_sha256: FARM_OS_PRODUCTION_IDENTITY_QUERY_V5_SHA256,
   remediated_section_count: 1,
   preserved_section_count: 10,

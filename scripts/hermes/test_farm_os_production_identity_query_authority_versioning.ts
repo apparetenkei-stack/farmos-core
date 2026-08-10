@@ -11,6 +11,12 @@ import {
   FARM_OS_STABLE_CHANGES_PRODUCTION_IDENTITY_QUERY_AUTHORITY,
   resolveFarmOsProductionIdentityQueryAuthority,
 } from "../../src/lib/hermes/farm_os_stable_changes_migration_reconciliation";
+import {
+  FARM_OS_PRODUCTION_IDENTITY_QUERY_V5_ADOPTION,
+} from "../../src/lib/hermes/farm_os_production_identity_query_v5_adoption";
+import {
+  FARM_OS_PRODUCTION_IDENTITY_QUERY_V2_RUNTIME_BINDING,
+} from "../../src/lib/hermes/farm_os_production_identity_runtime_foundation";
 
 const V1_ID = "farmos.production-target-identity-query.v1";
 const V1_SHA256 =
@@ -55,6 +61,7 @@ assert.equal(v1.contract_version, "farmos.production-target-live-evidence.v1");
 assert.equal(v1.tracked_preimage_available, false);
 assert.equal(v1.historical_status, "LEGACY_UNMATERIALIZED_AUTHORITY");
 assert.equal(v1.runtime_binding_status, "ACTIVE_RUNTIME_BINDING");
+assert.equal(v1.superseded_by, V2_ID);
 
 assert.equal(v2.authority_id, V2_ID);
 assert.equal(v2.version, "v2");
@@ -63,6 +70,8 @@ assert.equal(v2.review_status, "APPROVED");
 assert.equal(v2.query_sha256, V2_SHA256);
 assert.equal(v2.supersedes, V1_ID);
 assert.equal(v2.runtime_binding_status, "NOT_RUNTIME_BOUND");
+assert.equal(v2.historical_status, "HISTORICAL_SUPERSEDED_REPOSITORY_AUTHORITY");
+assert.equal(v2.superseded_by, V5_ID);
 assert.notEqual(v1.query_sha256, v2.query_sha256);
 
 assert.equal(v3.authority_id, V3_ID);
@@ -75,6 +84,7 @@ assert.equal(v3.automatic_latest_selection, false);
 assert.equal(v3.query_sha256, V3_SHA256);
 assert.equal(v3.supersedes, V2_ID);
 assert.equal(v3.superseded_by, V4_ID);
+assert.equal(v3.historical_status, "HISTORICAL_SUPERSEDED_CANDIDATE");
 
 assert.equal(v4.authority_id, V4_ID);
 assert.equal(v4.version, "v4");
@@ -86,21 +96,33 @@ assert.equal(v4.automatic_latest_selection, false);
 assert.equal(v4.query_sha256, V4_SHA256);
 assert.equal(v4.supersedes, V3_ID);
 assert.equal(v4.superseded_by, V5_ID);
+assert.equal(v4.historical_status, "HISTORICAL_SUPERSEDED_CANDIDATE");
 
 assert.equal(v5.authority_id, V5_ID);
 assert.equal(v5.version, "v5");
-assert.equal(v5.adoption_status, "NOT_ADOPTED");
-assert.equal(v5.review_status, "CANDIDATE_FOR_APPROVAL");
+assert.equal(v5.adoption_status, "ADOPTED");
+assert.equal(v5.review_status, "APPROVED");
 assert.equal(v5.runtime_binding_status, "NOT_RUNTIME_BOUND");
 assert.equal(v5.execution_enabled, false);
 assert.equal(v5.automatic_latest_selection, false);
 assert.equal(v5.query_sha256, V5_SHA256);
-assert.equal(v5.supersedes, V4_ID);
+assert.equal(v5.supersedes, V2_ID);
+assert.equal(v5.historical_status, "CURRENT_REPOSITORY_AUTHORITY");
 
 assert.deepEqual(FARM_OS_PRODUCTION_IDENTITY_QUERY_SUPERSESSION, {
-  predecessor_authority_id: V1_ID,
-  successor_authority_id: V2_ID,
+  predecessor_authority_id: V2_ID,
+  successor_authority_id: V5_ID,
   relationship: "REPOSITORY_AUTHORITY_SUPERSESSION",
+  runtime_binding_effect: "NONE",
+});
+assert.deepEqual(FARM_OS_PRODUCTION_IDENTITY_QUERY_V5_ADOPTION.candidate_artifact_lineage, [
+  V3_ID,
+  V4_ID,
+  V5_ID,
+]);
+assert.deepEqual(FARM_OS_PRODUCTION_IDENTITY_QUERY_V5_ADOPTION.repository_authority_supersession, {
+  predecessor_authority_id: V2_ID,
+  successor_authority_id: V5_ID,
   runtime_binding_effect: "NONE",
 });
 assert.deepEqual(FARM_OS_PRODUCTION_IDENTITY_QUERY_V3_CANDIDATE_SUPERSESSION, {
@@ -131,6 +153,12 @@ const authorityIds = FARM_OS_PRODUCTION_IDENTITY_QUERY_AUTHORITIES.map(
 assert.equal(new Set(authorityIds).size, authorityIds.length);
 assert.equal(Object.isFrozen(FARM_OS_PRODUCTION_IDENTITY_QUERY_AUTHORITIES), true);
 assert.equal(FARM_OS_PRODUCTION_IDENTITY_QUERY_AUTHORITIES.every(Object.isFrozen), true);
+assert.equal(
+  FARM_OS_PRODUCTION_IDENTITY_QUERY_AUTHORITIES.filter(
+    (authority) => authority.historical_status === "CURRENT_REPOSITORY_AUTHORITY",
+  ).length,
+  1,
+);
 
 const artifactBytes = readFileSync(V2_ARTIFACT_PATH);
 const artifactSha256 = `sha256:${createHash("sha256").update(artifactBytes).digest("hex")}`;
@@ -169,14 +197,20 @@ for (const rejectedSha256 of REJECTED_SHA256) {
 
 assert.equal(FARM_OS_STABLE_CHANGES_PRODUCTION_IDENTITY_QUERY_AUTHORITY.query_authority_id, V1_ID);
 assert.equal(FARM_OS_STABLE_CHANGES_PRODUCTION_IDENTITY_QUERY_AUTHORITY.expected_query_sha256, V1_SHA256);
+assert.equal(FARM_OS_PRODUCTION_IDENTITY_QUERY_V2_RUNTIME_BINDING.authority_id, V2_ID);
+assert.equal(FARM_OS_PRODUCTION_IDENTITY_QUERY_V2_RUNTIME_BINDING.enabled, false);
+assert.equal(FARM_OS_PRODUCTION_IDENTITY_QUERY_V2_RUNTIME_BINDING.binding_state, "DEFAULT_DISABLED");
+assert.equal(FARM_OS_PRODUCTION_IDENTITY_QUERY_V2_RUNTIME_BINDING.automatic_latest_selection, false);
 assert.equal(resolveFarmOsProductionIdentityQueryAuthority("farmos.production-target-identity-query.v0"), null);
 assert.equal(resolveFarmOsProductionIdentityQueryAuthority("latest"), null);
 assert.equal(resolveFarmOsProductionIdentityQueryAuthority("highest"), null);
+assert.equal(resolveFarmOsProductionIdentityQueryAuthority("current"), null);
+assert.equal(resolveFarmOsProductionIdentityQueryAuthority("CURRENT_REPOSITORY_AUTHORITY"), null);
 
 console.log(JSON.stringify({
   result: "pass",
-  repository_authority: V2_ID,
-  candidate_authority: V5_ID,
+  repository_authority: V5_ID,
+  candidate_lineage: FARM_OS_PRODUCTION_IDENTITY_QUERY_V5_ADOPTION.candidate_artifact_lineage,
   runtime_binding: V1_ID,
   production_operations: 0,
 }));
