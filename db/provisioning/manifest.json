@@ -48,6 +48,15 @@
       "apply_script": "db/migrations/202608070001_stable_changes_consumer_persistence.sql",
       "verification_script": "db/migrations/202608070001_stable_changes_consumer_persistence.verify.sql",
       "created_at": "2026-08-07T00:00:00.000Z"
+    },
+    {
+      "migration_id": "202608110001_production_target_execution_durability",
+      "sequence": 202608110001,
+      "description": "Add source-only production target execution durability storage foundation",
+      "checksum": "sha256:f97eca5134c44c5a144523ea19b44b679051f3592f9fd28dbf38c441be7b8131",
+      "apply_script": "db/migrations/202608110001_production_target_execution_durability.sql",
+      "verification_script": "db/migrations/202608110001_production_target_execution_durability.verify.sql",
+      "created_at": "2026-08-11T00:00:00.000Z"
     }
   ]
 }

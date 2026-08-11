@@ -427,7 +427,7 @@ export function deriveFarmOsStableChangesMigrationRegistry(
   value: unknown,
 ): readonly FarmOsMigrationRegistryEntry[] | null {
   const manifest = parseFarmOsCoreMigrationManifest(value);
-  if (manifest === null || manifest.migrations.length !== MIGRATION_METADATA.length) return null;
+  if (manifest === null || manifest.migrations.length < MIGRATION_METADATA.length) return null;
   const registry: FarmOsMigrationRegistryEntry[] = [];
   for (let index = 0; index < MIGRATION_METADATA.length; index += 1) {
     const metadata = MIGRATION_METADATA[index];

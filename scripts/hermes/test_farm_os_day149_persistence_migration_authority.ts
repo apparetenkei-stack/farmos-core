@@ -11,8 +11,8 @@ const APPLY_SHA256 =
   "98504d23be1922d339acf0c7384ad1a5f9b6257e44a07a9073200b21bd79ef0a";
 const VERIFY_SHA256 =
   "daddee61d384bb5f93662152bb52a760f2733ccc11dec026c5911ffd66524093";
-const MANIFEST_SHA256 =
-  "893cda0c7c29a1355da878bb0f1e29b48cf9c1384c69b74257fa1d15c1859b59";
+const DAY149_HISTORICAL_MANIFEST_PREFIX_SHA256 =
+  "2ffb2d6ff890f032793a0f02988e97e469ae2367fa90ab464786f91d5421e9f0";
 
 const VERIFY_PREDICATES = Object.freeze({
   V001: "required_objects_exist",
@@ -255,7 +255,8 @@ for (const name of [
 
 assert.equal(sha256(apply), APPLY_SHA256);
 assert.equal(sha256(verify), VERIFY_SHA256);
-assert.equal(sha256(manifestSource), MANIFEST_SHA256);
+assert.equal(sha256(JSON.stringify(manifest.migrations.slice(0, 4))),
+  DAY149_HISTORICAL_MANIFEST_PREFIX_SHA256);
 assert.equal(/pg_catalog\.coalesce\s*\(/i.test(apply), false);
 assert.equal(/pg_catalog\.coalesce\s*\(/i.test(verify), false);
 assert.match(
@@ -312,7 +313,7 @@ assert.deepEqual(receiptConstraintTriggers, [
 ]);
 assert.equal(manifest.manifest_version, "farmos.core-db-provisioning-manifest.v1");
 assert.equal(manifest.startup_auto_apply, false);
-assert.equal(manifest.migrations.length, 4);
+assert.ok(manifest.migrations.length >= 4);
 assert.deepEqual(
   manifest.migrations.slice(0, 3).map((entry) => ({
     migration_id: entry.migration_id,
@@ -346,6 +347,9 @@ assert.deepEqual(manifest.migrations[3], {
   verification_script: VERIFY_PATH,
   created_at: "2026-08-03T00:00:00.000Z",
 });
+assert.ok(manifest.migrations.slice(4).every((entry) =>
+  typeof entry.sequence === "number" && entry.sequence > 202608030001
+));
 
 for (const token of [
   "create table ai.operational_memory_projection_review_decisions",
@@ -490,7 +494,7 @@ console.log(JSON.stringify({
   status: "PASS",
   apply_sha256: APPLY_SHA256,
   verify_sha256: VERIFY_SHA256,
-  manifest_sha256: MANIFEST_SHA256,
+  historical_manifest_prefix_sha256: DAY149_HISTORICAL_MANIFEST_PREFIX_SHA256,
   coalesce_regression: {
     apply_pg_catalog_coalesce_count: 0,
     review_guard_unqualified_coalesce_present: "PASS",

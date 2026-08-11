@@ -22,6 +22,8 @@ const COMMAND_LEDGER_ID =
   "202608030001_daily_operational_projection_command_ledger";
 const STABLE_CHANGES_PERSISTENCE_ID =
   "202608070001_stable_changes_consumer_persistence";
+const PHASE_C2A_STORAGE_FOUNDATION_ID =
+  "202608110001_production_target_execution_durability";
 const STABLE_CHANGES_APPLY_PATH =
   `db/migrations/${STABLE_CHANGES_PERSISTENCE_ID}.sql`;
 const STABLE_CHANGES_VERIFY_PATH =
@@ -144,6 +146,15 @@ assert.equal(
   sha256(readFileSync(STABLE_CHANGES_APPLY_PATH, "utf8")),
 );
 assert.ok(readFileSync(STABLE_CHANGES_VERIFY_PATH, "utf8").length > 0);
+const phaseC2aEntry = manifest.migrations.find((entry) =>
+  entry.migration_id === PHASE_C2A_STORAGE_FOUNDATION_ID
+);
+assert.ok(phaseC2aEntry);
+assert.ok(phaseC2aEntry.sequence > stableChangesEntry.sequence);
+assert.equal(manifest.migrations.at(-1), phaseC2aEntry);
+assert.equal([
+  MIGRATION_ID, ACTIVATION_ID, COMMAND_LEDGER_ID, STABLE_CHANGES_PERSISTENCE_ID,
+].includes(phaseC2aEntry.migration_id), false);
 
 const stored = (entry: FarmOsCoreMigrationEntry) => ({
   migration_id: entry.migration_id,
@@ -159,7 +170,8 @@ assert.deepEqual(
   pendingPlan.result === "ready"
     ? pendingPlan.pending.map((entry) => entry.migration_id)
     : [],
-  [MIGRATION_ID, ACTIVATION_ID, COMMAND_LEDGER_ID, STABLE_CHANGES_PERSISTENCE_ID],
+  [MIGRATION_ID, ACTIVATION_ID, COMMAND_LEDGER_ID, STABLE_CHANGES_PERSISTENCE_ID,
+    PHASE_C2A_STORAGE_FOUNDATION_ID],
 );
 const activationPendingPlan = planFarmOsCoreMigrations({
   manifest: manifestRaw,
@@ -170,7 +182,8 @@ assert.deepEqual(
   activationPendingPlan.result === "ready"
     ? activationPendingPlan.pending.map((entry) => entry.migration_id)
     : [],
-  [ACTIVATION_ID, COMMAND_LEDGER_ID, STABLE_CHANGES_PERSISTENCE_ID],
+  [ACTIVATION_ID, COMMAND_LEDGER_ID, STABLE_CHANGES_PERSISTENCE_ID,
+    PHASE_C2A_STORAGE_FOUNDATION_ID],
 );
 assert.equal(
   planFarmOsCoreMigrations({
