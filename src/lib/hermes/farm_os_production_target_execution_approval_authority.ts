@@ -16,6 +16,13 @@ export const FARM_OS_PRODUCTION_TARGET_EXECUTION_APPROVAL_AUTHORITY_ID =
 export const FARM_OS_PRODUCTION_TARGET_EXECUTION_APPROVAL_RECEIPT_AUTHORITY_ID =
   "farmos.production-target-execution-approval-receipt.v1" as const;
 export const FARM_OS_PRODUCTION_TARGET_EXECUTION_APPROVAL_AUTHORITY_REVISION = 1 as const;
+export const FARM_OS_PRODUCTION_TARGET_EXECUTION_APPROVAL_REVOCATION_AUTHORITY_ID =
+  "farmos.production-target-execution-approval-revocation.v1" as const;
+export const FARM_OS_PRODUCTION_TARGET_EXECUTION_APPROVAL_REVOCATION_AUTHORITY_REVISION = 1 as const;
+export const FARM_OS_PRODUCTION_TARGET_EXECUTION_APPROVAL_REVOCATION_EVENT_SCHEMA_VERSION =
+  "farmos.production-target-execution-approval-revocation-event.v1" as const;
+export const FARM_OS_PRODUCTION_TARGET_EXECUTION_APPROVAL_REVOCATION_HEAD_SCHEMA_VERSION =
+  "farmos.production-target-execution-approval-revocation-head.v1" as const;
 
 export const FARM_OS_PRODUCTION_TARGET_EXECUTION_OPERATION_SCOPES = Object.freeze([
   "ACQUIRE_PRODUCTION_TARGET_IDENTITY_FORMAL_EVIDENCE",
@@ -36,6 +43,29 @@ export const FARM_OS_PRODUCTION_TARGET_EXECUTION_APPROVAL_CONTRACT = Object.free
   automatic_latest_selection: false,
   durable_approval_sot_established: false,
   implementation_status: "SOURCE_ONLY_CONTRACT_CANDIDATE",
+} as const);
+
+export const FARM_OS_PRODUCTION_TARGET_EXECUTION_APPROVAL_REVOCATION_REASONS = Object.freeze([
+  "HUMAN_REVIEW_REVOKED",
+  "GOVERNANCE_POLICY_REVOKED",
+  "SECURITY_AUTHORITY_REVOKED",
+] as const);
+export type FarmOsProductionTargetExecutionApprovalRevocationReason =
+  typeof FARM_OS_PRODUCTION_TARGET_EXECUTION_APPROVAL_REVOCATION_REASONS[number];
+
+export const FARM_OS_PRODUCTION_TARGET_EXECUTION_APPROVAL_REVOCATION_CONTRACT = Object.freeze({
+  authority_id: FARM_OS_PRODUCTION_TARGET_EXECUTION_APPROVAL_REVOCATION_AUTHORITY_ID,
+  authority_revision: FARM_OS_PRODUCTION_TARGET_EXECUTION_APPROVAL_REVOCATION_AUTHORITY_REVISION,
+  append_only_events: true,
+  approval_record_mutation: "PROHIBITED",
+  approval_receipt_mutation: "PROHIBITED",
+  command_binding_mutation: "PROHIBITED",
+  exact_event_resolution_only: true,
+  automatic_latest_event_resolution: false,
+  monotonic_event_sequence_required: true,
+  compare_and_set_head_required: true,
+  trusted_clock_evidence_required: true,
+  storage_implementation_status: "NOT_ESTABLISHED",
 } as const);
 
 export type FarmOsProductionTargetExecutionProposal = Readonly<{
@@ -102,6 +132,87 @@ export type FarmOsProductionTargetExecutionApprovalLineage = Readonly<{
   approval_receipt: FarmOsProductionTargetExecutionApprovalReceipt;
 }>;
 
+export type FarmOsProductionTargetExecutionApprovalRevocationEvent = Readonly<{
+  schema_version:
+    typeof FARM_OS_PRODUCTION_TARGET_EXECUTION_APPROVAL_REVOCATION_EVENT_SCHEMA_VERSION;
+  revocation_authority_id:
+    typeof FARM_OS_PRODUCTION_TARGET_EXECUTION_APPROVAL_REVOCATION_AUTHORITY_ID;
+  revocation_authority_revision: 1;
+  revocation_event_id: `approvalrev_${string}`;
+  revocation_event_digest: `sha256:${string}`;
+  approval_id: string;
+  approval_digest: `sha256:${string}`;
+  approval_receipt_id: string;
+  approval_receipt_digest: `sha256:${string}`;
+  target_binding_digest: `sha256:${string}`;
+  operation_scope: FarmOsProductionTargetExecutionOperationScope;
+  reason: FarmOsProductionTargetExecutionApprovalRevocationReason;
+  trusted_clock_evidence_id: string;
+  trusted_clock_evidence_digest: `sha256:${string}`;
+  effective_at: string;
+  event_sequence: number;
+  previous_event_digest: `sha256:${string}` | null;
+  server_owned_record: true;
+  append_only: true;
+}>;
+
+export type FarmOsProductionTargetExecutionApprovalRevocationHead = Readonly<{
+  schema_version:
+    typeof FARM_OS_PRODUCTION_TARGET_EXECUTION_APPROVAL_REVOCATION_HEAD_SCHEMA_VERSION;
+  revocation_authority_id:
+    typeof FARM_OS_PRODUCTION_TARGET_EXECUTION_APPROVAL_REVOCATION_AUTHORITY_ID;
+  revocation_authority_revision: 1;
+  approval_id: string;
+  approval_digest: `sha256:${string}`;
+  approval_receipt_id: string;
+  approval_receipt_digest: `sha256:${string}`;
+  target_binding_digest: `sha256:${string}`;
+  operation_scope: FarmOsProductionTargetExecutionOperationScope;
+  status: "ACTIVE" | "REVOKED";
+  head_version: number;
+  latest_event_id: `approvalrev_${string}` | null;
+  latest_event_digest: `sha256:${string}` | null;
+  effective_revoked_at: string | null;
+  head_digest: `sha256:${string}`;
+}>;
+
+export type FarmOsProductionTargetExecutionApprovalRevocationState = Readonly<{
+  head: FarmOsProductionTargetExecutionApprovalRevocationHead;
+  latest_event: FarmOsProductionTargetExecutionApprovalRevocationEvent | null;
+}>;
+
+export type FarmOsProductionTargetExecutionApprovalUsability =
+  | Readonly<{ status: "ACTIVE"; head: FarmOsProductionTargetExecutionApprovalRevocationHead }>
+  | Readonly<{ status: "REVOKED"; head: FarmOsProductionTargetExecutionApprovalRevocationHead;
+    effective_revoked_at: string }>
+  | Readonly<{ status: "EXPIRED"; head: FarmOsProductionTargetExecutionApprovalRevocationHead }>
+  | Readonly<{ status: "INVALID"; reason:
+    | "APPROVAL_SCHEMA_INVALID" | "APPROVAL_RECEIPT_SCHEMA_INVALID"
+    | "REVOCATION_HEAD_REQUIRED" | "REVOCATION_HEAD_INVALID"
+    | "REVOCATION_LINEAGE_MISMATCH" | "CLOCK_EVIDENCE_INVALID" }>;
+
+export type FarmOsProductionTargetExecutionApprovalRevocationEventValidation =
+  | Readonly<{ accepted: true; event: FarmOsProductionTargetExecutionApprovalRevocationEvent }>
+  | Readonly<{ accepted: false; reason:
+    | "REVOCATION_EVENT_SCHEMA_INVALID" | "REVOCATION_AUTHORITY_MISMATCH"
+    | "REVOCATION_EVENT_DIGEST_MISMATCH" | "REVOCATION_EVENT_ID_MISMATCH"
+    | "REVOCATION_LINEAGE_MISMATCH" | "CLOCK_EVIDENCE_INVALID"
+    | "CLOCK_EVIDENCE_MISMATCH" }>;
+
+export type FarmOsProductionTargetExecutionApprovalRevocationHeadAdvance =
+  | Readonly<{ accepted: true; head: FarmOsProductionTargetExecutionApprovalRevocationHead }>
+  | Readonly<{ accepted: false; reason:
+    | "REVOCATION_HEAD_SCHEMA_INVALID" | "REVOCATION_HEAD_DIGEST_MISMATCH"
+    | "REVOCATION_HEAD_CAS_MISMATCH" | "REVOCATION_SEQUENCE_REGRESSION"
+    | "REVOCATION_EVENT_CONFLICT" | "REVOCATION_LINEAGE_MISMATCH"
+    | "REVOCATION_ALREADY_EFFECTIVE" | "REVOCATION_EVENT_INVALID" }>;
+
+export type FarmOsProductionTargetExecutionApprovalRevocationStateValidation =
+  | Readonly<{ accepted: true; state: FarmOsProductionTargetExecutionApprovalRevocationState }>
+  | Readonly<{ accepted: false; reason:
+    | "REVOCATION_STATE_SCHEMA_INVALID" | "REVOCATION_STATE_INCOHERENT"
+    | "REVOCATION_HEAD_INVALID" | "REVOCATION_EVENT_INVALID" }>;
+
 export type FarmOsProductionTargetExecutionApprovalValidation =
   | Readonly<{ accepted: true; lineage: FarmOsProductionTargetExecutionApprovalLineage }>
   | Readonly<{ accepted: false; reason:
@@ -144,6 +255,21 @@ const RECEIPT_KEYS = [
   "authority_id", "authority_revision", "expires_at", "issued_at", "operation_scope",
   "proposal_digest", "proposal_id", "server_owned_record", "status", "target_binding_digest",
 ] as const;
+const REVOCATION_EVENT_KEYS = [
+  "append_only", "approval_digest", "approval_id", "approval_receipt_digest",
+  "approval_receipt_id", "effective_at", "event_sequence", "operation_scope",
+  "previous_event_digest", "reason", "revocation_authority_id",
+  "revocation_authority_revision", "revocation_event_digest", "revocation_event_id",
+  "schema_version", "server_owned_record", "target_binding_digest",
+  "trusted_clock_evidence_digest", "trusted_clock_evidence_id",
+] as const;
+const REVOCATION_HEAD_KEYS = [
+  "approval_digest", "approval_id", "approval_receipt_digest", "approval_receipt_id",
+  "effective_revoked_at", "head_digest", "head_version", "latest_event_digest",
+  "latest_event_id", "operation_scope", "revocation_authority_id",
+  "revocation_authority_revision", "schema_version", "status", "target_binding_digest",
+] as const;
+const REVOCATION_EVENT_ID = /^approvalrev_[a-f0-9]{64}$/u;
 
 function digestWithout<T extends Record<string, unknown>>(
   domain: string,
@@ -371,4 +497,420 @@ export function resolveExactFarmOsProductionTargetExecutionApproval(input: Reado
     return Object.freeze({ accepted: false, reason: "APPROVAL_EXPIRED" });
   }
   return Object.freeze({ accepted: true, approval });
+}
+
+function revocationEventMaterial(
+  value: Omit<FarmOsProductionTargetExecutionApprovalRevocationEvent,
+    "revocation_event_digest" | "revocation_event_id">,
+): Record<string, unknown> {
+  return value as unknown as Record<string, unknown>;
+}
+
+export function computeFarmOsProductionTargetExecutionApprovalRevocationEventDigest(
+  value: Omit<FarmOsProductionTargetExecutionApprovalRevocationEvent,
+    "revocation_event_digest" | "revocation_event_id">,
+): `sha256:${string}` {
+  return hashFarmOsProductionTargetExecutionContract(
+    "farmos.production-target-execution-approval-revocation-event.v1",
+    revocationEventMaterial(value),
+  );
+}
+
+export function computeFarmOsProductionTargetExecutionApprovalRevocationEventId(
+  digest: `sha256:${string}`,
+): `approvalrev_${string}` {
+  return `approvalrev_${digest.slice(7)}`;
+}
+
+export function computeFarmOsProductionTargetExecutionApprovalRevocationHeadDigest(
+  value: Omit<FarmOsProductionTargetExecutionApprovalRevocationHead, "head_digest">,
+): `sha256:${string}` {
+  return hashFarmOsProductionTargetExecutionContract(
+    "farmos.production-target-execution-approval-revocation-head.v1",
+    value,
+  );
+}
+
+export function createInitialFarmOsProductionTargetExecutionApprovalRevocationHead(
+  lineage: FarmOsProductionTargetExecutionApprovalLineage,
+): FarmOsProductionTargetExecutionApprovalRevocationHead {
+  const base = {
+    schema_version: FARM_OS_PRODUCTION_TARGET_EXECUTION_APPROVAL_REVOCATION_HEAD_SCHEMA_VERSION,
+    revocation_authority_id:
+      FARM_OS_PRODUCTION_TARGET_EXECUTION_APPROVAL_REVOCATION_AUTHORITY_ID,
+    revocation_authority_revision: 1 as const,
+    approval_id: lineage.approval.approval_id,
+    approval_digest: lineage.approval.approval_digest,
+    approval_receipt_id: lineage.approval_receipt.approval_receipt_id,
+    approval_receipt_digest: lineage.approval_receipt.approval_receipt_digest,
+    target_binding_digest: lineage.approval.target_binding_digest,
+    operation_scope: lineage.approval.operation_scope,
+    status: "ACTIVE" as const,
+    head_version: 0,
+    latest_event_id: null,
+    latest_event_digest: null,
+    effective_revoked_at: null,
+  };
+  return Object.freeze({
+    ...base,
+    head_digest: computeFarmOsProductionTargetExecutionApprovalRevocationHeadDigest(base),
+  });
+}
+
+export function parseFarmOsProductionTargetExecutionApprovalRevocationHead(
+  value: unknown,
+): FarmOsProductionTargetExecutionApprovalRevocationHeadAdvance {
+  if (!isFarmOsProductionTargetExecutionRecord(value) ||
+    !hasExactFarmOsProductionTargetExecutionKeys(value, REVOCATION_HEAD_KEYS) ||
+    value.schema_version !==
+      FARM_OS_PRODUCTION_TARGET_EXECUTION_APPROVAL_REVOCATION_HEAD_SCHEMA_VERSION ||
+    value.revocation_authority_id !==
+      FARM_OS_PRODUCTION_TARGET_EXECUTION_APPROVAL_REVOCATION_AUTHORITY_ID ||
+    value.revocation_authority_revision !== 1 ||
+    !isFarmOsProductionTargetExecutionIdentifier(value.approval_id) ||
+    !isFarmOsProductionTargetExecutionDigest(value.approval_digest) ||
+    !isFarmOsProductionTargetExecutionIdentifier(value.approval_receipt_id) ||
+    !isFarmOsProductionTargetExecutionDigest(value.approval_receipt_digest) ||
+    !isFarmOsProductionTargetExecutionDigest(value.target_binding_digest) ||
+    !validOperation(value.operation_scope) ||
+    (value.status !== "ACTIVE" && value.status !== "REVOKED") ||
+    !Number.isSafeInteger(value.head_version) || (value.head_version as number) < 0 ||
+    !(value.latest_event_id === null ||
+      (typeof value.latest_event_id === "string" && REVOCATION_EVENT_ID.test(value.latest_event_id))) ||
+    !(value.latest_event_digest === null ||
+      isFarmOsProductionTargetExecutionDigest(value.latest_event_digest)) ||
+    !(value.effective_revoked_at === null ||
+      isCanonicalFarmOsProductionTargetExecutionTimestamp(value.effective_revoked_at)) ||
+    !isFarmOsProductionTargetExecutionDigest(value.head_digest)) {
+    return Object.freeze({ accepted: false, reason: "REVOCATION_HEAD_SCHEMA_INVALID" });
+  }
+  const activeShape = value.status === "ACTIVE" && value.head_version === 0 &&
+    value.latest_event_id === null && value.latest_event_digest === null &&
+    value.effective_revoked_at === null;
+  const revokedShape = value.status === "REVOKED" && (value.head_version as number) >= 1 &&
+    value.latest_event_id !== null && value.latest_event_digest !== null &&
+    value.effective_revoked_at !== null;
+  if (!activeShape && !revokedShape) {
+    return Object.freeze({ accepted: false, reason: "REVOCATION_HEAD_SCHEMA_INVALID" });
+  }
+  const head = value as unknown as FarmOsProductionTargetExecutionApprovalRevocationHead;
+  const material = Object.fromEntries(
+    Object.entries(head).filter(([key]) => key !== "head_digest"),
+  ) as Omit<FarmOsProductionTargetExecutionApprovalRevocationHead, "head_digest">;
+  if (head.head_digest !==
+    computeFarmOsProductionTargetExecutionApprovalRevocationHeadDigest(material)) {
+    return Object.freeze({ accepted: false, reason: "REVOCATION_HEAD_DIGEST_MISMATCH" });
+  }
+  return Object.freeze({ accepted: true, head });
+}
+
+export function validateFarmOsProductionTargetExecutionApprovalRevocationEvent(
+  input: Readonly<{
+    event: unknown;
+    approval: unknown;
+    approval_receipt: unknown;
+    clock_evidence: unknown;
+    persisted_clock_lower_bound: string | null;
+  }>,
+): FarmOsProductionTargetExecutionApprovalRevocationEventValidation {
+  const value = input.event;
+  if (!isFarmOsProductionTargetExecutionRecord(value) ||
+    !hasExactFarmOsProductionTargetExecutionKeys(value, REVOCATION_EVENT_KEYS)) {
+    return Object.freeze({ accepted: false, reason: "REVOCATION_EVENT_SCHEMA_INVALID" });
+  }
+  if (value.schema_version !==
+      FARM_OS_PRODUCTION_TARGET_EXECUTION_APPROVAL_REVOCATION_EVENT_SCHEMA_VERSION ||
+    value.revocation_authority_id !==
+      FARM_OS_PRODUCTION_TARGET_EXECUTION_APPROVAL_REVOCATION_AUTHORITY_ID ||
+    value.revocation_authority_revision !== 1) {
+    return Object.freeze({ accepted: false, reason: "REVOCATION_AUTHORITY_MISMATCH" });
+  }
+  if (typeof value.revocation_event_id !== "string" ||
+    !REVOCATION_EVENT_ID.test(value.revocation_event_id) ||
+    !isFarmOsProductionTargetExecutionDigest(value.revocation_event_digest) ||
+    !isFarmOsProductionTargetExecutionIdentifier(value.approval_id) ||
+    !isFarmOsProductionTargetExecutionDigest(value.approval_digest) ||
+    !isFarmOsProductionTargetExecutionIdentifier(value.approval_receipt_id) ||
+    !isFarmOsProductionTargetExecutionDigest(value.approval_receipt_digest) ||
+    !isFarmOsProductionTargetExecutionDigest(value.target_binding_digest) ||
+    !validOperation(value.operation_scope) ||
+    !FARM_OS_PRODUCTION_TARGET_EXECUTION_APPROVAL_REVOCATION_REASONS.includes(
+      value.reason as FarmOsProductionTargetExecutionApprovalRevocationReason,
+    ) || !isFarmOsProductionTargetExecutionIdentifier(value.trusted_clock_evidence_id) ||
+    !isFarmOsProductionTargetExecutionDigest(value.trusted_clock_evidence_digest) ||
+    !isCanonicalFarmOsProductionTargetExecutionTimestamp(value.effective_at) ||
+    !Number.isSafeInteger(value.event_sequence) || (value.event_sequence as number) < 1 ||
+    !(value.previous_event_digest === null ||
+      isFarmOsProductionTargetExecutionDigest(value.previous_event_digest)) ||
+    value.server_owned_record !== true || value.append_only !== true) {
+    return Object.freeze({ accepted: false, reason: "REVOCATION_EVENT_SCHEMA_INVALID" });
+  }
+  const approval = parseApproval(input.approval);
+  const receipt = parseApprovalReceipt(input.approval_receipt);
+  if (!approval || !receipt ||
+    approval.approval_digest !== digestWithout(
+      "farmos.production-target-execution-approval.v1",
+      approval as unknown as Record<string, unknown>, "approval_digest",
+    ) || receipt.approval_receipt_digest !== digestWithout(
+      "farmos.production-target-execution-approval-receipt.v1",
+      receipt as unknown as Record<string, unknown>, "approval_receipt_digest",
+    ) || value.approval_id !== approval.approval_id ||
+    value.approval_digest !== approval.approval_digest ||
+    value.approval_receipt_id !== receipt.approval_receipt_id ||
+    value.approval_receipt_digest !== receipt.approval_receipt_digest ||
+    value.target_binding_digest !== approval.target_binding_digest ||
+    value.target_binding_digest !== receipt.target_binding_digest ||
+    value.operation_scope !== approval.operation_scope ||
+    value.operation_scope !== receipt.operation_scope ||
+    value.effective_at < receipt.issued_at) {
+    return Object.freeze({ accepted: false, reason: "REVOCATION_LINEAGE_MISMATCH" });
+  }
+  const clock = qualifyFarmOsProductionTargetExecutionClockEvidence({
+    evidence: input.clock_evidence,
+    persisted_lower_bound: input.persisted_clock_lower_bound,
+  });
+  if (!clock.accepted) {
+    return Object.freeze({ accepted: false, reason: "CLOCK_EVIDENCE_INVALID" });
+  }
+  if (value.trusted_clock_evidence_id !== clock.evidence.evidence_id ||
+    value.trusted_clock_evidence_digest !== clock.evidence.evidence_digest ||
+    value.effective_at !== clock.evidence.observed_at) {
+    return Object.freeze({ accepted: false, reason: "CLOCK_EVIDENCE_MISMATCH" });
+  }
+  const event = value as unknown as FarmOsProductionTargetExecutionApprovalRevocationEvent;
+  const material = Object.fromEntries(Object.entries(event).filter(([key]) =>
+    key !== "revocation_event_digest" && key !== "revocation_event_id")) as
+    Omit<FarmOsProductionTargetExecutionApprovalRevocationEvent,
+      "revocation_event_digest" | "revocation_event_id">;
+  const digest = computeFarmOsProductionTargetExecutionApprovalRevocationEventDigest(material);
+  if (event.revocation_event_digest !== digest) {
+    return Object.freeze({ accepted: false, reason: "REVOCATION_EVENT_DIGEST_MISMATCH" });
+  }
+  if (event.revocation_event_id !==
+    computeFarmOsProductionTargetExecutionApprovalRevocationEventId(digest)) {
+    return Object.freeze({ accepted: false, reason: "REVOCATION_EVENT_ID_MISMATCH" });
+  }
+  return Object.freeze({ accepted: true, event });
+}
+
+export function compareFarmOsProductionTargetExecutionApprovalRevocationEventIdentity(
+  existing: FarmOsProductionTargetExecutionApprovalRevocationEvent,
+  candidate: FarmOsProductionTargetExecutionApprovalRevocationEvent,
+): "MATCH" | "REVOCATION_EVENT_CONFLICT" {
+  return existing.revocation_event_id === candidate.revocation_event_id &&
+    existing.revocation_event_digest === candidate.revocation_event_digest
+    ? "MATCH" : "REVOCATION_EVENT_CONFLICT";
+}
+
+export function advanceFarmOsProductionTargetExecutionApprovalRevocationHead(
+  input: Readonly<{
+    current_head: unknown;
+    expected_head_version: number;
+    expected_head_digest: `sha256:${string}`;
+    event: unknown;
+    approval: unknown;
+    approval_receipt: unknown;
+    clock_evidence: unknown;
+    persisted_clock_lower_bound: string | null;
+  }>,
+): FarmOsProductionTargetExecutionApprovalRevocationHeadAdvance {
+  const parsedHead = parseFarmOsProductionTargetExecutionApprovalRevocationHead(
+    input.current_head,
+  );
+  if (!parsedHead.accepted) return parsedHead;
+  if (parsedHead.head.head_version !== input.expected_head_version ||
+    parsedHead.head.head_digest !== input.expected_head_digest) {
+    return Object.freeze({ accepted: false, reason: "REVOCATION_HEAD_CAS_MISMATCH" });
+  }
+  if (parsedHead.head.status !== "ACTIVE") {
+    return Object.freeze({ accepted: false, reason: "REVOCATION_ALREADY_EFFECTIVE" });
+  }
+  const parsedEvent = validateFarmOsProductionTargetExecutionApprovalRevocationEvent({
+    event: input.event,
+    approval: input.approval,
+    approval_receipt: input.approval_receipt,
+    clock_evidence: input.clock_evidence,
+    persisted_clock_lower_bound: input.persisted_clock_lower_bound,
+  });
+  if (!parsedEvent.accepted) {
+    return Object.freeze({ accepted: false, reason: "REVOCATION_EVENT_INVALID" });
+  }
+  const { head } = parsedHead;
+  const event = parsedEvent.event;
+  if (event.approval_id !== head.approval_id || event.approval_digest !== head.approval_digest ||
+    event.approval_receipt_id !== head.approval_receipt_id ||
+    event.approval_receipt_digest !== head.approval_receipt_digest ||
+    event.target_binding_digest !== head.target_binding_digest ||
+    event.operation_scope !== head.operation_scope) {
+    return Object.freeze({ accepted: false, reason: "REVOCATION_LINEAGE_MISMATCH" });
+  }
+  if (event.event_sequence !== head.head_version + 1 ||
+    event.previous_event_digest !== head.latest_event_digest) {
+    return Object.freeze({ accepted: false, reason: "REVOCATION_SEQUENCE_REGRESSION" });
+  }
+  const nextBase = {
+    ...head,
+    status: "REVOKED" as const,
+    head_version: event.event_sequence,
+    latest_event_id: event.revocation_event_id,
+    latest_event_digest: event.revocation_event_digest,
+    effective_revoked_at: event.effective_at,
+  };
+  const material = Object.fromEntries(Object.entries(nextBase).filter(([key]) =>
+    key !== "head_digest")) as Omit<
+      FarmOsProductionTargetExecutionApprovalRevocationHead, "head_digest">;
+  return Object.freeze({ accepted: true, head: Object.freeze({
+    ...material,
+    head_digest: computeFarmOsProductionTargetExecutionApprovalRevocationHeadDigest(material),
+  }) });
+}
+
+export function validateFarmOsProductionTargetExecutionApprovalRevocationState(
+  input: Readonly<{
+    state: unknown;
+    approval: unknown;
+    approval_receipt: unknown;
+    clock_evidence: unknown;
+    persisted_clock_lower_bound: string | null;
+  }>,
+): FarmOsProductionTargetExecutionApprovalRevocationStateValidation {
+  if (!isFarmOsProductionTargetExecutionRecord(input.state) ||
+    !hasExactFarmOsProductionTargetExecutionKeys(input.state, ["head", "latest_event"])) {
+    return Object.freeze({ accepted: false, reason: "REVOCATION_STATE_SCHEMA_INVALID" });
+  }
+  const approval = parseApproval(input.approval);
+  const receipt = parseApprovalReceipt(input.approval_receipt);
+  if (!approval || !receipt || approval.approval_digest !== digestWithout(
+    "farmos.production-target-execution-approval.v1",
+    approval as unknown as Record<string, unknown>, "approval_digest",
+  ) || receipt.approval_receipt_digest !== digestWithout(
+    "farmos.production-target-execution-approval-receipt.v1",
+    receipt as unknown as Record<string, unknown>, "approval_receipt_digest",
+  ) || receipt.approval_id !== approval.approval_id ||
+    receipt.approval_digest !== approval.approval_digest ||
+    receipt.proposal_id !== approval.proposal_id ||
+    receipt.proposal_digest !== approval.proposal_digest ||
+    receipt.target_binding_digest !== approval.target_binding_digest ||
+    receipt.operation_scope !== approval.operation_scope ||
+    receipt.issued_at < approval.approved_at ||
+    receipt.expires_at > approval.expires_at) {
+    return Object.freeze({ accepted: false, reason: "REVOCATION_STATE_INCOHERENT" });
+  }
+  const parsedHead = parseFarmOsProductionTargetExecutionApprovalRevocationHead(input.state.head);
+  if (!parsedHead.accepted) {
+    return Object.freeze({ accepted: false, reason: "REVOCATION_HEAD_INVALID" });
+  }
+  const head = parsedHead.head;
+  if (head.approval_id !== approval.approval_id ||
+    head.approval_digest !== approval.approval_digest ||
+    head.approval_receipt_id !== receipt.approval_receipt_id ||
+    head.approval_receipt_digest !== receipt.approval_receipt_digest ||
+    head.target_binding_digest !== approval.target_binding_digest ||
+    head.operation_scope !== approval.operation_scope) {
+    return Object.freeze({ accepted: false, reason: "REVOCATION_STATE_INCOHERENT" });
+  }
+  if (head.status === "ACTIVE") {
+    if (head.head_version !== 0 || head.latest_event_id !== null ||
+      head.latest_event_digest !== null || head.effective_revoked_at !== null ||
+      input.state.latest_event !== null) {
+      return Object.freeze({ accepted: false, reason: "REVOCATION_STATE_INCOHERENT" });
+    }
+    return Object.freeze({ accepted: true, state: Object.freeze({ head, latest_event: null }) });
+  }
+  const validatedEvent = validateFarmOsProductionTargetExecutionApprovalRevocationEvent({
+    event: input.state.latest_event,
+    approval,
+    approval_receipt: receipt,
+    clock_evidence: input.clock_evidence,
+    persisted_clock_lower_bound: input.persisted_clock_lower_bound,
+  });
+  if (!validatedEvent.accepted) {
+    return Object.freeze({ accepted: false, reason: "REVOCATION_EVENT_INVALID" });
+  }
+  if (head.head_version !== validatedEvent.event.event_sequence ||
+    head.latest_event_id !== validatedEvent.event.revocation_event_id ||
+    head.latest_event_digest !== validatedEvent.event.revocation_event_digest ||
+    head.effective_revoked_at !== validatedEvent.event.effective_at) {
+    return Object.freeze({ accepted: false, reason: "REVOCATION_STATE_INCOHERENT" });
+  }
+  return Object.freeze({ accepted: true, state: Object.freeze({
+    head, latest_event: validatedEvent.event,
+  }) });
+}
+
+export function evaluateFarmOsProductionTargetExecutionApprovalUsability(
+  input: Readonly<{
+    approval: unknown;
+    approval_receipt: unknown;
+    revocation_head: unknown;
+    revocation_event: unknown;
+    clock_evidence: unknown;
+    persisted_clock_lower_bound: string | null;
+  }>,
+): FarmOsProductionTargetExecutionApprovalUsability {
+  const approval = parseApproval(input.approval);
+  if (!approval) return Object.freeze({ status: "INVALID", reason: "APPROVAL_SCHEMA_INVALID" });
+  const receipt = parseApprovalReceipt(input.approval_receipt);
+  if (!receipt) {
+    return Object.freeze({ status: "INVALID", reason: "APPROVAL_RECEIPT_SCHEMA_INVALID" });
+  }
+  const approvalDigest = digestWithout(
+    "farmos.production-target-execution-approval.v1",
+    approval as unknown as Record<string, unknown>, "approval_digest",
+  );
+  const receiptDigest = digestWithout(
+    "farmos.production-target-execution-approval-receipt.v1",
+    receipt as unknown as Record<string, unknown>, "approval_receipt_digest",
+  );
+  if (approval.approval_digest !== approvalDigest ||
+    receipt.approval_receipt_digest !== receiptDigest ||
+    receipt.approval_id !== approval.approval_id ||
+    receipt.approval_digest !== approval.approval_digest ||
+    receipt.proposal_id !== approval.proposal_id ||
+    receipt.proposal_digest !== approval.proposal_digest ||
+    receipt.target_binding_digest !== approval.target_binding_digest ||
+    receipt.operation_scope !== approval.operation_scope ||
+    receipt.issued_at < approval.approved_at || receipt.expires_at > approval.expires_at) {
+    return Object.freeze({ status: "INVALID", reason: "REVOCATION_LINEAGE_MISMATCH" });
+  }
+  if (input.revocation_head === null || input.revocation_head === undefined) {
+    return Object.freeze({ status: "INVALID", reason: "REVOCATION_HEAD_REQUIRED" });
+  }
+  const revocationState = validateFarmOsProductionTargetExecutionApprovalRevocationState({
+    state: { head: input.revocation_head, latest_event: input.revocation_event },
+    approval,
+    approval_receipt: receipt,
+    clock_evidence: input.clock_evidence,
+    persisted_clock_lower_bound: input.persisted_clock_lower_bound,
+  });
+  if (!revocationState.accepted) {
+    return Object.freeze({ status: "INVALID", reason: "REVOCATION_HEAD_INVALID" });
+  }
+  const head = revocationState.state.head;
+  if (head.approval_id !== approval.approval_id || head.approval_digest !== approval.approval_digest ||
+    head.approval_receipt_id !== receipt.approval_receipt_id ||
+    head.approval_receipt_digest !== receipt.approval_receipt_digest ||
+    head.target_binding_digest !== approval.target_binding_digest ||
+    head.operation_scope !== approval.operation_scope) {
+    return Object.freeze({ status: "INVALID", reason: "REVOCATION_LINEAGE_MISMATCH" });
+  }
+  const clock = qualifyFarmOsProductionTargetExecutionClockEvidence({
+    evidence: input.clock_evidence,
+    persisted_lower_bound: input.persisted_clock_lower_bound,
+  });
+  if (!clock.accepted) {
+    return Object.freeze({ status: "INVALID", reason: "CLOCK_EVIDENCE_INVALID" });
+  }
+  if (approval.revoked) {
+    return Object.freeze({ status: "INVALID", reason: "REVOCATION_LINEAGE_MISMATCH" });
+  }
+  if (head.status === "REVOKED") {
+    return Object.freeze({ status: "REVOKED", head,
+      effective_revoked_at: head.effective_revoked_at ?? approval.approved_at });
+  }
+  if (clock.observed_at_epoch_ms >= Date.parse(approval.expires_at) ||
+    clock.observed_at_epoch_ms >= Date.parse(receipt.expires_at)) {
+    return Object.freeze({ status: "EXPIRED", head });
+  }
+  return Object.freeze({ status: "ACTIVE", head });
 }

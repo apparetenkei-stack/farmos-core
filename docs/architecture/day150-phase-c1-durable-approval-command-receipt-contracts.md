@@ -68,6 +68,40 @@ revoked, expired, malformed, latest, default, fallback, and digest-mismatched
 records fail closed. One approval may authorize at most one command. A reusable
 approval would require a future versioned authority.
 
+Proposal, Human Approval, and Approval Receipt records are immutable historical
+lineage. Post-issuance revocation never updates `approval.revoked`, any
+digest-bearing Approval field, the Approval Receipt, the Command,
+`command_record_digest`, or `execution_binding_digest`. Instead C1 owns the
+versioned `farmos.production-target-execution-approval-revocation.v1`
+append-only event authority and its CAS-controlled head projection. Each event
+binds the exact Approval and Approval Receipt IDs/digests, target, operation,
+bounded reason, effective trusted-clock evidence and timestamp, monotonic
+sequence, previous event digest, and its own derived ID/digest.
+
+The revocation head starts as the exact version-zero `ACTIVE` projection created
+with the Approval lineage. A revocation transaction must compare the expected
+head version/digest and latest event digest, append the event, and advance the
+head atomically. Missing heads, automatic latest-event selection, sequence
+regression, conflicting event identity, client authority assertions, and CAS
+mismatch fail closed. Approval usability is derived from the immutable Approval
+and Receipt, the exact authoritative revocation head/event state, and qualified
+trusted-clock evidence. It is explicitly `ACTIVE`, `REVOKED`, `EXPIRED`, or
+`INVALID`; the immutable Approval record alone is not current revocation
+authority. Evaluation recomputes the immutable Approval and Approval Receipt
+digests and verifies their complete lineage; retained-digest mutation of expiry
+or another authority field is invalid. `ACTIVE` requires a zero-version head
+and no event. `REVOKED` requires an exact digest-valid event agreeing with the
+head sequence, identity, digest, and effective timestamp. Reservation and
+attempt-start both bind the expected revocation head version/digest so a
+post-issuance revocation race rejects before operation. Their successful
+storage result must persist the exact observed head version/digest/event digest
+as versioned, domain-separated, digest-verifiable transaction-authoritative
+revalidation evidence with the lifecycle CAS. The evidence binds the command,
+execution binding, Approval, exact digest-valid head, transition kind, and
+successor lifecycle identity/version/digest. Evidence validation also binds the
+head's Approval Receipt lineage and requires `RESERVATION` to terminate at
+`RESERVED_NOT_STARTED` and `ATTEMPT_START` at `ATTEMPT_STARTED`.
+
 A command may be stored as a candidate that references an approval, but storage
 alone does not authorize it. The one-approval/one-command consumption boundary
 is the atomic reservation operation, which requires the Approval SOT still to
@@ -175,6 +209,38 @@ reconciliation even if approval or dependencies expired while reconciliation
 was delayed. Restart with an actively valid reserved-but-not-started command
 uses an explicit fail-closed cancellation transition and append-only receipt;
 restart with a started command uses an explicit `OUTCOME_UNKNOWN` transition.
+
+Reservation commit ambiguity uses three authoritative readback outcomes rather
+than a generic receipt append. `RESERVATION_CONFIRMED_ABSENT` requires an exact
+readback of the Command, Approval, Approval Receipt, execution binding,
+`UNRESERVED` lifecycle/version, and confirmed absence of both reservation and
+approval binding. Only that branch may apply
+`UNRESERVED -> RESERVATION_OUTCOME_UNKNOWN` with a matching receipt whose
+reservation and attempt references are null. Confirmed absence does not make the
+old Approval or Command reusable.
+
+`RESERVATION_CONFIRMED_PRESENT` requires the exact intended reservation ID and
+digest plus the same lineage/binding and a `RESERVED_NOT_STARTED` lifecycle.
+Only that branch may apply the existing `RESTART_RESERVED_CANCEL` transition to
+`CANCELLED_PRE_START` and atomically append its cancellation receipt. A
+`RESERVATION_OUTCOME_UNKNOWN` receipt is invalid for this branch.
+
+`RESERVATION_STORAGE_OBSERVATION_UNKNOWN` covers unavailable storage, schema
+mismatch, read timeout/outcome ambiguity, unexpected duplicates, and digest
+mismatch. It permits no lifecycle mutation, receipt append, retry, fallback
+store, latest lookup, or new reservation write; the command and Approval remain
+quarantined for manual review. Thus the original driver error is never treated
+as authoritative storage state, and no single blindly supplied receipt can
+serve both the absent and present branches.
+
+The branch observation is not caller input. The persistence port performs the
+exact authoritative readback internally, derives its observation digest, and
+returns that evidence with the result. The same port operation applies only the
+matching lifecycle transition and receipt in an atomic boundary. A
+caller-constructed provenance literal or observation has no authority. Audit
+verification requires the returned terminal lifecycle to be the exact
+`observed lifecycle version + 1` successor; a digest-valid but non-successor
+terminal record is rejected.
 
 ## Execution Receipt boundary
 

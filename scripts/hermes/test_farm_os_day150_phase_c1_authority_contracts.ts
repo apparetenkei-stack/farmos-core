@@ -7,15 +7,26 @@ import {
   type FarmOsProductionTargetExecutionClockEvidence,
 } from "../../src/lib/hermes/farm_os_production_target_execution_trusted_clock_contract";
 import {
+  advanceFarmOsProductionTargetExecutionApprovalRevocationHead,
+  compareFarmOsProductionTargetExecutionApprovalRevocationEventIdentity,
   computeFarmOsProductionTargetExecutionApprovalDigest,
   computeFarmOsProductionTargetExecutionApprovalReceiptDigest,
+  computeFarmOsProductionTargetExecutionApprovalRevocationEventDigest,
+  computeFarmOsProductionTargetExecutionApprovalRevocationEventId,
   computeFarmOsProductionTargetExecutionProposalDigest,
+  createInitialFarmOsProductionTargetExecutionApprovalRevocationHead,
+  evaluateFarmOsProductionTargetExecutionApprovalUsability,
   FARM_OS_PRODUCTION_TARGET_EXECUTION_APPROVAL_AUTHORITY_ID,
   FARM_OS_PRODUCTION_TARGET_EXECUTION_APPROVAL_RECEIPT_AUTHORITY_ID,
+  FARM_OS_PRODUCTION_TARGET_EXECUTION_APPROVAL_REVOCATION_AUTHORITY_ID,
+  FARM_OS_PRODUCTION_TARGET_EXECUTION_APPROVAL_REVOCATION_EVENT_SCHEMA_VERSION,
   FARM_OS_PRODUCTION_TARGET_EXECUTION_PROPOSAL_AUTHORITY_ID,
   resolveExactFarmOsProductionTargetExecutionApproval,
+  validateFarmOsProductionTargetExecutionApprovalRevocationEvent,
+  validateFarmOsProductionTargetExecutionApprovalRevocationState,
   validateFarmOsProductionTargetExecutionApprovalLineage,
   type FarmOsProductionTargetExecutionApprovalReceipt,
+  type FarmOsProductionTargetExecutionApprovalRevocationEvent,
   type FarmOsProductionTargetExecutionHumanApproval,
   type FarmOsProductionTargetExecutionProposal,
 } from "../../src/lib/hermes/farm_os_production_target_execution_approval_authority";
@@ -281,6 +292,183 @@ assert.equal(validateFarmOsProductionTargetExecutionApprovalLineage({
   ...formalLineage, clock_evidence: availableClock, persisted_clock_lower_bound: TIMES.proposed,
 }).accepted, true);
 
+const initialRevocationHead =
+  createInitialFarmOsProductionTargetExecutionApprovalRevocationHead(formalLineage);
+const approvalDigestBeforeRevocation = formalLineage.approval.approval_digest;
+const approvalReceiptDigestBeforeRevocation =
+  formalLineage.approval_receipt.approval_receipt_digest;
+function revocationEvent(overrides: Partial<Omit<
+  FarmOsProductionTargetExecutionApprovalRevocationEvent,
+  "revocation_event_digest" | "revocation_event_id">> = {},
+): FarmOsProductionTargetExecutionApprovalRevocationEvent {
+  const material = {
+    schema_version: FARM_OS_PRODUCTION_TARGET_EXECUTION_APPROVAL_REVOCATION_EVENT_SCHEMA_VERSION,
+    revocation_authority_id:
+      FARM_OS_PRODUCTION_TARGET_EXECUTION_APPROVAL_REVOCATION_AUTHORITY_ID,
+    revocation_authority_revision: 1 as const,
+    approval_id: formalLineage.approval.approval_id,
+    approval_digest: formalLineage.approval.approval_digest,
+    approval_receipt_id: formalLineage.approval_receipt.approval_receipt_id,
+    approval_receipt_digest: formalLineage.approval_receipt.approval_receipt_digest,
+    target_binding_digest: formalLineage.approval.target_binding_digest,
+    operation_scope: formalLineage.approval.operation_scope,
+    reason: "HUMAN_REVIEW_REVOKED" as const,
+    trusted_clock_evidence_id: availableClock.evidence_id,
+    trusted_clock_evidence_digest: availableClock.evidence_digest,
+    effective_at: availableClock.observed_at,
+    event_sequence: 1,
+    previous_event_digest: null,
+    server_owned_record: true as const,
+    append_only: true as const,
+    ...overrides,
+  };
+  const revocation_event_digest =
+    computeFarmOsProductionTargetExecutionApprovalRevocationEventDigest(material);
+  return Object.freeze({ ...material, revocation_event_digest,
+    revocation_event_id:
+      computeFarmOsProductionTargetExecutionApprovalRevocationEventId(
+        revocation_event_digest,
+      ) });
+}
+const validRevocationEvent = revocationEvent();
+assert.equal(validateFarmOsProductionTargetExecutionApprovalRevocationEvent({
+  event: validRevocationEvent,
+  approval: formalLineage.approval,
+  approval_receipt: formalLineage.approval_receipt,
+  clock_evidence: availableClock,
+  persisted_clock_lower_bound: TIMES.proposed,
+}).accepted, true);
+const revokedHeadResult = advanceFarmOsProductionTargetExecutionApprovalRevocationHead({
+  current_head: initialRevocationHead,
+  expected_head_version: initialRevocationHead.head_version,
+  expected_head_digest: initialRevocationHead.head_digest,
+  event: validRevocationEvent,
+  approval: formalLineage.approval,
+  approval_receipt: formalLineage.approval_receipt,
+  clock_evidence: availableClock,
+  persisted_clock_lower_bound: TIMES.proposed,
+});
+assert.equal(revokedHeadResult.accepted, true);
+if (!revokedHeadResult.accepted) throw new Error("revocation head rejected");
+assert.equal(evaluateFarmOsProductionTargetExecutionApprovalUsability({
+  approval: formalLineage.approval,
+  approval_receipt: formalLineage.approval_receipt,
+  revocation_head: revokedHeadResult.head,
+  revocation_event: validRevocationEvent,
+  clock_evidence: availableClock,
+  persisted_clock_lower_bound: TIMES.proposed,
+}).status, "REVOKED");
+assert.equal(formalLineage.approval.approval_digest, approvalDigestBeforeRevocation);
+assert.equal(formalLineage.approval_receipt.approval_receipt_digest,
+  approvalReceiptDigestBeforeRevocation);
+for (const invalidEvent of [
+  revocationEvent({ approval_id: "approval.c1-wrong-001" }),
+  revocationEvent({ approval_digest: D("0") }),
+  revocationEvent({ target_binding_digest: D("0") }),
+  revocationEvent({ trusted_clock_evidence_digest: D("0") }),
+  { ...validRevocationEvent, revocation_authority_id: "latest" },
+  { ...validRevocationEvent, client_provided_authority_role: "admin" },
+  { ...validRevocationEvent, credential: "secret-like-forbidden" },
+]) {
+  assert.equal(validateFarmOsProductionTargetExecutionApprovalRevocationEvent({
+    event: invalidEvent,
+    approval: formalLineage.approval,
+    approval_receipt: formalLineage.approval_receipt,
+    clock_evidence: availableClock,
+    persisted_clock_lower_bound: TIMES.proposed,
+  }).accepted, false);
+}
+assert.equal(advanceFarmOsProductionTargetExecutionApprovalRevocationHead({
+  current_head: initialRevocationHead,
+  expected_head_version: 1,
+  expected_head_digest: initialRevocationHead.head_digest,
+  event: validRevocationEvent,
+  approval: formalLineage.approval,
+  approval_receipt: formalLineage.approval_receipt,
+  clock_evidence: availableClock,
+  persisted_clock_lower_bound: TIMES.proposed,
+}).accepted, false);
+assert.equal(advanceFarmOsProductionTargetExecutionApprovalRevocationHead({
+  current_head: initialRevocationHead,
+  expected_head_version: 0,
+  expected_head_digest: initialRevocationHead.head_digest,
+  event: revocationEvent({ event_sequence: 2 }),
+  approval: formalLineage.approval,
+  approval_receipt: formalLineage.approval_receipt,
+  clock_evidence: availableClock,
+  persisted_clock_lower_bound: TIMES.proposed,
+}).accepted, false);
+assert.equal(compareFarmOsProductionTargetExecutionApprovalRevocationEventIdentity(
+  validRevocationEvent,
+  validRevocationEvent,
+), "MATCH");
+assert.equal(compareFarmOsProductionTargetExecutionApprovalRevocationEventIdentity(
+  validRevocationEvent,
+  { ...validRevocationEvent, revocation_event_digest: D("0") },
+), "REVOCATION_EVENT_CONFLICT");
+assert.equal(validateFarmOsProductionTargetExecutionApprovalRevocationState({
+  state: { head: revokedHeadResult.head, latest_event: validRevocationEvent },
+  approval: formalLineage.approval,
+  approval_receipt: formalLineage.approval_receipt,
+  clock_evidence: availableClock,
+  persisted_clock_lower_bound: TIMES.proposed,
+}).accepted, true);
+assert.equal(validateFarmOsProductionTargetExecutionApprovalRevocationState({
+  state: { head: initialRevocationHead, latest_event: validRevocationEvent },
+  approval: formalLineage.approval,
+  approval_receipt: formalLineage.approval_receipt,
+  clock_evidence: availableClock,
+  persisted_clock_lower_bound: TIMES.proposed,
+}).accepted, false);
+const invalidChronologyReceiptMaterial = Object.freeze({
+  ...formalLineage.approval_receipt,
+  issued_at: TIMES.proposed,
+});
+const { approval_receipt_digest: _ignoredChronologyDigest,
+  ...invalidChronologyReceiptWithoutDigest } = invalidChronologyReceiptMaterial;
+const invalidChronologyReceipt = Object.freeze({
+  ...invalidChronologyReceiptWithoutDigest,
+  approval_receipt_digest: computeFarmOsProductionTargetExecutionApprovalReceiptDigest(
+    invalidChronologyReceiptWithoutDigest,
+  ),
+});
+const invalidChronologyHead =
+  createInitialFarmOsProductionTargetExecutionApprovalRevocationHead({
+    ...formalLineage,
+    approval_receipt: invalidChronologyReceipt,
+  });
+assert.equal(validateFarmOsProductionTargetExecutionApprovalRevocationState({
+  state: { head: invalidChronologyHead, latest_event: null },
+  approval: formalLineage.approval,
+  approval_receipt: invalidChronologyReceipt,
+  clock_evidence: availableClock,
+  persisted_clock_lower_bound: TIMES.proposed,
+}).accepted, false);
+assert.equal(evaluateFarmOsProductionTargetExecutionApprovalUsability({
+  approval: formalLineage.approval,
+  approval_receipt: formalLineage.approval_receipt,
+  revocation_head: initialRevocationHead,
+  revocation_event: null,
+  clock_evidence: clock("AVAILABLE", TIMES.expires),
+  persisted_clock_lower_bound: TIMES.proposed,
+}).status, "EXPIRED");
+assert.equal(evaluateFarmOsProductionTargetExecutionApprovalUsability({
+  approval: formalLineage.approval,
+  approval_receipt: formalLineage.approval_receipt,
+  revocation_head: null,
+  revocation_event: null,
+  clock_evidence: availableClock,
+  persisted_clock_lower_bound: TIMES.proposed,
+}).status, "INVALID");
+assert.equal(evaluateFarmOsProductionTargetExecutionApprovalUsability({
+  approval: { ...formalLineage.approval, expires_at: "2026-08-13T00:00:00.000Z" },
+  approval_receipt: formalLineage.approval_receipt,
+  revocation_head: initialRevocationHead,
+  revocation_event: null,
+  clock_evidence: availableClock,
+  persisted_clock_lower_bound: TIMES.proposed,
+}).status, "INVALID");
+
 function replaceApprovalTiming(input: typeof formalLineage, approvedAt: string, expiresAt: string,
   receiptIssuedAt: string = input.approval_receipt.issued_at) {
   const approvalMaterial = {
@@ -375,6 +563,14 @@ assert.equal(validateFarmOsProductionTargetExecutionApprovalLineage({
 }).accepted, false);
 
 const formalCommand = command(FARM_OS_PRODUCTION_TARGET_EVIDENCE_OPERATION, formalLineage);
+const formalCommandAfterRevocationSemantics = command(
+  FARM_OS_PRODUCTION_TARGET_EVIDENCE_OPERATION,
+  formalLineage,
+);
+assert.equal(formalCommandAfterRevocationSemantics.execution_binding_digest,
+  formalCommand.execution_binding_digest);
+assert.equal(formalCommandAfterRevocationSemantics.command_record_digest,
+  formalCommand.command_record_digest);
 const formalValidation = validateCommand(
   formalCommand, FARM_OS_PRODUCTION_TARGET_EVIDENCE_OPERATION, formalLineage,
 );
