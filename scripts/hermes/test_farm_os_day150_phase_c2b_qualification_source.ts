@@ -174,36 +174,109 @@ assert.equal(validateFarmOsPteC2bDockerCommand({ ...dockerPlan.run_container,
     dockerPlan.run_container.argv.at(-1) ?? ""] }), false);
 const canonicalRepoDigest = `${FARM_OS_PTE_C2B_IMAGE_REPOSITORY}@${REPO_DIGEST}`;
 const canonicalRepoDigestB = `${FARM_OS_PTE_C2B_IMAGE_REPOSITORY}@${OBSERVED_DIGEST_B}`;
+const shortRepoDigest = `postgres@${REPO_DIGEST}`;
+const shortRepoDigestB = `postgres@${OBSERVED_DIGEST_B}`;
+const discoveryInspectCommand = Object.freeze({ ...dockerPlan.inspect_image,
+  argv: Object.freeze([...dockerPlan.inspect_image.argv.slice(0, -1),
+    "docker.io/library/postgres:17"]) });
+const discoveryContext = Object.freeze({ route: "LOCAL_IMAGE_IDENTITY_DISCOVERY" as const,
+  command: discoveryInspectCommand });
+const runtimeContext = (digest: `sha256:${string}`) => Object.freeze({
+  route: "B2_RUNTIME_IMAGE_VERIFICATION" as const,
+  command: Object.freeze({ ...dockerPlan.inspect_image,
+    argv: Object.freeze([...dockerPlan.inspect_image.argv.slice(0, -1),
+      `docker.io/library/postgres@${digest}`]) }),
+});
 const imageInspect = (repoDigests: unknown, overrides: Record<string, unknown> = {}) =>
   JSON.stringify([{ Id: IMAGE_ID, RepoDigests: repoDigests, Architecture: "amd64", Os: "linux",
     ...overrides }]);
 for (const raw of [JSON.stringify([{ Id: IMAGE_ID, Architecture: "amd64", Os: "linux" }]),
   imageInspect(null), imageInspect([])]) {
-  assert.equal(classifyFarmOsPteC2bImageInspect(raw).status,
+  assert.equal(classifyFarmOsPteC2bImageInspect(raw, discoveryContext).status,
     "BLOCKED_PHASE_C2B_IMAGE_AUTHORITY");
+}
+assert.deepEqual(classifyFarmOsPteC2bImageInspect(imageInspect([canonicalRepoDigest]), undefined), {
+  status: "BLOCKED_PHASE_C2B_IMAGE_AUTHORITY",
+  reason: "REPOSITORY_IDENTITY_CONTEXT_INVALID",
+});
+for (const invalidContext of [{ ...discoveryContext,
+  command: { ...discoveryInspectCommand, argv: [...discoveryInspectCommand.argv.slice(0, -1),
+    "postgres:17"] } }, { ...discoveryContext,
+  command: { ...discoveryInspectCommand, environment: { PATH: "/usr/bin", EXTRA: "invalid" } } },
+  { route: "LOCAL_IMAGE_IDENTITY_DISCOVERY" },
+  { route: "LOCAL_IMAGE_IDENTITY_DISCOVERY", command: {} },
+  { route: "LOCAL_IMAGE_IDENTITY_DISCOVERY", command: null },
+  { route: "LOCAL_IMAGE_IDENTITY_DISCOVERY",
+    command: { ...discoveryInspectCommand, argv: "image inspect" } },
+  { route: "LOCAL_IMAGE_IDENTITY_DISCOVERY",
+    command: { argv: discoveryInspectCommand.argv, timeout_ms: 30_000,
+      output_limit_bytes: 1_048_576 } },
+  { route: "LOCAL_IMAGE_IDENTITY_DISCOVERY",
+    command: { ...discoveryInspectCommand, environment: null } },
+  { route: "LOCAL_IMAGE_IDENTITY_DISCOVERY",
+    command: { ...discoveryInspectCommand, timeout_ms: "30000" } },
+  { route: "LOCAL_IMAGE_IDENTITY_DISCOVERY",
+    command: { ...discoveryInspectCommand, unexpected: true } }]) {
+  assert.equal(classifyFarmOsPteC2bImageInspect(imageInspect([canonicalRepoDigest]),
+    invalidContext).status, "BLOCKED_PHASE_C2B_IMAGE_AUTHORITY");
 }
 assert.deepEqual(classifyFarmOsPteC2bImageInspect(imageInspect([
   `ghcr.io/example/postgres@${REPO_DIGEST}`,
-])), { status: "BLOCKED_PHASE_C2B_IMAGE_AUTHORITY",
+]), discoveryContext), { status: "BLOCKED_PHASE_C2B_IMAGE_AUTHORITY",
   reason: "CANONICAL_REPOSITORY_DIGEST_MISSING" });
-const exactOne = classifyFarmOsPteC2bImageInspect(imageInspect([canonicalRepoDigest]));
+const exactOne = classifyFarmOsPteC2bImageInspect(imageInspect([canonicalRepoDigest]),
+  discoveryContext);
 assert.equal(exactOne.status, "IMAGE_CANDIDATE_DISCOVERED");
 assert.equal(exactOne.status === "IMAGE_CANDIDATE_DISCOVERED" &&
   exactOne.projection.observed_repository_digest, REPO_DIGEST);
+assert.equal(exactOne.status === "IMAGE_CANDIDATE_DISCOVERED" &&
+  exactOne.repository_identity_route, "CANONICAL_REPOSITORY_IDENTITY_UNCHANGED");
+const canonicalizedShort = classifyFarmOsPteC2bImageInspect(imageInspect([shortRepoDigest]),
+  discoveryContext);
+assert.equal(canonicalizedShort.status, "IMAGE_CANDIDATE_DISCOVERED");
+assert.equal(canonicalizedShort.status === "IMAGE_CANDIDATE_DISCOVERED" &&
+  canonicalizedShort.projection.observed_repository_digest, REPO_DIGEST);
+assert.equal(canonicalizedShort.status === "IMAGE_CANDIDATE_DISCOVERED" &&
+  canonicalizedShort.repository_identity_route, "EXACT_POSTGRES_OFFICIAL_SHORT_NAME_V1");
+const observedLocalCandidate = classifyFarmOsPteC2bImageInspect(imageInspect([
+  "postgres@sha256:7958605b474b3d264a969cb3a123d6aa00ad1e1fe9da8a69984dabb704d93317",
+], { Id: "sha256:7958605b474b3d264a969cb3a123d6aa00ad1e1fe9da8a69984dabb704d93317",
+  Architecture: "arm64", Variant: "v8" }), discoveryContext);
+assert.equal(observedLocalCandidate.status, "IMAGE_CANDIDATE_DISCOVERED");
+assert.equal(observedLocalCandidate.status === "IMAGE_CANDIDATE_DISCOVERED" &&
+  observedLocalCandidate.projection.observed_repository_digest,
+"sha256:7958605b474b3d264a969cb3a123d6aa00ad1e1fe9da8a69984dabb704d93317");
 assert.equal(classifyFarmOsPteC2bImageInspect(
-  imageInspect([canonicalRepoDigest, canonicalRepoDigest])).status,
+  imageInspect([canonicalRepoDigest, canonicalRepoDigest]), discoveryContext).status,
 "IMAGE_CANDIDATE_DISCOVERED");
+for (const entries of [[shortRepoDigest, shortRepoDigest],
+  [shortRepoDigest, canonicalRepoDigest], [canonicalRepoDigest, shortRepoDigest]]) {
+  const result = classifyFarmOsPteC2bImageInspect(imageInspect(entries), discoveryContext);
+  assert.equal(result.status, "IMAGE_CANDIDATE_DISCOVERED");
+  assert.equal(result.status === "IMAGE_CANDIDATE_DISCOVERED" &&
+    result.projection.observed_repository_digest, REPO_DIGEST);
+}
 for (const entries of [[canonicalRepoDigest, canonicalRepoDigestB],
-  [canonicalRepoDigestB, canonicalRepoDigest]]) {
-  assert.deepEqual(classifyFarmOsPteC2bImageInspect(imageInspect(entries)), {
+  [shortRepoDigest, canonicalRepoDigestB], [shortRepoDigest, shortRepoDigestB]]) {
+  assert.deepEqual(classifyFarmOsPteC2bImageInspect(imageInspect(entries), discoveryContext), {
     status: "HOLD_IMAGE_IDENTITY_AMBIGUOUS",
-    reason: "MULTIPLE_CANONICAL_REPOSITORY_DIGESTS",
+    reason: "MULTIPLE_REPOSITORY_DIGESTS",
   });
 }
-assert.deepEqual(classifyFarmOsPteC2bImageInspect(imageInspect([
-  canonicalRepoDigest, `ghcr.io/example/postgres@${REPO_DIGEST}`,
-])), { status: "HOLD_IMAGE_IDENTITY_AMBIGUOUS",
-  reason: "CANONICAL_AND_UNEXPECTED_REPOSITORY_IDENTITY" });
+for (const entries of [[shortRepoDigest, `anotherrepo/postgres@${REPO_DIGEST}`],
+  [canonicalRepoDigest, `anotherrepo/postgres@${REPO_DIGEST}`],
+  [shortRepoDigest, `unknown@${REPO_DIGEST}`]]) {
+  assert.deepEqual(classifyFarmOsPteC2bImageInspect(imageInspect(entries), discoveryContext), {
+    status: "HOLD_IMAGE_IDENTITY_AMBIGUOUS",
+    reason: "ADMISSIBLE_AND_UNEXPECTED_REPOSITORY_IDENTITY",
+  });
+}
+for (const wrongRepository of [`mysql@${REPO_DIGEST}`, `library/postgres@${REPO_DIGEST}`,
+  `registry-1.docker.io/library/postgres@${REPO_DIGEST}`,
+  `mirror.example/postgres@${REPO_DIGEST}`, `localhost/postgres@${REPO_DIGEST}`]) {
+  assert.equal(classifyFarmOsPteC2bImageInspect(imageInspect([wrongRepository]),
+    discoveryContext).status, "BLOCKED_PHASE_C2B_IMAGE_AUTHORITY");
+}
 for (const invalidCanonical of [
   `${FARM_OS_PTE_C2B_IMAGE_REPOSITORY}@sha256:${"A".repeat(64)}`,
   `${FARM_OS_PTE_C2B_IMAGE_REPOSITORY}@sha256:${"a".repeat(63)}`,
@@ -211,13 +284,28 @@ for (const invalidCanonical of [
   `${FARM_OS_PTE_C2B_IMAGE_REPOSITORY}@${REPO_DIGEST} `,
   `${FARM_OS_PTE_C2B_IMAGE_REPOSITORY}:17@${REPO_DIGEST}`,
   `${FARM_OS_PTE_C2B_IMAGE_REPOSITORY}@${REPO_DIGEST}?query=1`,
+  `postgres@sha256:${"A".repeat(64)}`, `postgres@sha256:${"a".repeat(63)}`,
+  `postgres@sha512:${"a".repeat(64)}`, `postgres@${REPO_DIGEST} `,
 ]) assert.notEqual(classifyFarmOsPteC2bImageInspect(
-  imageInspect([invalidCanonical])).status, "IMAGE_CANDIDATE_DISCOVERED");
+  imageInspect([invalidCanonical]), discoveryContext).status, "IMAGE_CANDIDATE_DISCOVERED");
+assert.equal(classifyFarmOsPteC2bImageInspect(imageInspect([], { Id: REPO_DIGEST }),
+  discoveryContext).status, "BLOCKED_PHASE_C2B_IMAGE_AUTHORITY");
+const imageIdDoesNotSupplyDigest = classifyFarmOsPteC2bImageInspect(
+  imageInspect([shortRepoDigestB], { Id: REPO_DIGEST }), discoveryContext);
+assert.equal(imageIdDoesNotSupplyDigest.status, "IMAGE_CANDIDATE_DISCOVERED");
+assert.equal(imageIdDoesNotSupplyDigest.status === "IMAGE_CANDIDATE_DISCOVERED" &&
+  imageIdDoesNotSupplyDigest.projection.observed_repository_digest, OBSERVED_DIGEST_B);
+assert.deepEqual(classifyFarmOsPteC2bImageInspect(imageInspect([shortRepoDigestB]),
+  runtimeContext(REPO_DIGEST)), { status: "BLOCKED_PHASE_C2B_IMAGE_AUTHORITY",
+  reason: "RUNTIME_REFERENCE_DIGEST_MISMATCH" });
+assert.equal(classifyFarmOsPteC2bImageInspect(imageInspect([shortRepoDigest]),
+  runtimeContext(REPO_DIGEST)).status, "IMAGE_CANDIDATE_DISCOVERED");
+assert.equal(validateFarmOsPteC2bDockerCommand(discoveryInspectCommand), false);
 const independentlyObserved = projectFarmOsPteC2bImageInspect(imageInspect([canonicalRepoDigestB], {
   Config: { Env: [`POSTGRES_PASSWORD=c2b_${"f".repeat(64)}`],
     Cmd: ["postgres", "--synthetic"] }, HostConfig: { Binds: ["not-projected"] },
   Mounts: [{ Source: "not-projected" }], UnknownNested: { token: "synthetic" },
-}));
+}), discoveryContext);
 assert.ok(independentlyObserved);
 assert.equal(independentlyObserved.observed_repository_digest, OBSERVED_DIGEST_B);
 assert.notEqual(independentlyObserved.observed_repository_digest, REPO_DIGEST);

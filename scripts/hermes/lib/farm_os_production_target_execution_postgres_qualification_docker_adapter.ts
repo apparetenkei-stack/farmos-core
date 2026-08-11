@@ -253,17 +253,89 @@ function projectionContainsForbiddenValue(value: unknown): boolean {
 export type FarmOsPteC2bImageInspectResult =
   | Readonly<{ status: "IMAGE_CANDIDATE_DISCOVERED";
     observation_route: "DOCKER_IMAGE_INSPECT_REPODIGEST_PROJECTION";
+    repository_identity_route: "EXACT_POSTGRES_OFFICIAL_SHORT_NAME_V1" |
+      "CANONICAL_REPOSITORY_IDENTITY_UNCHANGED";
     projection: Extract<FarmOsPteC2bDockerProjection, { kind: "IMAGE" }> }>
   | Readonly<{ status: "BLOCKED_PHASE_C2B_IMAGE_AUTHORITY";
     reason: "INSPECT_SHAPE_INVALID" | "CANONICAL_REPOSITORY_DIGEST_MISSING" |
-      "CANONICAL_REPOSITORY_DIGEST_INVALID" | "IMAGE_ID_OR_PLATFORM_INVALID" }>
+      "REPOSITORY_DIGEST_INVALID" | "REPOSITORY_IDENTITY_CONTEXT_INVALID" |
+      "RUNTIME_REFERENCE_DIGEST_MISMATCH" | "IMAGE_ID_OR_PLATFORM_INVALID" }>
   | Readonly<{ status: "HOLD_IMAGE_IDENTITY_AMBIGUOUS";
-    reason: "MULTIPLE_CANONICAL_REPOSITORY_DIGESTS" |
-      "CANONICAL_AND_UNEXPECTED_REPOSITORY_IDENTITY" }>;
+    reason: "MULTIPLE_REPOSITORY_DIGESTS" |
+      "ADMISSIBLE_AND_UNEXPECTED_REPOSITORY_IDENTITY" }>;
+
+export type FarmOsPteC2bImageInspectContextInput = Readonly<{
+  route: "LOCAL_IMAGE_IDENTITY_DISCOVERY" | "B2_RUNTIME_IMAGE_VERIFICATION";
+  command: FarmOsPteC2bDockerCommand;
+}>;
+
+type FarmOsPteC2bVerifiedImageInspectContext =
+  | Readonly<{ route: "LOCAL_IMAGE_IDENTITY_DISCOVERY";
+    inspected_reference: "docker.io/library/postgres:17" }>
+  | Readonly<{ route: "B2_RUNTIME_IMAGE_VERIFICATION";
+    inspected_reference: `docker.io/library/postgres@sha256:${string}` }>;
+
+function parseFarmOsPteC2bDockerCommandShape(value: unknown): FarmOsPteC2bDockerCommand | null {
+  if (typeof value !== "object" || value === null || Array.isArray(value) ||
+    Object.keys(value).sort().join("\0") !==
+      ["argv", "environment", "timeout_ms", "output_limit_bytes"].sort().join("\0")) return null;
+  const commandValue = value as Record<string, unknown>;
+  if (!Array.isArray(commandValue.argv) ||
+    !commandValue.argv.every((entry) => typeof entry === "string") ||
+    typeof commandValue.environment !== "object" || commandValue.environment === null ||
+    Array.isArray(commandValue.environment) ||
+    !Object.values(commandValue.environment).every((entry) => typeof entry === "string") ||
+    !Number.isSafeInteger(commandValue.timeout_ms) ||
+    !Number.isSafeInteger(commandValue.output_limit_bytes)) return null;
+  return Object.freeze({
+    argv: Object.freeze([...commandValue.argv]) as readonly string[],
+    environment: Object.freeze({ ...(commandValue.environment as Record<string, string>) }),
+    timeout_ms: commandValue.timeout_ms as number,
+    output_limit_bytes: commandValue.output_limit_bytes as number,
+  });
+}
+
+function validateFarmOsPteC2bDiscoveryImageInspectCommand(
+  input: FarmOsPteC2bDockerCommand,
+): boolean {
+  const op = operation(input);
+  return op?.length === 3 && op[0] === "image" && op[1] === "inspect" &&
+    op[2] === "docker.io/library/postgres:17" && input.timeout_ms >= 1 &&
+    input.timeout_ms <= 60_000 && input.output_limit_bytes === 1_048_576 &&
+    Object.keys(input.environment).join("\0") === "PATH" && input.environment.PATH === PATH_VALUE;
+}
+
+function parseFarmOsPteC2bImageInspectContext(
+  value: unknown,
+): FarmOsPteC2bVerifiedImageInspectContext | null {
+  if (typeof value !== "object" || value === null || Array.isArray(value) ||
+    Object.keys(value).sort().join("\0") !== ["route", "command"].sort().join("\0")) return null;
+  const context = value as Record<string, unknown>;
+  const inspectedCommand = parseFarmOsPteC2bDockerCommandShape(context.command);
+  if (inspectedCommand === null) return null;
+  const op = operation(inspectedCommand);
+  if (context.route === "LOCAL_IMAGE_IDENTITY_DISCOVERY" &&
+    validateFarmOsPteC2bDiscoveryImageInspectCommand(inspectedCommand)) {
+    return Object.freeze({ route: "LOCAL_IMAGE_IDENTITY_DISCOVERY",
+      inspected_reference: "docker.io/library/postgres:17" });
+  }
+  return context.route === "B2_RUNTIME_IMAGE_VERIFICATION" &&
+      validateFarmOsPteC2bDockerCommand(inspectedCommand) && op?.[0] === "image" &&
+      op[1] === "inspect" && typeof op[2] === "string" &&
+      /^docker\.io\/library\/postgres@sha256:[a-f0-9]{64}$/u.test(op[2])
+    ? Object.freeze({ route: "B2_RUNTIME_IMAGE_VERIFICATION",
+      inspected_reference: op[2] as `docker.io/library/postgres@sha256:${string}` }) : null;
+}
 
 export function classifyFarmOsPteC2bImageInspect(
   stdout: string,
+  contextValue: unknown,
 ): FarmOsPteC2bImageInspectResult {
+  const context = parseFarmOsPteC2bImageInspectContext(contextValue);
+  if (context === null) return Object.freeze({
+    status: "BLOCKED_PHASE_C2B_IMAGE_AUTHORITY",
+    reason: "REPOSITORY_IDENTITY_CONTEXT_INVALID",
+  });
   const values = parseArray(stdout);
   const image = values?.length === 1 && typeof values[0] === "object" && values[0] !== null
     ? values[0] as DockerInspect : null;
@@ -272,31 +344,52 @@ export function classifyFarmOsPteC2bImageInspect(
       reason: "INSPECT_SHAPE_INVALID" });
   }
   const canonicalPrefix = `${FARM_OS_PTE_C2B_IMAGE_REPOSITORY}@`;
-  const canonical = new Set<string>();
+  const shortPrefix = "postgres@";
+  const repositoryDigests = new Set<`sha256:${string}`>();
+  let shortRepresentationObserved = false;
   let unexpectedRepositoryIdentity = false;
   for (const entry of image.RepoDigests) {
-    if (typeof entry === "string" && entry.startsWith(canonicalPrefix)) {
-      if (!/^docker\.io\/library\/postgres@sha256:[a-f0-9]{64}$/u.test(entry)) {
-        return Object.freeze({ status: "BLOCKED_PHASE_C2B_IMAGE_AUTHORITY",
-          reason: "CANONICAL_REPOSITORY_DIGEST_INVALID" });
-      }
-      canonical.add(entry);
-    } else {
-      unexpectedRepositoryIdentity = true;
+    if (typeof entry !== "string") {
+      return Object.freeze({ status: "BLOCKED_PHASE_C2B_IMAGE_AUTHORITY",
+        reason: "REPOSITORY_DIGEST_INVALID" });
     }
+    if (entry.startsWith(canonicalPrefix) || entry.startsWith(shortPrefix)) {
+      const expression = entry.startsWith(canonicalPrefix)
+        ? /^docker\.io\/library\/postgres@(sha256:[a-f0-9]{64})$/u
+        : /^postgres@(sha256:[a-f0-9]{64})$/u;
+      const match = expression.exec(entry);
+      if (match?.[1] === undefined) return Object.freeze({
+        status: "BLOCKED_PHASE_C2B_IMAGE_AUTHORITY",
+        reason: "REPOSITORY_DIGEST_INVALID",
+      });
+      repositoryDigests.add(match[1] as `sha256:${string}`);
+      shortRepresentationObserved ||= entry.startsWith(shortPrefix);
+    } else unexpectedRepositoryIdentity = true;
   }
-  if (canonical.size === 0) return Object.freeze({
+  if (repositoryDigests.size === 0) return Object.freeze({
     status: "BLOCKED_PHASE_C2B_IMAGE_AUTHORITY",
     reason: "CANONICAL_REPOSITORY_DIGEST_MISSING",
   });
-  if (canonical.size > 1) return Object.freeze({
+  if (repositoryDigests.size > 1) return Object.freeze({
     status: "HOLD_IMAGE_IDENTITY_AMBIGUOUS",
-    reason: "MULTIPLE_CANONICAL_REPOSITORY_DIGESTS",
+    reason: "MULTIPLE_REPOSITORY_DIGESTS",
   });
   if (unexpectedRepositoryIdentity) return Object.freeze({
     status: "HOLD_IMAGE_IDENTITY_AMBIGUOUS",
-    reason: "CANONICAL_AND_UNEXPECTED_REPOSITORY_IDENTITY",
+    reason: "ADMISSIBLE_AND_UNEXPECTED_REPOSITORY_IDENTITY",
   });
+  const observedRepositoryDigest = [...repositoryDigests][0];
+  if (observedRepositoryDigest === undefined) return Object.freeze({
+    status: "BLOCKED_PHASE_C2B_IMAGE_AUTHORITY",
+    reason: "CANONICAL_REPOSITORY_DIGEST_MISSING",
+  });
+  if (context.route === "B2_RUNTIME_IMAGE_VERIFICATION") {
+    const expectedDigest = context.inspected_reference.slice(canonicalPrefix.length);
+    if (expectedDigest !== observedRepositoryDigest) return Object.freeze({
+      status: "BLOCKED_PHASE_C2B_IMAGE_AUTHORITY",
+      reason: "RUNTIME_REFERENCE_DIGEST_MISMATCH",
+    });
+  }
   const variant = image.Variant === undefined ? null : image.Variant;
   if (typeof image.Id !== "string" || !DIGEST.test(image.Id) ||
     !["amd64", "arm64"].includes(String(image.Architecture)) || image.Os !== "linux" ||
@@ -305,10 +398,6 @@ export function classifyFarmOsPteC2bImageInspect(
     return Object.freeze({ status: "BLOCKED_PHASE_C2B_IMAGE_AUTHORITY",
       reason: "IMAGE_ID_OR_PLATFORM_INVALID" });
   }
-  const canonicalRepositoryDigest = [...canonical][0] as
-    `docker.io/library/postgres@sha256:${string}`;
-  const observedRepositoryDigest = canonicalRepositoryDigest.slice(canonicalPrefix.length) as
-    `sha256:${string}`;
   const projection = Object.freeze({ kind: "IMAGE" as const,
     image_id: image.Id as `sha256:${string}`,
     observed_repository_digest: observedRepositoryDigest,
@@ -320,13 +409,17 @@ export function classifyFarmOsPteC2bImageInspect(
       reason: "INSPECT_SHAPE_INVALID" as const })
     : Object.freeze({ status: "IMAGE_CANDIDATE_DISCOVERED" as const,
       observation_route: "DOCKER_IMAGE_INSPECT_REPODIGEST_PROJECTION" as const,
+      repository_identity_route: shortRepresentationObserved
+        ? "EXACT_POSTGRES_OFFICIAL_SHORT_NAME_V1" as const
+        : "CANONICAL_REPOSITORY_IDENTITY_UNCHANGED" as const,
       projection });
 }
 
 export function projectFarmOsPteC2bImageInspect(
   stdout: string,
+  context: unknown,
 ): Extract<FarmOsPteC2bDockerProjection, { kind: "IMAGE" }> | null {
-  const result = classifyFarmOsPteC2bImageInspect(stdout);
+  const result = classifyFarmOsPteC2bImageInspect(stdout, context);
   return result.status === "IMAGE_CANDIDATE_DISCOVERED" ? result.projection : null;
 }
 
@@ -401,7 +494,10 @@ function projectFarmOsPteC2bDockerCommandOutput(input: FarmOsPteC2bDockerCommand
   const op = operation(input);
   if (op === null) return null;
   if (op[0] === "image" && op[1] === "inspect") {
-    const projection = projectFarmOsPteC2bImageInspect(stdout);
+    const projection = projectFarmOsPteC2bImageInspect(stdout, {
+      route: "B2_RUNTIME_IMAGE_VERIFICATION",
+      command: input,
+    });
     return projection === null ? null : Object.freeze({ projection, created_identity: null });
   }
   if (op[0] === "container" && op[1] === "inspect") {
