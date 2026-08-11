@@ -7,6 +7,7 @@ import {
   parseFarmOsPteC2bImageAuthority,
   type FarmOsPteC2bImageAuthority,
   type FarmOsPteC2bOwnedResources,
+  type FarmOsPteC2bPlatform,
 } from "./farm_os_production_target_execution_postgres_qualification_contract";
 import type { FarmOsPteC2bQualificationAdapter } from
   "./farm_os_production_target_execution_postgres_qualification_executor";
@@ -34,8 +35,9 @@ export type FarmOsPteC2bDockerResult = Readonly<{
   failure: "NONE" | "NOT_FOUND" | "TIMEOUT" | "FAILED";
 }>;
 export type FarmOsPteC2bDockerProjection =
-  | Readonly<{ kind: "IMAGE"; id: `sha256:${string}`; repository_digest: `sha256:${string}`;
-    architecture: "amd64" | "arm64"; os: "linux" }>
+  | Readonly<{ kind: "IMAGE"; image_id: `sha256:${string}`;
+    observed_repository_digest: `sha256:${string}`;
+    observed_platform: FarmOsPteC2bPlatform }>
   | Readonly<{ kind: "CONTAINER"; id: string; name: string; ownership_label_value: string;
     image_id: `sha256:${string}`; state_status: string; running: boolean;
     host_ip: "127.0.0.1"; host_port: number }>
@@ -221,6 +223,7 @@ type DockerInspect = Readonly<{
   RepoDigests?: unknown;
   Architecture?: unknown;
   Os?: unknown;
+  Variant?: unknown;
   Config?: Readonly<{ Labels?: unknown }>;
   Labels?: unknown;
   Internal?: unknown;
@@ -247,23 +250,84 @@ function projectionContainsForbiddenValue(value: unknown): boolean {
     .test(JSON.stringify(value));
 }
 
-export function projectFarmOsPteC2bImageInspect(
+export type FarmOsPteC2bImageInspectResult =
+  | Readonly<{ status: "IMAGE_CANDIDATE_DISCOVERED";
+    observation_route: "DOCKER_IMAGE_INSPECT_REPODIGEST_PROJECTION";
+    projection: Extract<FarmOsPteC2bDockerProjection, { kind: "IMAGE" }> }>
+  | Readonly<{ status: "BLOCKED_PHASE_C2B_IMAGE_AUTHORITY";
+    reason: "INSPECT_SHAPE_INVALID" | "CANONICAL_REPOSITORY_DIGEST_MISSING" |
+      "CANONICAL_REPOSITORY_DIGEST_INVALID" | "IMAGE_ID_OR_PLATFORM_INVALID" }>
+  | Readonly<{ status: "HOLD_IMAGE_IDENTITY_AMBIGUOUS";
+    reason: "MULTIPLE_CANONICAL_REPOSITORY_DIGESTS" |
+      "CANONICAL_AND_UNEXPECTED_REPOSITORY_IDENTITY" }>;
+
+export function classifyFarmOsPteC2bImageInspect(
   stdout: string,
-  approved: FarmOsPteC2bImageAuthority,
-): Extract<FarmOsPteC2bDockerProjection, { kind: "IMAGE" }> | null {
+): FarmOsPteC2bImageInspectResult {
   const values = parseArray(stdout);
   const image = values?.length === 1 && typeof values[0] === "object" && values[0] !== null
     ? values[0] as DockerInspect : null;
-  if (image === null || typeof image.Id !== "string" || !DIGEST.test(image.Id) ||
-    !Array.isArray(image.RepoDigests) ||
-    !image.RepoDigests.includes(`${FARM_OS_PTE_C2B_IMAGE_REPOSITORY}@${approved.repository_digest}`) ||
-    !["amd64", "arm64"].includes(String(image.Architecture)) || image.Os !== "linux") {
-    return null;
+  if (image === null || !Array.isArray(image.RepoDigests) || image.RepoDigests.length === 0) {
+    return Object.freeze({ status: "BLOCKED_PHASE_C2B_IMAGE_AUTHORITY",
+      reason: "INSPECT_SHAPE_INVALID" });
   }
+  const canonicalPrefix = `${FARM_OS_PTE_C2B_IMAGE_REPOSITORY}@`;
+  const canonical = new Set<string>();
+  let unexpectedRepositoryIdentity = false;
+  for (const entry of image.RepoDigests) {
+    if (typeof entry === "string" && entry.startsWith(canonicalPrefix)) {
+      if (!/^docker\.io\/library\/postgres@sha256:[a-f0-9]{64}$/u.test(entry)) {
+        return Object.freeze({ status: "BLOCKED_PHASE_C2B_IMAGE_AUTHORITY",
+          reason: "CANONICAL_REPOSITORY_DIGEST_INVALID" });
+      }
+      canonical.add(entry);
+    } else {
+      unexpectedRepositoryIdentity = true;
+    }
+  }
+  if (canonical.size === 0) return Object.freeze({
+    status: "BLOCKED_PHASE_C2B_IMAGE_AUTHORITY",
+    reason: "CANONICAL_REPOSITORY_DIGEST_MISSING",
+  });
+  if (canonical.size > 1) return Object.freeze({
+    status: "HOLD_IMAGE_IDENTITY_AMBIGUOUS",
+    reason: "MULTIPLE_CANONICAL_REPOSITORY_DIGESTS",
+  });
+  if (unexpectedRepositoryIdentity) return Object.freeze({
+    status: "HOLD_IMAGE_IDENTITY_AMBIGUOUS",
+    reason: "CANONICAL_AND_UNEXPECTED_REPOSITORY_IDENTITY",
+  });
+  const variant = image.Variant === undefined ? null : image.Variant;
+  if (typeof image.Id !== "string" || !DIGEST.test(image.Id) ||
+    !["amd64", "arm64"].includes(String(image.Architecture)) || image.Os !== "linux" ||
+    !(variant === null || variant === "v8") ||
+    (image.Architecture === "amd64" && variant !== null)) {
+    return Object.freeze({ status: "BLOCKED_PHASE_C2B_IMAGE_AUTHORITY",
+      reason: "IMAGE_ID_OR_PLATFORM_INVALID" });
+  }
+  const canonicalRepositoryDigest = [...canonical][0] as
+    `docker.io/library/postgres@sha256:${string}`;
+  const observedRepositoryDigest = canonicalRepositoryDigest.slice(canonicalPrefix.length) as
+    `sha256:${string}`;
   const projection = Object.freeze({ kind: "IMAGE" as const,
-    id: image.Id as `sha256:${string}`, repository_digest: approved.repository_digest,
-    architecture: image.Architecture as "amd64" | "arm64", os: "linux" as const });
-  return projectionContainsForbiddenValue(projection) ? null : projection;
+    image_id: image.Id as `sha256:${string}`,
+    observed_repository_digest: observedRepositoryDigest,
+    observed_platform: Object.freeze({ os: "linux" as const,
+      architecture: image.Architecture as "amd64" | "arm64",
+      variant: variant as null | "v8" }) });
+  return projectionContainsForbiddenValue(projection)
+    ? Object.freeze({ status: "BLOCKED_PHASE_C2B_IMAGE_AUTHORITY" as const,
+      reason: "INSPECT_SHAPE_INVALID" as const })
+    : Object.freeze({ status: "IMAGE_CANDIDATE_DISCOVERED" as const,
+      observation_route: "DOCKER_IMAGE_INSPECT_REPODIGEST_PROJECTION" as const,
+      projection });
+}
+
+export function projectFarmOsPteC2bImageInspect(
+  stdout: string,
+): Extract<FarmOsPteC2bDockerProjection, { kind: "IMAGE" }> | null {
+  const result = classifyFarmOsPteC2bImageInspect(stdout);
+  return result.status === "IMAGE_CANDIDATE_DISCOVERED" ? result.projection : null;
 }
 
 export function projectFarmOsPteC2bContainerInspect(
@@ -337,11 +401,7 @@ function projectFarmOsPteC2bDockerCommandOutput(input: FarmOsPteC2bDockerCommand
   const op = operation(input);
   if (op === null) return null;
   if (op[0] === "image" && op[1] === "inspect") {
-    const reference = op[2] ?? "";
-    const digest = reference.slice(reference.indexOf("@") + 1);
-    const approved = parseFarmOsPteC2bImageAuthority({ repository: FARM_OS_PTE_C2B_IMAGE_REPOSITORY,
-      repository_digest: digest, runtime_reference: reference });
-    const projection = approved === null ? null : projectFarmOsPteC2bImageInspect(stdout, approved);
+    const projection = projectFarmOsPteC2bImageInspect(stdout);
     return projection === null ? null : Object.freeze({ projection, created_identity: null });
   }
   if (op[0] === "container" && op[1] === "inspect") {

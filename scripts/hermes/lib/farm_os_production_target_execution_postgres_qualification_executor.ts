@@ -14,9 +14,11 @@ import {
   FARM_OS_PTE_C2B_POSTGRES_MAJOR,
   deriveFarmOsPteC2bOwnedResources,
   digestFarmOsPteC2b,
+  farmOsPteC2bPlatformsEqual,
   parseFarmOsPteC2bCleanupResult,
   parseFarmOsPteC2bEvidence,
   parseFarmOsPteC2bImageAuthority,
+  parseFarmOsPteC2bPlatform,
   parseFarmOsPteC2bAuthorizationEnvelopeSyntax,
   parseFarmOsPteC2bSourceLineage,
   validateFarmOsPteC2bAuthorizationForExecution,
@@ -29,6 +31,7 @@ import {
   type FarmOsPteC2bEvidence,
   type FarmOsPteC2bImageAuthority,
   type FarmOsPteC2bOwnedResources,
+  type FarmOsPteC2bPlatform,
   type FarmOsPteC2bResourceType,
   type FarmOsPteC2bSourceLineage,
 } from "./farm_os_production_target_execution_postgres_qualification_contract";
@@ -49,7 +52,8 @@ import {
 } from "./farm_os_production_target_execution_postgres_qualification_docker_adapter";
 
 export const FARM_OS_PTE_C2B_EXECUTION_POLICY = Object.freeze({
-  source_state: "QUALIFICATION_SOURCE_ARTIFACT_CREATED_CANDIDATE",
+  source_state: "QUALIFICATION_SOURCE_ARTIFACT_CREATED",
+  image_authority_state: "V2_SOURCE_CANDIDATE",
   production_target: "FORBIDDEN",
   production_credentials: "FORBIDDEN",
   docker_qualification_authorized: false,
@@ -77,6 +81,7 @@ export const FARM_OS_PTE_C2B_MIGRATION_PLAN = Object.freeze({
 export const FARM_OS_PTE_C2B_EXECUTOR_FAILURE_CODES = Object.freeze([
   "INPUT_INVALID", "AUTHORIZATION_INVALID", "REAL_CAPABILITY_INVALID",
   "SOURCE_IDENTITY_MISMATCH", "IMAGE_AUTHORITY_INVALID",
+  "BLOCKED_PHASE_C2B_IMAGE_AUTHORITY",
   "BLOCKED_ENVIRONMENT", "OWNERSHIP_CONFLICT", "FIXTURE_SETUP_FAILED",
   "MIGRATION_APPLY_FAILED", "MIGRATION_HISTORY_MISMATCH", "VERIFY_FAILED",
   "CASE_RESULT_INVALID", "CASE_FAILED", "CLEANUP_FAILED", "EVIDENCE_INVALID",
@@ -93,8 +98,9 @@ export class FarmOsPteC2bQualificationError extends Error {
 }
 
 export type FarmOsPteC2bObservedEnvironment = Readonly<{
+  observed_repository_digest: `sha256:${string}`;
   observed_image_id: `sha256:${string}`;
-  platform: string;
+  observed_platform: FarmOsPteC2bPlatform;
   server_version_num: number;
   server_version: string;
   container_identity_digest: `sha256:${string}`;
@@ -170,8 +176,13 @@ function fail(code: FarmOsPteC2bExecutorFailureCode): never {
 }
 
 function observedEnvironmentIsExact(value: FarmOsPteC2bObservedEnvironment): boolean {
-  return /^sha256:[a-f0-9]{64}$/u.test(value.observed_image_id) &&
-    /^linux\/(?:amd64|arm64)(?:\/v8)?$/u.test(value.platform) &&
+  return Object.keys(value).sort().join("\0") === ["observed_repository_digest",
+    "observed_image_id", "observed_platform", "server_version_num", "server_version",
+    "container_identity_digest", "network_identity_digest", "volume_identity_digest",
+    "database_identity_digest"].sort().join("\0") &&
+    /^sha256:[a-f0-9]{64}$/u.test(value.observed_repository_digest) &&
+    /^sha256:[a-f0-9]{64}$/u.test(value.observed_image_id) &&
+    parseFarmOsPteC2bPlatform(value.observed_platform) !== null &&
     Number.isSafeInteger(value.server_version_num) && value.server_version_num >= 170000 &&
     value.server_version_num < 180000 &&
     /^PostgreSQL 17\.[0-9]+(?:[ .(][A-Za-z0-9_+.,() /:-]*)?$/u.test(value.server_version) &&
@@ -277,10 +288,12 @@ function buildEvidence(input: Readonly<{
     migration_id: FARM_OS_PRODUCTION_TARGET_EXECUTION_POSTGRES_MIGRATION_ID,
     apply_sha256: FARM_OS_PRODUCTION_TARGET_EXECUTION_POSTGRES_APPLY_SHA256,
     verify_sha256: FARM_OS_PRODUCTION_TARGET_EXECUTION_POSTGRES_VERIFY_SHA256,
-    image_repository: FARM_OS_PTE_C2B_IMAGE_REPOSITORY,
+    approved_repository: FARM_OS_PTE_C2B_IMAGE_REPOSITORY,
     approved_repository_digest: input.executor.image_authority.repository_digest,
+    observed_repository_digest: input.observed?.observed_repository_digest ?? null,
+    expected_platform: input.authorization.expected_platform,
+    observed_platform: input.observed?.observed_platform ?? null,
     observed_image_id: input.observed?.observed_image_id ?? null,
-    platform: input.observed?.platform ?? null,
     server_version_num: input.observed?.server_version_num ?? null,
     server_version: input.observed?.server_version ?? null,
     container_identity_digest: input.observed?.container_identity_digest ?? null,
@@ -359,6 +372,9 @@ export async function executeFarmOsPteC2bQualification(
       fail("BLOCKED_ENVIRONMENT");
     }
     observed = preflight.observed;
+    if (observed.observed_repository_digest !== image.repository_digest ||
+      !farmOsPteC2bPlatformsEqual(authorization.expected_platform,
+        observed.observed_platform)) fail("BLOCKED_PHASE_C2B_IMAGE_AUTHORITY");
     if (await input.adapter.prepareFixture({ resources,
       fixture_authority: FARM_OS_PTE_C2B_FIXTURE_AUTHORITY,
       fixture_digest: FARM_OS_PTE_C2B_SYNTHETIC_FIXTURE_DIGEST }) !== "PASS") {
@@ -403,9 +419,11 @@ export async function executeFarmOsPteC2bQualification(
         actual_result: "NOT_EXECUTED", winner_count: null, authoritative_row_count: null,
         loser_results: Object.freeze([]) })));
     const boundedCleanup = cleanup ?? failedCleanupFromLedger(creationLedger);
-    const classification = failure === "BLOCKED_ENVIRONMENT"
+    const classification = failure === "BLOCKED_ENVIRONMENT" ||
+      failure === "BLOCKED_PHASE_C2B_IMAGE_AUTHORITY"
       ? "BLOCKED_ENVIRONMENT" as const : "FAILED_EXECUTION" as const;
-    const evidence = observed === null && failure === "INPUT_INVALID" ? null : buildEvidence({
+    const evidence = failure === "INPUT_INVALID" ||
+      failure === "BLOCKED_PHASE_C2B_IMAGE_AUTHORITY" ? null : buildEvidence({
       executor: input, authorization, source_lineage: sourceLineage,
       observed, results: completedResults, cleanup: boundedCleanup, classification,
     });

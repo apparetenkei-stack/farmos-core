@@ -23,11 +23,13 @@ import {
   FARM_OS_PTE_C2B_CASE_REGISTRY_AUTHORITY,
   FARM_OS_PTE_C2B_CASE_REGISTRY_DIGEST,
   FARM_OS_PTE_C2B_CONTRACT,
+  FARM_OS_PTE_C2B_EVIDENCE_AUTHORITY_STATE,
   FARM_OS_PTE_C2B_EVIDENCE_VERSION,
   FARM_OS_PTE_C2B_EXECUTOR_AUTHORITY,
   FARM_OS_PTE_C2B_FAULT_POINTS,
   FARM_OS_PTE_C2B_FAULT_REGISTRY_AUTHORITY,
   FARM_OS_PTE_C2B_FAULT_REGISTRY_DIGEST,
+  FARM_OS_PTE_C2B_HISTORICAL_EVIDENCE_VERSION,
   FARM_OS_PTE_C2B_IMAGE_REPOSITORY,
   FARM_OS_PTE_C2B_RECEIPT_VERSION,
   buildFarmOsPteC2bEvidenceRelativePath,
@@ -58,9 +60,11 @@ import {
   FARM_OS_PTE_C2B_DOCKER_OPERATION_ALLOWLIST,
   buildFarmOsPteC2bDockerPlan,
   buildFarmOsPteC2bOwnedCleanupPlan,
+  classifyFarmOsPteC2bImageInspect,
   createFarmOsPteC2bFailClosedRealDockerBoundary,
   executeFarmOsPteC2bOwnedCleanupPlan,
   projectFarmOsPteC2bContainerInspect,
+  projectFarmOsPteC2bImageInspect,
   projectFarmOsPteC2bNetworkInspect,
   projectFarmOsPteC2bVolumeInspect,
   validateFarmOsPteC2bRealExecutionCapability,
@@ -83,6 +87,9 @@ const NONCE = "0123456789abcdef01234567";
 const SOURCE_COMMIT = "0123456789abcdef0123456789abcdef01234567";
 const REPO_DIGEST = `sha256:${"a".repeat(64)}` as const;
 const IMAGE_ID = `sha256:${"b".repeat(64)}` as const;
+const OBSERVED_DIGEST_B = `sha256:${"c".repeat(64)}` as const;
+const LINUX_AMD64 = Object.freeze({ os: "linux" as const,
+  architecture: "amd64" as const, variant: null });
 const runtimeReference = `docker.io/library/postgres@${REPO_DIGEST}` as const;
 const image = parseFarmOsPteC2bImageAuthority({ repository: FARM_OS_PTE_C2B_IMAGE_REPOSITORY,
   repository_digest: REPO_DIGEST, runtime_reference: runtimeReference });
@@ -100,6 +107,7 @@ assert.equal(FARM_OS_PTE_C2B_CASE_REGISTRY_AUTHORITY,
   "farmos.production-target-execution-postgres-qualification-case-registry.v1");
 assert.equal(FARM_OS_PTE_C2B_EVIDENCE_VERSION,
   "farmos.production-target-execution-postgres-isolated-qualification-evidence.v2");
+assert.equal(FARM_OS_PTE_C2B_EVIDENCE_AUTHORITY_STATE, "V2_SOURCE_CANDIDATE");
 assert.equal(FARM_OS_PTE_C2B_CASE_REGISTRY.length, 66);
 assert.match(FARM_OS_PTE_C2B_CASE_REGISTRY_DIGEST, /^sha256:[a-f0-9]{64}$/u);
 assert.equal(FARM_OS_PTE_C2B_CASE_REGISTRY_DIGEST, digestFarmOsPteC2b(
@@ -164,6 +172,60 @@ assert.deepEqual(Object.keys(dockerPlan.run_container.environment).sort(),
 assert.equal(validateFarmOsPteC2bDockerCommand({ ...dockerPlan.run_container,
   argv: [...dockerPlan.run_container.argv.slice(0, -1), "--privileged",
     dockerPlan.run_container.argv.at(-1) ?? ""] }), false);
+const canonicalRepoDigest = `${FARM_OS_PTE_C2B_IMAGE_REPOSITORY}@${REPO_DIGEST}`;
+const canonicalRepoDigestB = `${FARM_OS_PTE_C2B_IMAGE_REPOSITORY}@${OBSERVED_DIGEST_B}`;
+const imageInspect = (repoDigests: unknown, overrides: Record<string, unknown> = {}) =>
+  JSON.stringify([{ Id: IMAGE_ID, RepoDigests: repoDigests, Architecture: "amd64", Os: "linux",
+    ...overrides }]);
+for (const raw of [JSON.stringify([{ Id: IMAGE_ID, Architecture: "amd64", Os: "linux" }]),
+  imageInspect(null), imageInspect([])]) {
+  assert.equal(classifyFarmOsPteC2bImageInspect(raw).status,
+    "BLOCKED_PHASE_C2B_IMAGE_AUTHORITY");
+}
+assert.deepEqual(classifyFarmOsPteC2bImageInspect(imageInspect([
+  `ghcr.io/example/postgres@${REPO_DIGEST}`,
+])), { status: "BLOCKED_PHASE_C2B_IMAGE_AUTHORITY",
+  reason: "CANONICAL_REPOSITORY_DIGEST_MISSING" });
+const exactOne = classifyFarmOsPteC2bImageInspect(imageInspect([canonicalRepoDigest]));
+assert.equal(exactOne.status, "IMAGE_CANDIDATE_DISCOVERED");
+assert.equal(exactOne.status === "IMAGE_CANDIDATE_DISCOVERED" &&
+  exactOne.projection.observed_repository_digest, REPO_DIGEST);
+assert.equal(classifyFarmOsPteC2bImageInspect(
+  imageInspect([canonicalRepoDigest, canonicalRepoDigest])).status,
+"IMAGE_CANDIDATE_DISCOVERED");
+for (const entries of [[canonicalRepoDigest, canonicalRepoDigestB],
+  [canonicalRepoDigestB, canonicalRepoDigest]]) {
+  assert.deepEqual(classifyFarmOsPteC2bImageInspect(imageInspect(entries)), {
+    status: "HOLD_IMAGE_IDENTITY_AMBIGUOUS",
+    reason: "MULTIPLE_CANONICAL_REPOSITORY_DIGESTS",
+  });
+}
+assert.deepEqual(classifyFarmOsPteC2bImageInspect(imageInspect([
+  canonicalRepoDigest, `ghcr.io/example/postgres@${REPO_DIGEST}`,
+])), { status: "HOLD_IMAGE_IDENTITY_AMBIGUOUS",
+  reason: "CANONICAL_AND_UNEXPECTED_REPOSITORY_IDENTITY" });
+for (const invalidCanonical of [
+  `${FARM_OS_PTE_C2B_IMAGE_REPOSITORY}@sha256:${"A".repeat(64)}`,
+  `${FARM_OS_PTE_C2B_IMAGE_REPOSITORY}@sha256:${"a".repeat(63)}`,
+  `${FARM_OS_PTE_C2B_IMAGE_REPOSITORY}@sha512:${"a".repeat(64)}`,
+  `${FARM_OS_PTE_C2B_IMAGE_REPOSITORY}@${REPO_DIGEST} `,
+  `${FARM_OS_PTE_C2B_IMAGE_REPOSITORY}:17@${REPO_DIGEST}`,
+  `${FARM_OS_PTE_C2B_IMAGE_REPOSITORY}@${REPO_DIGEST}?query=1`,
+]) assert.notEqual(classifyFarmOsPteC2bImageInspect(
+  imageInspect([invalidCanonical])).status, "IMAGE_CANDIDATE_DISCOVERED");
+const independentlyObserved = projectFarmOsPteC2bImageInspect(imageInspect([canonicalRepoDigestB], {
+  Config: { Env: [`POSTGRES_PASSWORD=c2b_${"f".repeat(64)}`],
+    Cmd: ["postgres", "--synthetic"] }, HostConfig: { Binds: ["not-projected"] },
+  Mounts: [{ Source: "not-projected" }], UnknownNested: { token: "synthetic" },
+}));
+assert.ok(independentlyObserved);
+assert.equal(independentlyObserved.observed_repository_digest, OBSERVED_DIGEST_B);
+assert.notEqual(independentlyObserved.observed_repository_digest, REPO_DIGEST);
+assert.deepEqual(independentlyObserved.observed_platform, LINUX_AMD64);
+assert.deepEqual(Object.keys(independentlyObserved).sort(),
+  ["image_id", "kind", "observed_platform", "observed_repository_digest"]);
+assert.doesNotMatch(JSON.stringify(independentlyObserved),
+  /POSTGRES_PASSWORD|Config|Env|RepoDigests|HostConfig|Mounts|token/iu);
 const ownershipLabels = { "farmos.day150.phase-c2b": NONCE };
 const secretPassword = `c2b_${"f".repeat(64)}`;
 const containerRawInspect = JSON.stringify([{
@@ -253,7 +315,9 @@ assert.equal(FARM_OS_PTE_C2B_MIGRATION_PLAN.verify_mode, "READ_ONLY");
 assert.equal(FARM_OS_PTE_C2B_EXECUTION_POLICY.automatic_retry, 0);
 assert.equal(FARM_OS_PTE_C2B_EXECUTION_POLICY.ipc_socket_count, 0);
 assert.equal(FARM_OS_PTE_C2B_CONTRACT.source_state,
-  "QUALIFICATION_SOURCE_ARTIFACT_CREATED_CANDIDATE");
+  "QUALIFICATION_SOURCE_ARTIFACT_CREATED");
+assert.equal(FARM_OS_PTE_C2B_CONTRACT.image_authority_state, "V2_SOURCE_CANDIDATE");
+assert.equal(FARM_OS_PTE_C2B_CONTRACT.evidence_authority_state, "V2_SOURCE_CANDIDATE");
 for (const state of ["isolated_migration_qualified", "durable_approval_sot_established",
   "durable_reservation_finalization_established", "storage_backed_concurrency_tested",
   "storage_backed_crash_semantics_tested", "storage_backed_restart_tested",
@@ -335,6 +399,7 @@ const authorizationMaterial = Object.freeze({
   expected_c2b_source_commit: SOURCE_COMMIT,
   image_repository: FARM_OS_PTE_C2B_IMAGE_REPOSITORY,
   image_repository_digest: REPO_DIGEST,
+  expected_platform: LINUX_AMD64,
   case_registry_authority: FARM_OS_PTE_C2B_CASE_REGISTRY_AUTHORITY,
   case_registry_digest: FARM_OS_PTE_C2B_CASE_REGISTRY_DIGEST,
   fault_registry_authority: FARM_OS_PTE_C2B_FAULT_REGISTRY_AUTHORITY,
@@ -367,10 +432,12 @@ const evidence: FarmOsPteC2bEvidence = Object.freeze({
   migration_id: FARM_OS_PTE_C2B_MIGRATION_PLAN.migration_id,
   apply_sha256: FARM_OS_PTE_C2B_MIGRATION_PLAN.apply_sha256,
   verify_sha256: FARM_OS_PTE_C2B_MIGRATION_PLAN.verify_sha256,
-  image_repository: FARM_OS_PTE_C2B_IMAGE_REPOSITORY,
+  approved_repository: FARM_OS_PTE_C2B_IMAGE_REPOSITORY,
   approved_repository_digest: REPO_DIGEST,
+  observed_repository_digest: REPO_DIGEST,
+  expected_platform: LINUX_AMD64,
+  observed_platform: LINUX_AMD64,
   observed_image_id: IMAGE_ID,
-  platform: "linux/amd64",
   server_version_num: 170010,
   server_version: "PostgreSQL 17.10 synthetic source validation",
   container_identity_digest: identityDigest("container"),
@@ -389,6 +456,24 @@ const evidence: FarmOsPteC2bEvidence = Object.freeze({
   classification: "QUALIFIED",
 });
 assert.ok(parseFarmOsPteC2bEvidence(evidence));
+assert.equal(parseFarmOsPteC2bEvidence({ ...evidence,
+  schema_version: FARM_OS_PTE_C2B_HISTORICAL_EVIDENCE_VERSION }), null);
+const withoutEvidenceKey = (key: string) => Object.fromEntries(
+  Object.entries(evidence).filter(([candidate]) => candidate !== key));
+for (const missing of ["observed_repository_digest", "expected_platform", "observed_platform"]) {
+  assert.equal(parseFarmOsPteC2bEvidence(withoutEvidenceKey(missing)), null);
+}
+assert.equal(parseFarmOsPteC2bEvidence({ ...evidence,
+  observed_repository_digest: OBSERVED_DIGEST_B }), null);
+assert.equal(parseFarmOsPteC2bEvidence({ ...evidence,
+  observed_platform: { os: "linux", architecture: "arm64", variant: null } }), null);
+assert.equal(parseFarmOsPteC2bEvidence({ ...evidence,
+  expected_platform: { os: "linux", architecture: "arm64", variant: null } }), null);
+assert.equal(parseFarmOsPteC2bEvidence({ ...evidence,
+  observed_platform: { os: "windows", architecture: "amd64", variant: null } }), null);
+assert.equal(parseFarmOsPteC2bEvidence({ ...evidence,
+  expected_platform: { os: "linux", architecture: "arm64", variant: "v8" },
+  observed_platform: { os: "linux", architecture: "arm64", variant: null } }), null);
 assert.equal(parseFarmOsPteC2bEvidence({ ...evidence, unexpected: true }), null);
 assert.equal(parseFarmOsPteC2bEvidence({ ...evidence, case_results: caseResults.slice(1) }), null);
 assert.equal(parseFarmOsPteC2bEvidence({ ...evidence, case_results: caseResults.map(
@@ -404,7 +489,13 @@ assert.equal(parseFarmOsPteC2bEvidence({ ...evidence,
 const receipt = createFarmOsPteC2bReceiptCandidateFromEvidence(evidence);
 assert.ok(receipt);
 assert.equal(receipt.schema_version, FARM_OS_PTE_C2B_RECEIPT_VERSION);
+assert.equal(receipt.evidence_schema_version, FARM_OS_PTE_C2B_EVIDENCE_VERSION);
 assert.ok(parseFarmOsPteC2bReceiptSyntax(receipt));
+assert.equal(parseFarmOsPteC2bReceiptSyntax({ ...receipt,
+  evidence_schema_version: FARM_OS_PTE_C2B_HISTORICAL_EVIDENCE_VERSION }), null);
+assert.equal(validateFarmOsPteC2bReceiptAgainstEvidence({ evidence,
+  receipt: { ...receipt,
+    evidence_schema_version: FARM_OS_PTE_C2B_HISTORICAL_EVIDENCE_VERSION } }), null);
 assert.equal(parseFarmOsPteC2bReceiptSyntax({ ...receipt, unexpected: true }), null);
 assert.ok(validateFarmOsPteC2bReceiptAgainstEvidence({ evidence, receipt }));
 const orphanReceipt = Object.freeze({ ...receipt, evidence_digest: REPO_DIGEST });
@@ -418,14 +509,45 @@ const differentEvidence = Object.freeze({ ...evidence,
 assert.ok(parseFarmOsPteC2bEvidence(differentEvidence));
 assert.equal(validateFarmOsPteC2bReceiptAgainstEvidence({ evidence: differentEvidence,
   receipt }), null);
+const differentObservedDigestEvidence = Object.freeze({ ...evidence,
+  observed_repository_digest: OBSERVED_DIGEST_B });
+assert.equal(validateFarmOsPteC2bReceiptAgainstEvidence({
+  evidence: differentObservedDigestEvidence, receipt }), null);
+assert.notEqual(digestFarmOsPteC2b(FARM_OS_PTE_C2B_EVIDENCE_VERSION, evidence),
+  digestFarmOsPteC2b(FARM_OS_PTE_C2B_EVIDENCE_VERSION, differentObservedDigestEvidence));
+const arm64Platform = Object.freeze({ os: "linux" as const,
+  architecture: "arm64" as const, variant: null });
+const differentPlatformEvidence = Object.freeze({ ...evidence,
+  expected_platform: arm64Platform, observed_platform: arm64Platform });
+assert.ok(parseFarmOsPteC2bEvidence(differentPlatformEvidence));
+assert.notEqual(digestFarmOsPteC2b(FARM_OS_PTE_C2B_EVIDENCE_VERSION, evidence),
+  digestFarmOsPteC2b(FARM_OS_PTE_C2B_EVIDENCE_VERSION, differentPlatformEvidence));
+const differentPlatformReceipt = createFarmOsPteC2bReceiptCandidateFromEvidence(
+  differentPlatformEvidence);
+assert.ok(differentPlatformReceipt);
+assert.notEqual(differentPlatformReceipt.evidence_digest, receipt.evidence_digest);
 const commitMarker = createFarmOsPteC2bCommitMarkerCandidate(evidence, receipt);
 assert.ok(commitMarker);
+const differentPlatformMarker = createFarmOsPteC2bCommitMarkerCandidate(
+  differentPlatformEvidence, differentPlatformReceipt);
+assert.ok(differentPlatformMarker);
+assert.notEqual(differentPlatformMarker.receipt_digest, commitMarker.receipt_digest);
+assert.notEqual(differentPlatformMarker.chain_digest, commitMarker.chain_digest);
+assert.equal(commitMarker.evidence_schema_version, FARM_OS_PTE_C2B_EVIDENCE_VERSION);
+assert.equal(commitMarker.receipt_schema_version, FARM_OS_PTE_C2B_RECEIPT_VERSION);
 assert.equal(commitMarker.status, "ACCEPTED_QUALIFIED_CHAIN");
 assert.ok(parseFarmOsPteC2bCommitMarkerSyntax(commitMarker));
 assert.equal(validateFarmOsPteC2bAcceptedQualificationChain({ evidence: null, receipt,
   commit_marker: commitMarker, authorization }), false);
+assert.equal(validateFarmOsPteC2bAcceptedQualificationChain({ evidence, receipt: null,
+  commit_marker: commitMarker, authorization }), false);
 assert.equal(validateFarmOsPteC2bAcceptedQualificationChain({ evidence: differentEvidence,
   receipt, commit_marker: commitMarker, authorization }), false);
+assert.equal(validateFarmOsPteC2bAcceptedQualificationChain({ evidence: differentPlatformEvidence,
+  receipt, commit_marker: commitMarker, authorization }), false);
+assert.equal(validateFarmOsPteC2bAcceptedQualificationChain({ evidence: differentPlatformEvidence,
+  receipt: differentPlatformReceipt, commit_marker: differentPlatformMarker,
+  authorization }), false);
 assert.equal(validateFarmOsPteC2bAcceptedQualificationChain({ evidence, receipt,
   commit_marker: commitMarker, authorization }), true);
 assert.equal(validateFarmOsPteC2bAcceptedQualificationChain({ evidence, receipt,

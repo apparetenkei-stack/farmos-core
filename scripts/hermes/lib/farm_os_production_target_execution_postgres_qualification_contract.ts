@@ -19,6 +19,9 @@ export const FARM_OS_PTE_C2B_FAULT_REGISTRY_AUTHORITY =
   "farmos.production-target-execution-postgres-qualification-fault-registry.v1" as const;
 export const FARM_OS_PTE_C2B_EVIDENCE_VERSION =
   "farmos.production-target-execution-postgres-isolated-qualification-evidence.v2" as const;
+export const FARM_OS_PTE_C2B_HISTORICAL_EVIDENCE_VERSION =
+  "farmos.production-target-execution-postgres-isolated-qualification-evidence.v1" as const;
+export const FARM_OS_PTE_C2B_EVIDENCE_AUTHORITY_STATE = "V2_SOURCE_CANDIDATE" as const;
 export const FARM_OS_PTE_C2B_RECEIPT_VERSION =
   "farmos.production-target-execution-postgres-isolated-qualification-receipt.v2" as const;
 export const FARM_OS_PTE_C2B_COMMIT_VERSION =
@@ -37,7 +40,7 @@ export const FARM_OS_PTE_C2B_APPLICATION_NAME =
   "farmos-day150-c2b-qualification" as const;
 export const FARM_OS_PTE_C2B_AUTOMATIC_RETRY = 0 as const;
 export const FARM_OS_PTE_C2B_SOURCE_STATE =
-  "QUALIFICATION_SOURCE_ARTIFACT_CREATED_CANDIDATE" as const;
+  "QUALIFICATION_SOURCE_ARTIFACT_CREATED" as const;
 
 const SHA256 = /^sha256:[a-f0-9]{64}$/u;
 const COMMIT = /^[a-f0-9]{40}$/u;
@@ -193,6 +196,26 @@ export type FarmOsPteC2bImageAuthority = Readonly<{
   runtime_reference: `docker.io/library/postgres@sha256:${string}`;
 }>;
 
+export type FarmOsPteC2bPlatform = Readonly<{
+  os: "linux";
+  architecture: "amd64" | "arm64";
+  variant: null | "v8";
+}>;
+
+export function parseFarmOsPteC2bPlatform(value: unknown): FarmOsPteC2bPlatform | null {
+  return exactObject(value, ["os", "architecture", "variant"]) && value.os === "linux" &&
+      ["amd64", "arm64"].includes(String(value.architecture)) &&
+      (value.variant === null || value.variant === "v8") &&
+      (value.architecture === "arm64" || value.variant === null)
+    ? Object.freeze(value as unknown as FarmOsPteC2bPlatform) : null;
+}
+
+export function farmOsPteC2bPlatformsEqual(expected: FarmOsPteC2bPlatform,
+  observed: FarmOsPteC2bPlatform): boolean {
+  return expected.os === observed.os && expected.architecture === observed.architecture &&
+    expected.variant === observed.variant;
+}
+
 export function parseFarmOsPteC2bImageAuthority(value: unknown): FarmOsPteC2bImageAuthority | null {
   if (!exactObject(value, ["repository", "repository_digest", "runtime_reference"])) return null;
   const match = typeof value.runtime_reference === "string"
@@ -217,6 +240,7 @@ export type FarmOsPteC2bAuthorizationEnvelope = Readonly<{
   expected_c2b_source_commit: string;
   image_repository: typeof FARM_OS_PTE_C2B_IMAGE_REPOSITORY;
   image_repository_digest: `sha256:${string}`;
+  expected_platform: FarmOsPteC2bPlatform;
   case_registry_authority: typeof FARM_OS_PTE_C2B_CASE_REGISTRY_AUTHORITY;
   case_registry_digest: typeof FARM_OS_PTE_C2B_CASE_REGISTRY_DIGEST;
   fault_registry_authority: typeof FARM_OS_PTE_C2B_FAULT_REGISTRY_AUTHORITY;
@@ -308,10 +332,12 @@ export type FarmOsPteC2bEvidence = Readonly<{
   migration_id: typeof FARM_OS_PRODUCTION_TARGET_EXECUTION_POSTGRES_MIGRATION_ID;
   apply_sha256: typeof FARM_OS_PRODUCTION_TARGET_EXECUTION_POSTGRES_APPLY_SHA256;
   verify_sha256: typeof FARM_OS_PRODUCTION_TARGET_EXECUTION_POSTGRES_VERIFY_SHA256;
-  image_repository: typeof FARM_OS_PTE_C2B_IMAGE_REPOSITORY;
+  approved_repository: typeof FARM_OS_PTE_C2B_IMAGE_REPOSITORY;
   approved_repository_digest: `sha256:${string}`;
+  observed_repository_digest: `sha256:${string}` | null;
+  expected_platform: FarmOsPteC2bPlatform;
+  observed_platform: FarmOsPteC2bPlatform | null;
   observed_image_id: `sha256:${string}` | null;
-  platform: string | null;
   server_version_num: number | null;
   server_version: string | null;
   container_identity_digest: `sha256:${string}` | null;
@@ -335,8 +361,9 @@ const EVIDENCE_KEYS = [
   "case_registry_digest", "fault_registry_authority", "fault_registry_digest",
   "qualification_mode", "execution_nonce", "c2a_source_commit", "expected_c2b_source_commit",
   "observed_c2b_source_commit", "authorization_digest", "migration_id",
-  "apply_sha256", "verify_sha256", "image_repository", "approved_repository_digest",
-  "observed_image_id", "platform", "server_version_num", "server_version",
+  "apply_sha256", "verify_sha256", "approved_repository", "approved_repository_digest",
+  "observed_repository_digest", "expected_platform", "observed_platform",
+  "observed_image_id", "server_version_num", "server_version",
   "container_identity_digest", "network_identity_digest", "volume_identity_digest",
   "database_identity_digest", "case_results", "cleanup", "residual_resource_count",
   "production_operations", "external_network_operations", "automatic_retry_count",
@@ -365,7 +392,7 @@ export function validateFarmOsPteC2bExecutionWindow(startedAt: unknown,
 const AUTHORIZATION_KEYS = [
   "schema_version", "authorization_authority", "authorization_authority_revision",
   "operation", "execution_nonce", "c2a_source_commit", "expected_c2b_source_commit",
-  "image_repository", "image_repository_digest", "case_registry_authority",
+  "image_repository", "image_repository_digest", "expected_platform", "case_registry_authority",
   "case_registry_digest", "fault_registry_authority", "fault_registry_digest", "migration_id",
   "apply_sha256", "verify_sha256", "issued_at", "expires_at",
   "human_approval_reference_digest", "authorization_digest",
@@ -402,6 +429,7 @@ export function parseFarmOsPteC2bAuthorizationEnvelopeSyntax(
       !COMMIT.test(value.expected_c2b_source_commit) ||
     value.image_repository !== FARM_OS_PTE_C2B_IMAGE_REPOSITORY ||
     typeof value.image_repository_digest !== "string" || !SHA256.test(value.image_repository_digest) ||
+    parseFarmOsPteC2bPlatform(value.expected_platform) === null ||
     value.case_registry_authority !== FARM_OS_PTE_C2B_CASE_REGISTRY_AUTHORITY ||
     value.case_registry_digest !== FARM_OS_PTE_C2B_CASE_REGISTRY_DIGEST ||
     value.fault_registry_authority !== FARM_OS_PTE_C2B_FAULT_REGISTRY_AUTHORITY ||
@@ -555,9 +583,10 @@ export function parseFarmOsPteC2bEvidence(value: unknown): FarmOsPteC2bEvidence 
     value.migration_id !== FARM_OS_PRODUCTION_TARGET_EXECUTION_POSTGRES_MIGRATION_ID ||
     value.apply_sha256 !== FARM_OS_PRODUCTION_TARGET_EXECUTION_POSTGRES_APPLY_SHA256 ||
     value.verify_sha256 !== FARM_OS_PRODUCTION_TARGET_EXECUTION_POSTGRES_VERIFY_SHA256 ||
-    value.image_repository !== FARM_OS_PTE_C2B_IMAGE_REPOSITORY ||
+    value.approved_repository !== FARM_OS_PTE_C2B_IMAGE_REPOSITORY ||
     typeof value.approved_repository_digest !== "string" ||
       !SHA256.test(value.approved_repository_digest) ||
+    parseFarmOsPteC2bPlatform(value.expected_platform) === null ||
     cases === null || cleanup === null ||
     !Number.isSafeInteger(value.residual_resource_count) || Number(value.residual_resource_count) < 0 ||
     value.production_operations !== 0 || value.external_network_operations !== 0 ||
@@ -570,13 +599,19 @@ export function parseFarmOsPteC2bEvidence(value: unknown): FarmOsPteC2bEvidence 
   }
   const allPass = cases.every((entry) => entry.status === "PASS");
   const qualified = value.classification === "QUALIFIED";
-  const observedFields = [value.observed_image_id, value.platform, value.server_version_num,
+  const observedFields = [value.observed_repository_digest, value.observed_platform,
+    value.observed_image_id, value.server_version_num,
     value.server_version, value.container_identity_digest, value.network_identity_digest,
     value.volume_identity_digest, value.database_identity_digest];
   const observedAbsent = observedFields.every((entry) => entry === null);
-  const observedExact = typeof value.observed_image_id === "string" &&
-    SHA256.test(value.observed_image_id) && typeof value.platform === "string" &&
-    /^linux\/(?:amd64|arm64)(?:\/v8)?$/u.test(value.platform) &&
+  const observedRepositoryDigest = typeof value.observed_repository_digest === "string" &&
+    SHA256.test(value.observed_repository_digest) ? value.observed_repository_digest : null;
+  const expectedPlatform = parseFarmOsPteC2bPlatform(value.expected_platform);
+  const observedPlatform = parseFarmOsPteC2bPlatform(value.observed_platform);
+  const observedExact = observedRepositoryDigest !== null &&
+    observedRepositoryDigest === value.approved_repository_digest && expectedPlatform !== null &&
+    observedPlatform !== null && farmOsPteC2bPlatformsEqual(expectedPlatform, observedPlatform) &&
+    typeof value.observed_image_id === "string" && SHA256.test(value.observed_image_id) &&
     Number.isSafeInteger(value.server_version_num) && Number(value.server_version_num) >= 170000 &&
     Number(value.server_version_num) < 180000 && typeof value.server_version === "string" &&
     /^PostgreSQL 17\.[0-9]+(?:[ .(][A-Za-z0-9_+.,() /:-]*)?$/u.test(value.server_version) &&
@@ -595,6 +630,7 @@ export function parseFarmOsPteC2bEvidence(value: unknown): FarmOsPteC2bEvidence 
 
 export type FarmOsPteC2bReceipt = Readonly<{
   schema_version: typeof FARM_OS_PTE_C2B_RECEIPT_VERSION;
+  evidence_schema_version: typeof FARM_OS_PTE_C2B_EVIDENCE_VERSION;
   execution_nonce: string;
   evidence_relative_path: string;
   evidence_digest: `sha256:${string}`;
@@ -607,6 +643,8 @@ export type FarmOsPteC2bReceipt = Readonly<{
 }>;
 export type FarmOsPteC2bCommitMarker = Readonly<{
   schema_version: typeof FARM_OS_PTE_C2B_COMMIT_VERSION;
+  evidence_schema_version: typeof FARM_OS_PTE_C2B_EVIDENCE_VERSION;
+  receipt_schema_version: typeof FARM_OS_PTE_C2B_RECEIPT_VERSION;
   execution_nonce: string;
   evidence_digest: `sha256:${string}`;
   receipt_digest: `sha256:${string}`;
@@ -621,11 +659,13 @@ export type FarmOsPteC2bCommitMarker = Readonly<{
 }>;
 
 export function parseFarmOsPteC2bReceiptSyntax(value: unknown): FarmOsPteC2bReceipt | null {
-  if (!exactObject(value, ["schema_version", "execution_nonce", "evidence_relative_path",
+  if (!exactObject(value, ["schema_version", "evidence_schema_version", "execution_nonce",
+    "evidence_relative_path",
     "evidence_digest", "expected_c2b_source_commit", "observed_c2b_source_commit",
     "case_registry_digest", "image_repository_digest", "authorization_digest",
     "classification"]) ||
     value.schema_version !== FARM_OS_PTE_C2B_RECEIPT_VERSION ||
+    value.evidence_schema_version !== FARM_OS_PTE_C2B_EVIDENCE_VERSION ||
     typeof value.execution_nonce !== "string" || !NONCE.test(value.execution_nonce) ||
     value.evidence_relative_path !== buildFarmOsPteC2bEvidenceRelativePath(value.execution_nonce) ||
     typeof value.evidence_digest !== "string" || !SHA256.test(value.evidence_digest) ||
@@ -659,11 +699,14 @@ export function validateFarmOsPteC2bReceiptAgainstEvidence(input: Readonly<{
 export function parseFarmOsPteC2bCommitMarkerSyntax(
   value: unknown,
 ): FarmOsPteC2bCommitMarker | null {
-  if (!exactObject(value, ["schema_version", "execution_nonce", "evidence_digest",
+  if (!exactObject(value, ["schema_version", "evidence_schema_version", "receipt_schema_version",
+    "execution_nonce", "evidence_digest",
     "receipt_digest", "chain_digest", "expected_c2b_source_commit",
     "observed_c2b_source_commit", "case_registry_digest", "image_repository_digest",
     "authorization_digest", "qualification_classification", "status"]) ||
     value.schema_version !== FARM_OS_PTE_C2B_COMMIT_VERSION ||
+    value.evidence_schema_version !== FARM_OS_PTE_C2B_EVIDENCE_VERSION ||
+    value.receipt_schema_version !== FARM_OS_PTE_C2B_RECEIPT_VERSION ||
     typeof value.execution_nonce !== "string" || !NONCE.test(value.execution_nonce) ||
     typeof value.evidence_digest !== "string" || !SHA256.test(value.evidence_digest) ||
     typeof value.receipt_digest !== "string" || !SHA256.test(value.receipt_digest) ||
@@ -688,6 +731,7 @@ export function createFarmOsPteC2bReceiptCandidateFromEvidence(
   const path = buildFarmOsPteC2bEvidenceRelativePath(evidence.execution_nonce);
   return path === null ? null : Object.freeze({
     schema_version: FARM_OS_PTE_C2B_RECEIPT_VERSION,
+    evidence_schema_version: FARM_OS_PTE_C2B_EVIDENCE_VERSION,
     execution_nonce: evidence.execution_nonce,
     evidence_relative_path: path,
     evidence_digest: digestFarmOsPteC2b(FARM_OS_PTE_C2B_EVIDENCE_VERSION, evidence),
@@ -701,6 +745,8 @@ export function createFarmOsPteC2bReceiptCandidateFromEvidence(
 }
 
 function qualificationChainDigest(input: Readonly<{
+  evidence_schema_version: typeof FARM_OS_PTE_C2B_EVIDENCE_VERSION;
+  receipt_schema_version: typeof FARM_OS_PTE_C2B_RECEIPT_VERSION;
   evidence_digest: `sha256:${string}`;
   receipt_digest: `sha256:${string}`;
   execution_nonce: string;
@@ -710,7 +756,7 @@ function qualificationChainDigest(input: Readonly<{
   image_repository_digest: `sha256:${string}`;
   authorization_digest: `sha256:${string}`;
 }>): `sha256:${string}` {
-  return digestFarmOsPteC2b("farmos.production-target-execution-postgres-qualified-chain.v1", input);
+  return digestFarmOsPteC2b("farmos.production-target-execution-postgres-qualified-chain.v2", input);
 }
 
 export function createFarmOsPteC2bCommitMarkerCandidate(
@@ -722,7 +768,10 @@ export function createFarmOsPteC2bCommitMarkerCandidate(
   if (parsedEvidence === null || parsedReceipt === null) return null;
   const evidenceDigest = parsedReceipt.evidence_digest;
   const receiptDigest = digestFarmOsPteC2b(FARM_OS_PTE_C2B_RECEIPT_VERSION, parsedReceipt);
-  const chainMaterial = Object.freeze({ evidence_digest: evidenceDigest,
+  const chainMaterial = Object.freeze({
+    evidence_schema_version: FARM_OS_PTE_C2B_EVIDENCE_VERSION,
+    receipt_schema_version: FARM_OS_PTE_C2B_RECEIPT_VERSION,
+    evidence_digest: evidenceDigest,
     receipt_digest: receiptDigest, execution_nonce: parsedEvidence.execution_nonce,
     expected_c2b_source_commit: parsedEvidence.expected_c2b_source_commit,
     observed_c2b_source_commit: parsedEvidence.observed_c2b_source_commit,
@@ -752,7 +801,10 @@ export function validateFarmOsPteC2bAcceptedQualificationChain(input: Readonly<{
   if (evidence === null || evidence.classification !== "QUALIFIED" || receipt === null ||
     marker === null || authorization === null) return false;
   const receiptDigest = digestFarmOsPteC2b(FARM_OS_PTE_C2B_RECEIPT_VERSION, receipt);
-  const expectedChain = qualificationChainDigest({ evidence_digest: receipt.evidence_digest,
+  const expectedChain = qualificationChainDigest({
+    evidence_schema_version: FARM_OS_PTE_C2B_EVIDENCE_VERSION,
+    receipt_schema_version: FARM_OS_PTE_C2B_RECEIPT_VERSION,
+    evidence_digest: receipt.evidence_digest,
     receipt_digest: receiptDigest, execution_nonce: evidence.execution_nonce,
     expected_c2b_source_commit: evidence.expected_c2b_source_commit,
     observed_c2b_source_commit: evidence.observed_c2b_source_commit,
@@ -763,6 +815,7 @@ export function validateFarmOsPteC2bAcceptedQualificationChain(input: Readonly<{
     authorization.execution_nonce === evidence.execution_nonce &&
     authorization.expected_c2b_source_commit === evidence.expected_c2b_source_commit &&
     authorization.image_repository_digest === evidence.approved_repository_digest &&
+    farmOsPteC2bPlatformsEqual(authorization.expected_platform, evidence.expected_platform) &&
     Date.parse(evidence.started_at_metadata) >= Date.parse(authorization.issued_at) &&
     Date.parse(evidence.started_at_metadata) < Date.parse(authorization.expires_at) &&
     marker.execution_nonce === evidence.execution_nonce &&
@@ -778,6 +831,8 @@ export function validateFarmOsPteC2bAcceptedQualificationChain(input: Readonly<{
 export const FARM_OS_PTE_C2B_CONTRACT = Object.freeze({
   contract_version: FARM_OS_PTE_C2B_QUALIFICATION_CONTRACT_VERSION,
   source_state: FARM_OS_PTE_C2B_SOURCE_STATE,
+  image_authority_state: "V2_SOURCE_CANDIDATE",
+  evidence_authority_state: FARM_OS_PTE_C2B_EVIDENCE_AUTHORITY_STATE,
   c2a_source_commit: FARM_OS_PTE_C2A_SOURCE_COMMIT,
   migration_id: FARM_OS_PRODUCTION_TARGET_EXECUTION_POSTGRES_MIGRATION_ID,
   apply_sha256: FARM_OS_PRODUCTION_TARGET_EXECUTION_POSTGRES_APPLY_SHA256,
