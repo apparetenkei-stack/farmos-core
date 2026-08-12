@@ -23,7 +23,7 @@ public enum DarwinStoragePrimitive: String, CaseIterable, Sendable {
     case writeBoundedCanonicalBytes = "WRITE_BOUNDED_CANONICAL_BYTES"
     case fullFileDurability = "F_FULLFSYNC_FILE"
     case atomicNoReplacePublication = "RENAMEATX_NP_RENAME_EXCL"
-    case parentDirectoryDurability = "FSYNC_PARENT_DIRECTORY"
+    case parentDirectoryDurability = "F_FULLFSYNC_DIRECTORY"
     case finalDirFDReadback = "FINAL_DIRFD_RELATIVE_REOPEN_READBACK"
     case replayGenesisToHead = "REPLAY_GENESIS_TO_HEAD"
 }
@@ -54,7 +54,7 @@ public struct DarwinStorageObjectCandidate: Equatable, Sendable {
     }
 }
 
-public enum DarwinStorageValidationFailure: String, Equatable, Sendable {
+public enum DarwinStorageValidationFailure: String, Error, Equatable, Sendable {
     case symbolicLink = "SYMLINK_REJECTED"
     case wrongType = "WRONG_FILE_TYPE"
     case deviceMismatch = "DEVICE_MISMATCH"
@@ -65,6 +65,12 @@ public enum DarwinStorageValidationFailure: String, Equatable, Sendable {
     case durabilityFailure = "DURABILITY_FAILURE"
     case readbackMismatch = "REOPEN_READBACK_MISMATCH"
     case unsupportedPrimitive = "UNSUPPORTED_DARWIN_PRIMITIVE"
+    case invalidRoot = "INVALID_QUALIFICATION_ROOT"
+    case nonLocalAPFS = "NON_LOCAL_APFS"
+    case unexpectedEntry = "UNEXPECTED_LEDGER_ENTRY"
+    case malformedRecord = "MALFORMED_RUNTIME_RECORD"
+    case corruptChain = "CORRUPT_RUNTIME_CHAIN"
+    case outcomeUnknown = "QUALIFICATION_OUTCOME_UNKNOWN"
 }
 
 public enum DarwinStorageSource {
