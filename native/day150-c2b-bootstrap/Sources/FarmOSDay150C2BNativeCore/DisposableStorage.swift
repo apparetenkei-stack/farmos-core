@@ -27,6 +27,11 @@ public struct DisposableRuntimeRecord: Equatable, Sendable {
     public let sourceBindingsCanonical: String
     public let eventKind: String
     public let projectionInvariantCanonical: String
+    public let eventPayloadCanonical: String
+    public let projectionCanonical: String
+    public let issuedChallengeReference: String?
+    public let issuedCapabilityReference: String?
+    public let usedRecoverySessionReference: String?
 
     fileprivate init(
         generation: UInt64,
@@ -36,7 +41,12 @@ public struct DisposableRuntimeRecord: Equatable, Sendable {
         canonicalBytes: Data,
         sourceBindingsCanonical: String,
         eventKind: String,
-        projectionInvariantCanonical: String
+        projectionInvariantCanonical: String,
+        eventPayloadCanonical: String,
+        projectionCanonical: String,
+        issuedChallengeReference: String?,
+        issuedCapabilityReference: String?,
+        usedRecoverySessionReference: String?
     ) {
         self.generation = generation
         self.previousGeneration = previousGeneration
@@ -46,6 +56,11 @@ public struct DisposableRuntimeRecord: Equatable, Sendable {
         self.sourceBindingsCanonical = sourceBindingsCanonical
         self.eventKind = eventKind
         self.projectionInvariantCanonical = projectionInvariantCanonical
+        self.eventPayloadCanonical = eventPayloadCanonical
+        self.projectionCanonical = projectionCanonical
+        self.issuedChallengeReference = issuedChallengeReference
+        self.issuedCapabilityReference = issuedCapabilityReference
+        self.usedRecoverySessionReference = usedRecoverySessionReference
     }
 }
 
@@ -61,7 +76,7 @@ public enum DisposableRecordValidator {
         "r2_genesis_source_candidate_digest", "r3_actor_source_authority",
         "r3_actor_source_candidate_digest", "r3_clock_source_authority",
         "r3_clock_source_candidate_digest", "installation_profile_digest_candidate",
-        "native_profile_digest_candidate",
+        "native_profile_digest_candidate", "companion_artifact_reference_digest_candidate",
     ]
     private static let projectionKeys: Set<String> = [
         "schema_version", "discriminator", "bootstrap_candidate_state",
@@ -96,6 +111,16 @@ public enum DisposableRecordValidator {
         "proposed_epoch_reference_digest_candidate", "proposed_genesis_timestamp_candidate",
         "proposed_initial_monotonic_floor_timestamp_candidate", "actor_policy_revision",
         "clock_policy_revision", "publication_policy_revision",
+    ]
+    private static let freshnessKeys: Set<String> = [
+        "freshness_basis", "clock_epoch_reference_digest_candidate",
+        "prior_monotonic_floor_timestamp_candidate",
+        "proposed_monotonic_floor_timestamp_candidate",
+        "os_utc_observation_reference_digest_candidate",
+        "continuous_time_bracket_reference_digest_candidate",
+        "boot_session_reference_digest_candidate",
+        "native_recovery_session_reference_digest_candidate",
+        "clock_comparison_policy_revision",
     ]
 
     public static func parse(_ bytes: Data) -> DisposableRuntimeRecord? {
@@ -148,8 +173,18 @@ public enum DisposableRecordValidator {
         guard let canonicalEnvelope = try? FarmOSCanonicalDigest.canonicalJSON(envelope),
               Data(canonicalEnvelope.utf8) == bytes,
               let sourceBindingsCanonical = try? FarmOSCanonicalDigest.canonicalJSON(bindings),
-              let projectionInvariantCanonical = projectionInvariant(projection)
+              let projectionInvariantCanonical = projectionInvariant(projection),
+              let eventPayloadCanonical = try? FarmOSCanonicalDigest.canonicalJSON(payload),
+              let projectionCanonical = try? FarmOSCanonicalDigest.canonicalJSON(projection)
         else { return nil }
+        let recoveryBinding = payload["cross_epoch_recovery_binding_candidate"] as? [String: Any]
+        let bootRecoveryBinding = payload[
+            "boot_session_recovery_binding_candidate"] as? [String: Any]
+        let usedRecoverySession = eventKind == "CHALLENGE_TERMINALIZATION_CANDIDATE"
+            ? recoveryBinding?["recovery_session_reference_digest_candidate"] as? String
+            : eventKind == "CHALLENGE_ISSUANCE_CANDIDATE"
+                ? bootRecoveryBinding?["recovery_session_reference_digest_candidate"] as? String
+                : nil
         return DisposableRuntimeRecord(
             generation: generation,
             previousGeneration: previousGeneration,
@@ -158,7 +193,14 @@ public enum DisposableRecordValidator {
             canonicalBytes: bytes,
             sourceBindingsCanonical: sourceBindingsCanonical,
             eventKind: eventKind,
-            projectionInvariantCanonical: projectionInvariantCanonical
+            projectionInvariantCanonical: projectionInvariantCanonical,
+            eventPayloadCanonical: eventPayloadCanonical,
+            projectionCanonical: projectionCanonical,
+            issuedChallengeReference: eventKind == "CHALLENGE_ISSUANCE_CANDIDATE"
+                ? payload["challenge_reference_digest_candidate"] as? String : nil,
+            issuedCapabilityReference: eventKind == "CAPABILITY_ISSUANCE_CANDIDATE"
+                ? payload["capability_reference_digest_candidate"] as? String : nil,
+            usedRecoverySessionReference: usedRecoverySession
         )
     }
 
@@ -238,16 +280,13 @@ public enum DisposableRecordValidator {
             "sha256:98e57a4f41639b64e1b992e3e6ccf56c3f0b625916ded4d2b2c4fc56760376f4" &&
         value["r3_actor_source_authority"] as? String ==
             "farmos.day150-c2b-bootstrap-actor-intent-source.v1" &&
-        value["r3_actor_source_candidate_digest"] as? String ==
-            "sha256:" + String(repeating: "a", count: 64) &&
+        digest(value["r3_actor_source_candidate_digest"]) != nil &&
         value["r3_clock_source_authority"] as? String ==
             "farmos.day150-c2b-bootstrap-clock-intent-source.v1" &&
-        value["r3_clock_source_candidate_digest"] as? String ==
-            "sha256:" + String(repeating: "b", count: 64) &&
-        value["installation_profile_digest_candidate"] as? String ==
-            "sha256:" + String(repeating: "c", count: 64) &&
-        value["native_profile_digest_candidate"] as? String ==
-            "sha256:" + String(repeating: "d", count: 64)
+        digest(value["r3_clock_source_candidate_digest"]) != nil &&
+        digest(value["installation_profile_digest_candidate"]) != nil &&
+        digest(value["native_profile_digest_candidate"]) != nil &&
+        digest(value["companion_artifact_reference_digest_candidate"]) != nil
     }
 
     private static func validateEvent(
@@ -256,6 +295,141 @@ public enum DisposableRecordValidator {
         switch kind {
         case "INTEGRATED_RUNTIME_GENESIS_CANDIDATE":
             return validateGenesis(payload: payload, bindings: bindings)
+        case "CHALLENGE_ISSUANCE_CANDIDATE":
+            let base = freshnessKeys.union([
+                "challenge_reference_digest_candidate", "actor_reference_digest_candidate",
+                "native_ceremony_session_reference_digest_candidate", "expires_at_candidate",
+                "issued_at_candidate", "scope",
+            ])
+            let recovery = payload["boot_session_recovery_binding_candidate"] as? [String: Any]
+            let keysValid = Set(payload.keys) == base ||
+                Set(payload.keys) == base.union(["boot_session_recovery_binding_candidate"])
+            let timeValid = recovery == nil
+                ? timestamp(payload["issued_at_candidate"]) && timestamp(payload["expires_at_candidate"]) &&
+                    (payload["issued_at_candidate"] as? String)! <
+                        (payload["expires_at_candidate"] as? String)!
+                : payload["issued_at_candidate"] is NSNull &&
+                    payload["expires_at_candidate"] is NSNull &&
+                    BootSessionRecoveryCapabilityPolicy.bindingIsStructurallyValid(
+                        recovery, stage: "RECOVERY_CHALLENGE_ISSUANCE_CANDIDATE")
+            return keysValid && digests(payload, [
+                "challenge_reference_digest_candidate", "actor_reference_digest_candidate",
+                "native_ceremony_session_reference_digest_candidate",
+            ]) && timeValid &&
+            payload["scope"] as? String == "DAY150_PHASE_C2B_ISOLATED_DURABILITY_QUALIFICATION" &&
+            validateFreshness(payload)
+        case "CHALLENGE_TERMINALIZATION_CANDIDATE":
+            let normalKeys = freshnessKeys.union([
+                "challenge_reference_digest_candidate", "terminal_state",
+                "terminal_reference_digest_candidate", "observed_at_candidate",
+                "native_ceremony_session_reference_digest_candidate",
+            ])
+            let crossEpoch = payload["cross_epoch_recovery_binding_candidate"] as? [String: Any]
+            let recovery = payload["boot_session_recovery_binding_candidate"] as? [String: Any]
+            let keysValid = Set(payload.keys) == normalKeys ||
+                Set(payload.keys) == normalKeys.union(["cross_epoch_recovery_binding_candidate"]) ||
+                Set(payload.keys) == normalKeys.union(["boot_session_recovery_binding_candidate"])
+            let special = payload["terminal_state"] as? String ==
+                "BOOT_SESSION_INVALIDATED_CANDIDATE"
+            return keysValid && digests(payload, [
+                "challenge_reference_digest_candidate", "terminal_reference_digest_candidate",
+                "native_ceremony_session_reference_digest_candidate",
+            ]) && Set(["CONSUMED_APPROVAL_SUCCESS_CANDIDATE",
+                   "CONSUMED_AUTHENTICATION_SUCCESS_CANDIDATE",
+                   "CONSUMED_APPROVAL_FAILURE_CANDIDATE",
+                   "ABANDONED_CANDIDATE", "EXPIRED_CANDIDATE", "OUTCOME_UNKNOWN_CANDIDATE",
+                   "BOOT_SESSION_INVALIDATED_CANDIDATE"]
+                ).contains(payload["terminal_state"] as? String ?? "") &&
+            validateFreshness(payload) && (special
+                ? payload["observed_at_candidate"] is NSNull &&
+                    CrossEpochChallengeRecoveryPolicy.bindingIsStructurallyValid(crossEpoch)
+                : crossEpoch == nil && (recovery == nil
+                    ? timestamp(payload["observed_at_candidate"])
+                    : payload["observed_at_candidate"] is NSNull &&
+                        payload["terminal_state"] as? String ==
+                            "CONSUMED_APPROVAL_SUCCESS_CANDIDATE" &&
+                        BootSessionRecoveryCapabilityPolicy.bindingIsStructurallyValid(
+                            recovery, stage: "RECOVERY_CHALLENGE_TERMINALIZATION_CANDIDATE")))
+        case "CAPABILITY_ISSUANCE_CANDIDATE":
+            let base = freshnessKeys.union([
+                "capability_reference_digest_candidate", "actor_reference_digest_candidate",
+                "challenge_reference_digest_candidate",
+                "native_ceremony_session_reference_digest_candidate", "capability_generation",
+                "previous_capability_or_revocation_reference_digest_candidate",
+                "expires_at_candidate", "issued_at_candidate", "scope", "one_shot",
+            ])
+            let recovery = payload["boot_session_recovery_binding_candidate"] as? [String: Any]
+            let keysValid = Set(payload.keys) == base ||
+                Set(payload.keys) == base.union(["boot_session_recovery_binding_candidate"])
+            let timeValid = recovery == nil
+                ? timestamp(payload["issued_at_candidate"]) && timestamp(payload["expires_at_candidate"]) &&
+                    exactNormalCapabilityLifetime(
+                        issuedAt: payload["issued_at_candidate"],
+                        expiresAt: payload["expires_at_candidate"])
+                : payload["issued_at_candidate"] is NSNull &&
+                    payload["expires_at_candidate"] is NSNull &&
+                    BootSessionRecoveryCapabilityPolicy.bindingIsStructurallyValid(
+                        recovery, stage: "RECOVERY_CAPABILITY_ISSUANCE_CANDIDATE")
+            return keysValid && digests(payload, [
+                "capability_reference_digest_candidate", "actor_reference_digest_candidate",
+                "challenge_reference_digest_candidate",
+                "native_ceremony_session_reference_digest_candidate",
+                "previous_capability_or_revocation_reference_digest_candidate",
+            ]) && exactUInt(payload["capability_generation"]) != nil && timeValid &&
+            payload["scope"] as? String == "DAY150_PHASE_C2B_ISOLATED_DURABILITY_QUALIFICATION" &&
+            payload["one_shot"] as? Bool == true && validateFreshness(payload)
+        case "CAPABILITY_TERMINALIZATION_CANDIDATE":
+            return Set(payload.keys) == freshnessKeys.union([
+                "capability_reference_digest_candidate", "terminal_state",
+                "terminal_reference_digest_candidate", "observed_at_candidate",
+                "native_ceremony_session_reference_digest_candidate",
+            ]) && digests(payload, [
+                "capability_reference_digest_candidate", "terminal_reference_digest_candidate",
+                "native_ceremony_session_reference_digest_candidate",
+            ]) && Set(["CONSUMED_CANDIDATE", "EXPIRED_CANDIDATE", "REVOKED_CANDIDATE",
+                   "REPLACED_CANDIDATE", "OUTCOME_UNKNOWN_CANDIDATE"]
+                ).contains(payload["terminal_state"] as? String ?? "") &&
+            timestamp(payload["observed_at_candidate"]) && validateFreshness(payload)
+        case "CLOCK_FLOOR_ADVANCEMENT_CANDIDATE":
+            return Set(payload.keys) == Set([
+                "epoch_reference_digest_candidate", "prior_floor_timestamp_candidate",
+                "proposed_floor_timestamp_candidate", "os_utc_observation_reference_digest_candidate",
+                "continuous_time_bracket_reference_digest_candidate",
+                "boot_session_reference_digest_candidate", "comparison_policy_revision",
+            ]) && digests(payload, [
+                "epoch_reference_digest_candidate", "os_utc_observation_reference_digest_candidate",
+                "continuous_time_bracket_reference_digest_candidate",
+                "boot_session_reference_digest_candidate",
+            ]) && timestamp(payload["prior_floor_timestamp_candidate"]) &&
+            timestamp(payload["proposed_floor_timestamp_candidate"]) &&
+            (payload["prior_floor_timestamp_candidate"] as? String)! <
+                (payload["proposed_floor_timestamp_candidate"] as? String)! &&
+            exactUInt(payload["comparison_policy_revision"]) == 1
+        case "CLOCK_EPOCH_SUPERSESSION_CANDIDATE":
+            return Set(payload.keys) == Set([
+                "previous_epoch_reference_digest_candidate",
+                "proposed_new_epoch_reference_digest_candidate",
+                "recovery_actor_reference_digest_candidate",
+                "recovery_capability_reference_digest_candidate",
+                "proposed_corrected_genesis_timestamp_candidate",
+                "proposed_new_floor_timestamp_candidate",
+                "affected_record_policy_reference_digest_candidate",
+                "os_utc_observation_reference_digest_candidate",
+                "continuous_time_bracket_reference_digest_candidate",
+                "boot_session_reference_digest_candidate",
+            ]) && digests(payload, [
+                "previous_epoch_reference_digest_candidate",
+                "proposed_new_epoch_reference_digest_candidate",
+                "recovery_actor_reference_digest_candidate",
+                "recovery_capability_reference_digest_candidate",
+                "affected_record_policy_reference_digest_candidate",
+                "os_utc_observation_reference_digest_candidate",
+                "continuous_time_bracket_reference_digest_candidate",
+                "boot_session_reference_digest_candidate",
+            ]) && payload["previous_epoch_reference_digest_candidate"] as? String !=
+                payload["proposed_new_epoch_reference_digest_candidate"] as? String &&
+                timestamp(payload["proposed_corrected_genesis_timestamp_candidate"]) &&
+                timestamp(payload["proposed_new_floor_timestamp_candidate"])
         case "RUNTIME_QUARANTINE_ENTERED_CANDIDATE":
             return Set(payload.keys) == Set([
                 "reason", "evidence_reference_digest_candidate", "outcome",
@@ -268,6 +442,63 @@ public enum DisposableRecordValidator {
         default:
             return false
         }
+    }
+
+    private static func digests(_ payload: [String: Any], _ keys: [String]) -> Bool {
+        keys.allSatisfy { digest(payload[$0]) != nil }
+    }
+
+    private static func timestamp(_ value: Any?) -> Bool {
+        guard let value = value as? String else { return false }
+        let pattern = #"^[0-9]{4}-(0[1-9]|1[0-2])-([0-2][0-9]|3[01])T([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]\.[0-9]{3}Z$"#
+        return value.range(of: pattern, options: .regularExpression) != nil
+    }
+
+    private static func exactNormalCapabilityLifetime(
+        issuedAt: Any?, expiresAt: Any?
+    ) -> Bool {
+        guard let issuedAt = issuedAt as? String, let expiresAt = expiresAt as? String else {
+            return false
+        }
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.timeZone = TimeZone(secondsFromGMT: 0)
+        formatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'"
+        guard let issued = formatter.date(from: issuedAt),
+              let expiry = formatter.date(from: expiresAt)
+        else { return false }
+        return expiry.timeIntervalSince(issued) ==
+            PostGen0NormalCapabilityTTLPolicy.lifetimeSeconds
+    }
+
+    private static func validateFreshness(_ payload: [String: Any]) -> Bool {
+        if payload["freshness_basis"] as? String ==
+            "CLOCK_RECOVERY_NATIVE_SESSION_CANDIDATE" {
+            return digest(payload["native_recovery_session_reference_digest_candidate"]) != nil &&
+                payload["clock_epoch_reference_digest_candidate"] is NSNull &&
+                payload["prior_monotonic_floor_timestamp_candidate"] is NSNull &&
+                payload["proposed_monotonic_floor_timestamp_candidate"] is NSNull &&
+                payload["os_utc_observation_reference_digest_candidate"] is NSNull &&
+                payload["continuous_time_bracket_reference_digest_candidate"] is NSNull &&
+                payload["boot_session_reference_digest_candidate"] is NSNull &&
+                exactUInt(payload["clock_comparison_policy_revision"]) == 1
+        }
+        guard payload["freshness_basis"] as? String == "ACTIVE_TRUSTED_CLOCK_CANDIDATE",
+              digests(payload, [
+                "clock_epoch_reference_digest_candidate",
+                "os_utc_observation_reference_digest_candidate",
+                "continuous_time_bracket_reference_digest_candidate",
+                "boot_session_reference_digest_candidate",
+              ]), timestamp(payload["prior_monotonic_floor_timestamp_candidate"]),
+              timestamp(payload["proposed_monotonic_floor_timestamp_candidate"]),
+              payload["native_recovery_session_reference_digest_candidate"] is NSNull,
+              exactUInt(payload["clock_comparison_policy_revision"]) == 1,
+              let prior = payload["prior_monotonic_floor_timestamp_candidate"] as? String,
+              let proposed = payload["proposed_monotonic_floor_timestamp_candidate"] as? String,
+              prior < proposed
+        else { return false }
+        return true
     }
 
     private static func validateGenesis(
@@ -283,6 +514,8 @@ public enum DisposableRecordValidator {
                 "native_ceremony_session_reference_digest_candidate",
                 "os_utc_observation_reference_digest_candidate",
                 "human_time_plausibility_confirmation_reference_digest",
+                "actor_policy_revision", "clock_policy_revision",
+                "publication_policy_revision", "companion_artifact_reference_digest_candidate",
               ]),
               Set(decision.keys) == Set([
                 "schema_version", "decision", "proposal_reference_digest",
@@ -305,6 +538,17 @@ public enum DisposableRecordValidator {
               exactUInt(decision["authentication_mechanism_revision"]) == 1,
               receipt["schema_version"] as? String ==
                 "farmos.day150-c2b-bootstrap-runtime-genesis-approval-receipt.v1",
+              exactUInt(proposal["actor_policy_revision"]) == 1,
+              exactUInt(proposal["clock_policy_revision"]) == 1,
+              exactUInt(proposal["publication_policy_revision"]) == 1,
+              proposal["companion_artifact_reference_digest_candidate"] as? String ==
+                bindings["companion_artifact_reference_digest_candidate"] as? String,
+              proposal["actor_policy_revision"] as? NSNumber ==
+                payload["actor_policy_revision"] as? NSNumber,
+              proposal["clock_policy_revision"] as? NSNumber ==
+                payload["clock_policy_revision"] as? NSNumber,
+              proposal["publication_policy_revision"] as? NSNumber ==
+                payload["publication_policy_revision"] as? NSNumber,
               receipt["challenge_terminal_state"] as? String ==
                 "CONSUMED_APPROVAL_SUCCESS_CANDIDATE",
               receipt["capability_terminal_state"] as? String == "CONSUMED_CANDIDATE",
@@ -315,7 +559,7 @@ public enum DisposableRecordValidator {
                 "CONSUMED_APPROVAL_SUCCESS_CANDIDATE",
               payload["bootstrap_capability_terminal_state"] as? String == "CONSUMED_CANDIDATE",
               let genesisTime = payload["proposed_genesis_timestamp_candidate"] as? String,
-              genesisTime == "2026-08-12T00:00:00.000Z",
+              timestamp(genesisTime),
               payload["proposed_initial_monotonic_floor_timestamp_candidate"] as? String == genesisTime,
               let bindingJSON = try? FarmOSCanonicalDigest.canonicalJSON(bindings),
               let target = digest(payload["proposal_target_binding_digest"]),
@@ -387,25 +631,36 @@ public enum DisposableRecordValidator {
               value["bootstrap_candidate_state"] as? String == "INITIALIZED_CANDIDATE",
               value["actor_candidate_state"] as? String == "ESTABLISHMENT_CANDIDATE_PRESENT",
               digest(value["actor_reference_digest_candidate"]) != nil,
-              value["challenge_candidate_state"] as? String ==
-                "CONSUMED_APPROVAL_SUCCESS_CANDIDATE",
+              Set(["OUTSTANDING_CANDIDATE", "CONSUMED_APPROVAL_SUCCESS_CANDIDATE",
+               "CONSUMED_AUTHENTICATION_SUCCESS_CANDIDATE",
+               "CONSUMED_APPROVAL_FAILURE_CANDIDATE", "ABANDONED_CANDIDATE",
+               "EXPIRED_CANDIDATE", "OUTCOME_UNKNOWN_CANDIDATE",
+               "BOOT_SESSION_INVALIDATED_CANDIDATE"])
+                .contains(value["challenge_candidate_state"] as? String ?? ""),
               digest(value["challenge_reference_digest_candidate"]) != nil,
               digest(value["challenge_native_session_reference_digest_candidate"]) != nil,
-              value["challenge_expires_at_candidate"] is NSNull,
-              value["challenge_freshness_basis"] as? String ==
-                "CLOCK_RECOVERY_NATIVE_SESSION_CANDIDATE",
-              value["capability_candidate_state"] as? String == "CONSUMED_CANDIDATE",
+              value["challenge_expires_at_candidate"] is NSNull ||
+                timestamp(value["challenge_expires_at_candidate"]),
+              Set(["ACTIVE_TRUSTED_CLOCK_CANDIDATE", "CLOCK_RECOVERY_NATIVE_SESSION_CANDIDATE"])
+                .contains(value["challenge_freshness_basis"] as? String ?? ""),
+              Set(["AVAILABLE_CANDIDATE", "CONSUMED_CANDIDATE", "EXPIRED_CANDIDATE",
+               "REVOKED_CANDIDATE", "REPLACED_CANDIDATE", "OUTCOME_UNKNOWN_CANDIDATE"]
+                ).contains(value["capability_candidate_state"] as? String ?? ""),
               digest(value["capability_reference_digest_candidate"]) != nil,
-              exactUInt(value["capability_generation_candidate"]) == 0,
-              value["capability_expires_at_candidate"] is NSNull,
-              value["capability_freshness_basis"] as? String ==
-                "CLOCK_RECOVERY_NATIVE_SESSION_CANDIDATE",
+              exactUInt(value["capability_generation_candidate"]) != nil,
+              value["capability_expires_at_candidate"] is NSNull ||
+                timestamp(value["capability_expires_at_candidate"]),
+              Set(["ACTIVE_TRUSTED_CLOCK_CANDIDATE", "CLOCK_RECOVERY_NATIVE_SESSION_CANDIDATE"])
+                .contains(value["capability_freshness_basis"] as? String ?? ""),
               digest(value["capability_lineage_head_reference_digest_candidate"]) != nil,
               value["clock_candidate_state"] as? String == "ESTABLISHMENT_CANDIDATE_PRESENT",
               digest(value["epoch_reference_digest_candidate"]) != nil,
-              value["monotonic_floor_timestamp_candidate"] as? String ==
-                "2026-08-12T00:00:00.000Z",
-              digest(value["boot_session_reference_digest_candidate"]) != nil
+              timestamp(value["monotonic_floor_timestamp_candidate"]),
+              digest(value["boot_session_reference_digest_candidate"]) != nil,
+              Set(["NOT_QUARANTINED_CANDIDATE", "QUARANTINE_REQUIRED_CANDIDATE"])
+                .contains(value["quarantine_candidate_state"] as? String ?? ""),
+              Set(["KNOWN_SOURCE_CANDIDATE", "OUTCOME_UNKNOWN_CANDIDATE"])
+                .contains(value["publication_outcome_candidate"] as? String ?? "")
         else { return false }
         if eventKind == "INTEGRATED_RUNTIME_GENESIS_CANDIDATE" {
             return value["quarantine_candidate_state"] as? String == "NOT_QUARANTINED_CANDIDATE" &&
@@ -427,9 +682,12 @@ public enum DisposableRecordValidator {
                 value["boot_session_reference_digest_candidate"] as? String ==
                     payload["boot_session_reference_digest_candidate"] as? String
         }
-        return eventKind == "RUNTIME_QUARANTINE_ENTERED_CANDIDATE" &&
-            value["quarantine_candidate_state"] as? String == "QUARANTINE_REQUIRED_CANDIDATE" &&
-            value["publication_outcome_candidate"] as? String == "OUTCOME_UNKNOWN_CANDIDATE"
+        if eventKind == "RUNTIME_QUARANTINE_ENTERED_CANDIDATE" {
+            return value["quarantine_candidate_state"] as? String ==
+                "QUARANTINE_REQUIRED_CANDIDATE" &&
+                value["publication_outcome_candidate"] as? String == "OUTCOME_UNKNOWN_CANDIDATE"
+        }
+        return true
     }
 
     private static func projectionInvariant(_ value: [String: Any]) -> String? {
@@ -453,6 +711,8 @@ public enum DisposableRecordValidator {
             "r3_clock_source_candidate_digest": "sha256:" + String(repeating: "b", count: 64),
             "installation_profile_digest_candidate": "sha256:" + String(repeating: "c", count: 64),
             "native_profile_digest_candidate": "sha256:" + String(repeating: "d", count: 64),
+            "companion_artifact_reference_digest_candidate":
+                "sha256:" + String(repeating: "f", count: 64),
         ]
     }
 
@@ -472,6 +732,9 @@ public enum DisposableRecordValidator {
             "native_ceremony_session_reference_digest_candidate": d("5"),
             "os_utc_observation_reference_digest_candidate": d("8"),
             "human_time_plausibility_confirmation_reference_digest": d("9"),
+            "actor_policy_revision": 1, "clock_policy_revision": 1,
+            "publication_policy_revision": 1,
+            "companion_artifact_reference_digest_candidate": d("f"),
         ]
         let proposalReference = FarmOSCanonicalDigest.sha256(
             domain: "farmos.day150-c2b-bootstrap-runtime-genesis-proposal.v1:body",
@@ -740,6 +1003,12 @@ public final class DisposableAPFSLedger: @unchecked Sendable {
         return true
     }
 
+    public func trustedQualificationRecord(generation: UInt64) -> DisposableRuntimeRecord? {
+        guard let head = try? trustedQualificationReadback(),
+              generation < head.records else { return nil }
+        return try? readRecord(name: Self.recordName(generation))
+    }
+
     private func replayRecords(
         allowedPendingAttempts: [UInt64: String],
         allowAllPendingForReadback: Bool = false
@@ -757,6 +1026,9 @@ public final class DisposableAPFSLedger: @unchecked Sendable {
         var sourceBindingsCanonical: String?
         var projectionInvariantCanonical: String?
         var terminal = false
+        var issuedChallenges = Set<String>()
+        var issuedCapabilities = Set<String>()
+        var usedRecoverySessions = Set<String>()
         var expectedGeneration: UInt64 = 0
         while expectedGeneration < UInt64(recordEntries.count) {
             let name = Self.recordName(expectedGeneration)
@@ -769,13 +1041,23 @@ public final class DisposableAPFSLedger: @unchecked Sendable {
                   current.previousRecordDigest == previous?.recordDigest,
                   sourceBindingsCanonical == nil ||
                     current.sourceBindingsCanonical == sourceBindingsCanonical,
-                  projectionInvariantCanonical == nil ||
-                    current.projectionInvariantCanonical == projectionInvariantCanonical,
-                  !terminal
+                  !terminal,
+                  previous == nil || DisposableRecordValidator.transitionIsValid(
+                    previous: previous!, current: current
+                  ),
+                  current.issuedChallengeReference == nil ||
+                    !issuedChallenges.contains(current.issuedChallengeReference!),
+                  current.issuedCapabilityReference == nil ||
+                    !issuedCapabilities.contains(current.issuedCapabilityReference!),
+                  current.usedRecoverySessionReference == nil ||
+                    !usedRecoverySessions.contains(current.usedRecoverySessionReference!)
             else { throw DarwinStorageValidationFailure.corruptChain }
             sourceBindingsCanonical = current.sourceBindingsCanonical
             projectionInvariantCanonical = current.projectionInvariantCanonical
             terminal = current.eventKind == "RUNTIME_QUARANTINE_ENTERED_CANDIDATE"
+            if let challenge = current.issuedChallengeReference { issuedChallenges.insert(challenge) }
+            if let capability = current.issuedCapabilityReference { issuedCapabilities.insert(capability) }
+            if let recovery = current.usedRecoverySessionReference { usedRecoverySessions.insert(recovery) }
             previous = current
             expectedGeneration += 1
         }
@@ -839,15 +1121,20 @@ public final class DisposableAPFSLedger: @unchecked Sendable {
                 ? .alreadyPresent : .casConflict
         }
         let expectedNext = (head.generation ?? UInt64.max) &+ 1
+        let predecessor = head.generation.flatMap {
+            try? readRecord(name: Self.recordName($0))
+        }
         guard candidate.generation == expectedNext,
               candidate.previousGeneration == head.generation,
               candidate.previousRecordDigest == head.digest,
               (head.sourceBindingsCanonical == nil ||
                 candidate.sourceBindingsCanonical == head.sourceBindingsCanonical),
-              (head.projectionInvariantCanonical == nil ||
-                candidate.projectionInvariantCanonical == head.projectionInvariantCanonical),
               !head.terminal,
-              (head.records == 0 || candidate.eventKind != "INTEGRATED_RUNTIME_GENESIS_CANDIDATE")
+              (head.records == 0 || candidate.eventKind != "INTEGRATED_RUNTIME_GENESIS_CANDIDATE"),
+              predecessor == nil || DisposableRecordValidator.transitionIsValid(
+                previous: predecessor!, current: candidate
+              ),
+              !issuedReferenceAlreadyExists(candidate, records: head.records)
         else { return .rejected }
 
         let pendingName = Self.pendingAttemptName(candidate.generation)
@@ -927,6 +1214,24 @@ public final class DisposableAPFSLedger: @unchecked Sendable {
         }
         explicitlyReconciledAttempts[candidate.generation] = candidate.recordDigest
         return .committed
+    }
+
+    private func issuedReferenceAlreadyExists(
+        _ candidate: DisposableRuntimeRecord,
+        records: UInt64
+    ) -> Bool {
+        guard candidate.issuedChallengeReference != nil || candidate.issuedCapabilityReference != nil
+        else { return false }
+        var generation: UInt64 = 0
+        while generation < records {
+            guard let prior = try? readRecord(name: Self.recordName(generation)) else { return true }
+            if prior.issuedChallengeReference == candidate.issuedChallengeReference &&
+                candidate.issuedChallengeReference != nil { return true }
+            if prior.issuedCapabilityReference == candidate.issuedCapabilityReference &&
+                candidate.issuedCapabilityReference != nil { return true }
+            generation += 1
+        }
+        return false
     }
 
     private func readRecord(name: String) throws -> DisposableRuntimeRecord {

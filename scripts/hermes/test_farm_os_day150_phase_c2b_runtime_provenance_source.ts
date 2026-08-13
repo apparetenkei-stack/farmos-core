@@ -9,6 +9,10 @@ import {
   type FarmOsDay150C2bNativeProtocolRequestBody,
 } from "./lib/farm_os_day150_phase_c2b_native_protocol_contract";
 import {
+  FARM_OS_DAY150_C2B_BOOT_SESSION_RECOVERY_CAPABILITY_AUTHORITY,
+  FARM_OS_DAY150_C2B_BOOT_SESSION_RECOVERY_CAPABILITY_DIGEST,
+  FARM_OS_DAY150_C2B_CROSS_EPOCH_CHALLENGE_RECOVERY_AUTHORITY,
+  FARM_OS_DAY150_C2B_CROSS_EPOCH_CHALLENGE_RECOVERY_DIGEST,
   FARM_OS_DAY150_C2B_RUNTIME_PROVENANCE_EVENT_AUTHORITY,
   FARM_OS_DAY150_C2B_RUNTIME_PROVENANCE_EVENT_KINDS,
   FARM_OS_DAY150_C2B_RUNTIME_PROVENANCE_RECORD_AUTHORITY,
@@ -94,6 +98,7 @@ const bindings: FarmOsDay150C2bRuntimeSourceBindings = {
   r3_clock_source_candidate_digest: D("b"),
   installation_profile_digest_candidate: D("c"),
   native_profile_digest_candidate: D("d"),
+  companion_artifact_reference_digest_candidate: D("f"),
 };
 const activeFreshness = (prior = T0, proposed = T0) => ({
   freshness_basis: "ACTIVE_TRUSTED_CLOCK_CANDIDATE" as const,
@@ -114,6 +119,8 @@ const proposalBody: FarmOsDay150C2bRuntimeGenesisProposalBody = {
   native_ceremony_session_reference_digest_candidate: D("5"),
   os_utc_observation_reference_digest_candidate: D("8"),
   human_time_plausibility_confirmation_reference_digest: D("9"),
+  actor_policy_revision: 1, clock_policy_revision: 1, publication_policy_revision: 1,
+  companion_artifact_reference_digest_candidate: D("f"),
 };
 const proposalReference = computeFarmOsDay150C2bRuntimeGenesisProposalDigest(proposalBody);
 const decisionBody: FarmOsDay150C2bRuntimeGenesisDecisionBody = {
@@ -195,7 +202,11 @@ const gen0 = seal({ schema_version: FARM_OS_DAY150_C2B_RUNTIME_PROVENANCE_RECORD
 function next(prior: FarmOsDay150C2bRuntimeProvenanceRecordSourceCandidate,
   current: FarmOsDay150C2bRuntimeProvenanceSourceProjection,
   event: FarmOsDay150C2bRuntimeProvenanceEvent): FarmOsDay150C2bRuntimeProvenanceRecordSourceCandidate {
-  const projected = deriveFarmOsDay150C2bRuntimeProvenanceNextSourceProjection(current, event);
+  const projected = deriveFarmOsDay150C2bRuntimeProvenanceNextSourceProjection(current, event, {
+    generation: prior.record_body.generation,
+    digest: prior.record_digest,
+    event: prior.record_body.event,
+  });
   if (!projected) throw new Error("FIXTURE_TRANSITION_INVALID");
   return seal({ schema_version: FARM_OS_DAY150_C2B_RUNTIME_PROVENANCE_RECORD_AUTHORITY,
     authority_id: FARM_OS_DAY150_C2B_RUNTIME_PROVENANCE_RECORD_AUTHORITY, authority_revision: 1,
@@ -305,7 +316,7 @@ test("event transition and terminal behavior", () => {
     schema_version: FARM_OS_DAY150_C2B_RUNTIME_PROVENANCE_EVENT_AUTHORITY,
     event_kind: "CHALLENGE_TERMINALIZATION_CANDIDATE", payload: {
       challenge_reference_digest_candidate: D("f"),
-      terminal_state: "CONSUMED_APPROVAL_SUCCESS_CANDIDATE",
+      terminal_state: "CONSUMED_AUTHENTICATION_SUCCESS_CANDIDATE",
       terminal_reference_digest_candidate: D("1"),
       observed_at_candidate: T1, native_ceremony_session_reference_digest_candidate: D("5"),
       ...activeFreshness(T1, T1),
@@ -323,7 +334,7 @@ test("challenge and capability lineage is one-shot and monotonic", () => {
     schema_version: FARM_OS_DAY150_C2B_RUNTIME_PROVENANCE_EVENT_AUTHORITY,
     event_kind: "CHALLENGE_TERMINALIZATION_CANDIDATE", payload: {
       challenge_reference_digest_candidate: D("f"),
-      terminal_state: "CONSUMED_APPROVAL_SUCCESS_CANDIDATE",
+      terminal_state: "CONSUMED_AUTHENTICATION_SUCCESS_CANDIDATE",
       terminal_reference_digest_candidate: D("1"), observed_at_candidate: T1,
       native_ceremony_session_reference_digest_candidate: D("5"), ...activeFreshness(T1, T1),
     },
@@ -340,13 +351,35 @@ test("challenge and capability lineage is one-shot and monotonic", () => {
       native_ceremony_session_reference_digest_candidate: D("5"), capability_generation: 1,
       previous_capability_or_revocation_reference_digest_candidate: D("7"),
       issued_at_candidate: "2026-08-12T01:02:00.000Z",
-      expires_at_candidate: "2026-08-12T01:15:00.000Z",
+      expires_at_candidate: "2026-08-12T01:04:00.000Z",
       scope: "DAY150_PHASE_C2B_ISOLATED_DURABILITY_QUALIFICATION", one_shot: true,
       ...activeFreshness(T1, "2026-08-12T01:02:00.000Z"),
     },
   };
+  const approvalOnlyEvent = clone(terminalEvent);
+  if (approvalOnlyEvent.event_kind === "CHALLENGE_TERMINALIZATION_CANDIDATE") {
+    approvalOnlyEvent.payload.terminal_state = "CONSUMED_APPROVAL_SUCCESS_CANDIDATE";
+  }
+  const approvalOnlyProjection = deriveFarmOsDay150C2bRuntimeProvenanceNextSourceProjection(
+    challenge.record_body.projected_source_state_claim, approvalOnlyEvent, {
+      generation: challenge.record_body.generation, digest: challenge.record_digest,
+      event: challenge.record_body.event,
+    });
+  assert.ok(approvalOnlyProjection);
+  assert.equal(deriveFarmOsDay150C2bRuntimeProvenanceNextSourceProjection(
+    approvalOnlyProjection!, capabilityEvent, {
+      generation: terminal.record_body.generation, digest: terminal.record_digest,
+      event: approvalOnlyEvent,
+    }), null);
   const capability = next(terminal, terminal.record_body.projected_source_state_claim, capabilityEvent);
   assert.equal(capability.record_body.projected_source_state_claim.capability_generation_candidate, 1);
+  const wrongTTL = clone(capabilityEvent);
+  if (wrongTTL.event_kind === "CAPABILITY_ISSUANCE_CANDIDATE") {
+    wrongTTL.payload.expires_at_candidate = "2026-08-12T01:04:00.001Z";
+  }
+  assert.throws(() => next(
+    terminal, terminal.record_body.projected_source_state_claim, wrongTTL),
+  /INVALID_EVENT_PAYLOAD/);
   const capabilityTerminal = (state: "EXPIRED_CANDIDATE" | "CONSUMED_CANDIDATE",
     observed: string): FarmOsDay150C2bRuntimeProvenanceEvent => ({
     schema_version: FARM_OS_DAY150_C2B_RUNTIME_PROVENANCE_EVENT_AUTHORITY,
@@ -359,13 +392,31 @@ test("challenge and capability lineage is one-shot and monotonic", () => {
   });
   assert.notEqual(deriveFarmOsDay150C2bRuntimeProvenanceNextSourceProjection(
     capability.record_body.projected_source_state_claim,
-    capabilityTerminal("EXPIRED_CANDIDATE", "2026-08-12T01:15:00.000Z")), null);
+    capabilityTerminal("EXPIRED_CANDIDATE", "2026-08-12T01:04:00.001Z")), null);
   assert.equal(deriveFarmOsDay150C2bRuntimeProvenanceNextSourceProjection(
     capability.record_body.projected_source_state_claim,
-    capabilityTerminal("EXPIRED_CANDIDATE", "2026-08-12T01:14:59.999Z")), null);
-  assert.equal(deriveFarmOsDay150C2bRuntimeProvenanceNextSourceProjection(
+    capabilityTerminal("EXPIRED_CANDIDATE", "2026-08-12T01:04:00.000Z")), null);
+  assert.notEqual(deriveFarmOsDay150C2bRuntimeProvenanceNextSourceProjection(
     capability.record_body.projected_source_state_claim,
-    capabilityTerminal("CONSUMED_CANDIDATE", "2026-08-12T01:15:00.001Z")), null);
+    capabilityTerminal("CONSUMED_CANDIDATE", "2026-08-12T01:04:00.000Z")), null);
+  const consumedEvent = capabilityTerminal("CONSUMED_CANDIDATE", "2026-08-12T01:04:00.000Z");
+  const consumedProjection = deriveFarmOsDay150C2bRuntimeProvenanceNextSourceProjection(
+    capability.record_body.projected_source_state_claim, consumedEvent);
+  assert.ok(consumedProjection);
+  const oldAuthenticationRenewal = clone(capabilityEvent);
+  if (oldAuthenticationRenewal.event_kind === "CAPABILITY_ISSUANCE_CANDIDATE") {
+    oldAuthenticationRenewal.payload.capability_generation = 2;
+    oldAuthenticationRenewal.payload.previous_capability_or_revocation_reference_digest_candidate = D("0");
+    oldAuthenticationRenewal.payload.issued_at_candidate = "2026-08-12T01:05:00.000Z";
+    oldAuthenticationRenewal.payload.expires_at_candidate = "2026-08-12T01:07:00.000Z";
+    Object.assign(oldAuthenticationRenewal.payload,
+      activeFreshness("2026-08-12T01:04:00.000Z", "2026-08-12T01:05:00.000Z"));
+  }
+  assert.equal(deriveFarmOsDay150C2bRuntimeProvenanceNextSourceProjection(
+    consumedProjection!, oldAuthenticationRenewal, {
+      generation: capability.record_body.generation + 1,
+      digest: D("2"), event: consumedEvent,
+    }), null);
   const wrongGeneration = clone(capabilityEvent);
   if (wrongGeneration.event_kind === "CAPABILITY_ISSUANCE_CANDIDATE") {
     wrongGeneration.payload.capability_generation = 3;
@@ -518,6 +569,317 @@ test("authority mutations bind clock atomically and epoch recovery consumes capa
     recovered!, resumedChallenge), null);
   const noCapability = { ...recoveryProjection, capability_candidate_state: "CONSUMED_CANDIDATE" as const };
   assert.equal(deriveFarmOsDay150C2bRuntimeProvenanceNextSourceProjection(noCapability, supersession), null);
+
+  const crossEpoch: FarmOsDay150C2bRuntimeProvenanceEvent = {
+    schema_version: FARM_OS_DAY150_C2B_RUNTIME_PROVENANCE_EVENT_AUTHORITY,
+    event_kind: "CHALLENGE_TERMINALIZATION_CANDIDATE", payload: {
+      challenge_reference_digest_candidate: D("f"),
+      terminal_state: "BOOT_SESSION_INVALIDATED_CANDIDATE",
+      terminal_reference_digest_candidate: D("6"), observed_at_candidate: null,
+      native_ceremony_session_reference_digest_candidate: D("5"),
+      freshness_basis: "CLOCK_RECOVERY_NATIVE_SESSION_CANDIDATE",
+      clock_epoch_reference_digest_candidate: null,
+      prior_monotonic_floor_timestamp_candidate: null,
+      proposed_monotonic_floor_timestamp_candidate: null,
+      os_utc_observation_reference_digest_candidate: null,
+      continuous_time_bracket_reference_digest_candidate: null,
+      boot_session_reference_digest_candidate: null,
+      native_recovery_session_reference_digest_candidate: D("8"),
+      clock_comparison_policy_revision: 1,
+      cross_epoch_recovery_binding_candidate: {
+        amendment_authority: FARM_OS_DAY150_C2B_CROSS_EPOCH_CHALLENGE_RECOVERY_AUTHORITY,
+        amendment_revision: 1,
+        amendment_digest: FARM_OS_DAY150_C2B_CROSS_EPOCH_CHALLENGE_RECOVERY_DIGEST,
+        expected_head_generation: 1, expected_head_digest: challenge.record_digest,
+        old_epoch_reference_digest_candidate: D("e"),
+        old_boot_session_reference_digest_candidate: D("b"),
+        current_boot_session_reference_digest_candidate: D("c"),
+        recovery_session_reference_digest_candidate: D("8"),
+        recovery_freshness_reference_digest_candidate: D("9"),
+        terminal_reason: "BOOT_SESSION_CHANGE",
+      },
+    },
+  };
+  const head = { generation: 1, digest: challenge.record_digest };
+  const invalidated = deriveFarmOsDay150C2bRuntimeProvenanceNextSourceProjection(
+    challenge.record_body.projected_source_state_claim, crossEpoch, head);
+  assert.equal(invalidated?.challenge_candidate_state, "BOOT_SESSION_INVALIDATED_CANDIDATE");
+  assert.equal(invalidated?.monotonic_floor_timestamp_candidate, T1);
+  assert.equal(invalidated?.capability_candidate_state, "CONSUMED_CANDIDATE");
+  assert.equal(deriveFarmOsDay150C2bRuntimeProvenanceNextSourceProjection(
+    challenge.record_body.projected_source_state_claim, crossEpoch), null);
+  const mutate = (callback: (event: any) => void) => {
+    const value = clone(crossEpoch); callback(value);
+    return deriveFarmOsDay150C2bRuntimeProvenanceNextSourceProjection(
+      challenge.record_body.projected_source_state_claim, value, head);
+  };
+  assert.equal(mutate((event) => {
+    event.payload.cross_epoch_recovery_binding_candidate
+      .current_boot_session_reference_digest_candidate = D("b");
+  }), null);
+  assert.equal(mutate((event) => {
+    event.payload.cross_epoch_recovery_binding_candidate.expected_head_digest = D("0");
+  }), null);
+  assert.equal(mutate((event) => {
+    event.payload.challenge_reference_digest_candidate = D("0");
+  }), null);
+  assert.equal(mutate((event) => {
+    event.payload.native_ceremony_session_reference_digest_candidate = D("0");
+  }), null);
+  assert.equal(mutate((event) => {
+    event.payload.native_recovery_session_reference_digest_candidate = null;
+  }), null);
+  assert.equal(mutate((event) => {
+    event.payload.freshness_basis = "ACTIVE_TRUSTED_CLOCK_CANDIDATE";
+  }), null);
+  const unknownProjection = { ...challenge.record_body.projected_source_state_claim,
+    publication_outcome_candidate: "OUTCOME_UNKNOWN_CANDIDATE" as const };
+  assert.equal(deriveFarmOsDay150C2bRuntimeProvenanceNextSourceProjection(
+    unknownProjection, crossEpoch, head), null);
+  assert.equal(deriveFarmOsDay150C2bRuntimeProvenanceNextSourceProjection(
+    invalidated!, challengeEvent(D("0"), T1, "2026-08-12T01:03:00.000Z")), null);
+  const floorAdvance: FarmOsDay150C2bRuntimeProvenanceEvent = {
+    schema_version: FARM_OS_DAY150_C2B_RUNTIME_PROVENANCE_EVENT_AUTHORITY,
+    event_kind: "CLOCK_FLOOR_ADVANCEMENT_CANDIDATE", payload: {
+      epoch_reference_digest_candidate: D("e"), prior_floor_timestamp_candidate: T1,
+      proposed_floor_timestamp_candidate: "2026-08-12T01:03:00.000Z",
+      os_utc_observation_reference_digest_candidate: D("1"),
+      continuous_time_bracket_reference_digest_candidate: D("2"),
+      boot_session_reference_digest_candidate: D("b"), comparison_policy_revision: 1,
+    },
+  };
+  assert.equal(deriveFarmOsDay150C2bRuntimeProvenanceNextSourceProjection(
+    invalidated!, floorAdvance), null);
+  const terminalRecord = seal({
+    schema_version: FARM_OS_DAY150_C2B_RUNTIME_PROVENANCE_RECORD_AUTHORITY,
+    authority_id: FARM_OS_DAY150_C2B_RUNTIME_PROVENANCE_RECORD_AUTHORITY,
+    authority_revision: 1, generation: 2, previous_generation: 1,
+    previous_record_digest: challenge.record_digest, source_bindings: bindings,
+    event: crossEpoch, projected_source_state_claim: invalidated!,
+  });
+  const replayed = replayFarmOsDay150C2bRuntimeProvenanceSourceChainCandidate(
+    [gen0, challenge, terminalRecord]);
+  assert.equal(replayed.classification,
+    "STRUCTURALLY_VALID_RUNTIME_PROVENANCE_CHAIN_CANDIDATE");
+  assert.equal(gen0.record_digest, gen0.record_digest);
+  assert.equal(challenge.record_digest, challenge.record_digest);
+});
+test("boot-session recovery amendment is narrow, one-shot, and supersession-only", () => {
+  const recoveryFreshness = {
+    freshness_basis: "CLOCK_RECOVERY_NATIVE_SESSION_CANDIDATE" as const,
+    clock_epoch_reference_digest_candidate: null,
+    prior_monotonic_floor_timestamp_candidate: null,
+    proposed_monotonic_floor_timestamp_candidate: null,
+    os_utc_observation_reference_digest_candidate: null,
+    continuous_time_bracket_reference_digest_candidate: null,
+    boot_session_reference_digest_candidate: null,
+    native_recovery_session_reference_digest_candidate: D("2"),
+    clock_comparison_policy_revision: 1 as const,
+  };
+  const gen2Event: FarmOsDay150C2bRuntimeProvenanceEvent = {
+    schema_version: FARM_OS_DAY150_C2B_RUNTIME_PROVENANCE_EVENT_AUTHORITY,
+    event_kind: "CHALLENGE_TERMINALIZATION_CANDIDATE", payload: {
+      challenge_reference_digest_candidate: D("f"),
+      terminal_state: "BOOT_SESSION_INVALIDATED_CANDIDATE",
+      terminal_reference_digest_candidate: D("6"), observed_at_candidate: null,
+      native_ceremony_session_reference_digest_candidate: D("5"),
+      ...recoveryFreshness, native_recovery_session_reference_digest_candidate: D("8"),
+      cross_epoch_recovery_binding_candidate: {
+        amendment_authority: FARM_OS_DAY150_C2B_CROSS_EPOCH_CHALLENGE_RECOVERY_AUTHORITY,
+        amendment_revision: 1,
+        amendment_digest: FARM_OS_DAY150_C2B_CROSS_EPOCH_CHALLENGE_RECOVERY_DIGEST,
+        expected_head_generation: 1, expected_head_digest: challenge.record_digest,
+        old_epoch_reference_digest_candidate: D("e"),
+        old_boot_session_reference_digest_candidate: D("b"),
+        current_boot_session_reference_digest_candidate: D("c"),
+        recovery_session_reference_digest_candidate: D("8"),
+        recovery_freshness_reference_digest_candidate: D("9"),
+        terminal_reason: "BOOT_SESSION_CHANGE",
+      },
+    },
+  };
+  const invalidated = deriveFarmOsDay150C2bRuntimeProvenanceNextSourceProjection(
+    challenge.record_body.projected_source_state_claim, gen2Event,
+    { generation: 1, digest: challenge.record_digest });
+  assert.ok(invalidated);
+  const gen2 = seal({ schema_version: FARM_OS_DAY150_C2B_RUNTIME_PROVENANCE_RECORD_AUTHORITY,
+    authority_id: FARM_OS_DAY150_C2B_RUNTIME_PROVENANCE_RECORD_AUTHORITY,
+    authority_revision: 1, generation: 2, previous_generation: 1,
+    previous_record_digest: challenge.record_digest, source_bindings: bindings,
+    event: gen2Event, projected_source_state_claim: invalidated! });
+  const binding = (stage: string, generation: number, digest: string,
+    terminal: string | null = null, capability: string | null = null) => ({
+    amendment_authority: FARM_OS_DAY150_C2B_BOOT_SESSION_RECOVERY_CAPABILITY_AUTHORITY,
+    amendment_revision: 1,
+    amendment_digest: FARM_OS_DAY150_C2B_BOOT_SESSION_RECOVERY_CAPABILITY_DIGEST,
+    recovery_stage: stage, expected_head_generation: generation, expected_head_digest: digest,
+    gen2_record_digest_candidate: gen2.record_digest,
+    gen2_terminal_reference_digest_candidate: D("6"),
+    historical_challenge_reference_digest_candidate: D("f"),
+    historical_session_reference_digest_candidate: D("5"),
+    old_epoch_reference_digest_candidate: D("e"),
+    old_boot_session_reference_digest_candidate: D("b"),
+    current_boot_session_reference_digest_candidate: D("c"),
+    recovery_purpose: "CLOCK_EPOCH_SUPERSESSION_CANDIDATE",
+    recovery_policy_revision: 1,
+    recovery_challenge_reference_digest_candidate: D("1"),
+    recovery_challenge_terminal_reference_digest_candidate: terminal,
+    recovery_capability_reference_digest_candidate: capability,
+    recovery_session_reference_digest_candidate: D("2"),
+    recovery_freshness_reference_digest_candidate: D("3"),
+  });
+  const issuance: FarmOsDay150C2bRuntimeProvenanceEvent = {
+    schema_version: FARM_OS_DAY150_C2B_RUNTIME_PROVENANCE_EVENT_AUTHORITY,
+    event_kind: "CHALLENGE_ISSUANCE_CANDIDATE", payload: {
+      challenge_reference_digest_candidate: D("1"), actor_reference_digest_candidate: D("4"),
+      native_ceremony_session_reference_digest_candidate: D("2"),
+      expires_at_candidate: null, issued_at_candidate: null,
+      scope: "DAY150_PHASE_C2B_ISOLATED_DURABILITY_QUALIFICATION", ...recoveryFreshness,
+      boot_session_recovery_binding_candidate:
+        binding("RECOVERY_CHALLENGE_ISSUANCE_CANDIDATE", 2, gen2.record_digest) as any,
+    },
+  };
+  const head2 = { generation: 2, digest: gen2.record_digest, event: gen2Event };
+  const outstanding = deriveFarmOsDay150C2bRuntimeProvenanceNextSourceProjection(
+    invalidated!, issuance, head2);
+  assert.equal(outstanding?.challenge_candidate_state, "OUTSTANDING_CANDIDATE");
+  const rejectIssuance = (change: (value: any) => void) => {
+    const value = clone(issuance); change(value);
+    return deriveFarmOsDay150C2bRuntimeProvenanceNextSourceProjection(invalidated!, value, head2);
+  };
+  assert.equal(rejectIssuance((v) => { v.payload.boot_session_recovery_binding_candidate
+    .expected_head_digest = D("0"); }), null);
+  assert.equal(rejectIssuance((v) => { v.payload.boot_session_recovery_binding_candidate
+    .historical_challenge_reference_digest_candidate = D("0"); }), null);
+  assert.equal(rejectIssuance((v) => { v.payload.boot_session_recovery_binding_candidate
+    .historical_session_reference_digest_candidate = D("0"); }), null);
+  assert.equal(rejectIssuance((v) => { v.payload.boot_session_recovery_binding_candidate
+    .current_boot_session_reference_digest_candidate = D("b"); }), null);
+  assert.equal(rejectIssuance((v) => { v.payload.boot_session_recovery_binding_candidate
+    .old_epoch_reference_digest_candidate = D("0"); }), null);
+  assert.equal(rejectIssuance((v) => { v.payload.boot_session_recovery_binding_candidate
+    .recovery_purpose = "NORMAL_CHALLENGE_ISSUANCE"; }), null);
+  assert.equal(rejectIssuance((v) => { v.payload.native_recovery_session_reference_digest_candidate = null; }), null);
+  assert.equal(deriveFarmOsDay150C2bRuntimeProvenanceNextSourceProjection(
+    { ...invalidated!, publication_outcome_candidate: "OUTCOME_UNKNOWN_CANDIDATE" }, issuance, head2), null);
+  assert.equal(deriveFarmOsDay150C2bRuntimeProvenanceNextSourceProjection(
+    challenge.record_body.projected_source_state_claim, issuance, head2), null);
+  assert.equal(deriveFarmOsDay150C2bRuntimeProvenanceNextSourceProjection(
+    invalidated!, issuance, { ...head2, event: challenge.record_body.event }), null);
+
+  const recoveryChallenge = seal({ schema_version: FARM_OS_DAY150_C2B_RUNTIME_PROVENANCE_RECORD_AUTHORITY,
+    authority_id: FARM_OS_DAY150_C2B_RUNTIME_PROVENANCE_RECORD_AUTHORITY,
+    authority_revision: 1, generation: 3, previous_generation: 2,
+    previous_record_digest: gen2.record_digest, source_bindings: bindings,
+    event: issuance, projected_source_state_claim: outstanding! });
+  const terminal: FarmOsDay150C2bRuntimeProvenanceEvent = {
+    schema_version: FARM_OS_DAY150_C2B_RUNTIME_PROVENANCE_EVENT_AUTHORITY,
+    event_kind: "CHALLENGE_TERMINALIZATION_CANDIDATE", payload: {
+      challenge_reference_digest_candidate: D("1"),
+      terminal_state: "CONSUMED_APPROVAL_SUCCESS_CANDIDATE",
+      terminal_reference_digest_candidate: D("7"), observed_at_candidate: null,
+      native_ceremony_session_reference_digest_candidate: D("2"), ...recoveryFreshness,
+      boot_session_recovery_binding_candidate: binding(
+        "RECOVERY_CHALLENGE_TERMINALIZATION_CANDIDATE", 3,
+        recoveryChallenge.record_digest, D("7")) as any,
+    },
+  };
+  const consumed = deriveFarmOsDay150C2bRuntimeProvenanceNextSourceProjection(
+    outstanding!, terminal, { generation: 3, digest: recoveryChallenge.record_digest, event: issuance });
+  assert.equal(consumed?.challenge_candidate_state, "CONSUMED_APPROVAL_SUCCESS_CANDIDATE");
+  const recoveryTerminal = seal({ schema_version: FARM_OS_DAY150_C2B_RUNTIME_PROVENANCE_RECORD_AUTHORITY,
+    authority_id: FARM_OS_DAY150_C2B_RUNTIME_PROVENANCE_RECORD_AUTHORITY,
+    authority_revision: 1, generation: 4, previous_generation: 3,
+    previous_record_digest: recoveryChallenge.record_digest, source_bindings: bindings,
+    event: terminal, projected_source_state_claim: consumed! });
+  const capability: FarmOsDay150C2bRuntimeProvenanceEvent = {
+    schema_version: FARM_OS_DAY150_C2B_RUNTIME_PROVENANCE_EVENT_AUTHORITY,
+    event_kind: "CAPABILITY_ISSUANCE_CANDIDATE", payload: {
+      capability_reference_digest_candidate: D("a"), actor_reference_digest_candidate: D("4"),
+      challenge_reference_digest_candidate: D("1"),
+      native_ceremony_session_reference_digest_candidate: D("2"), capability_generation: 1,
+      previous_capability_or_revocation_reference_digest_candidate: D("7"),
+      expires_at_candidate: null, issued_at_candidate: null,
+      scope: "DAY150_PHASE_C2B_ISOLATED_DURABILITY_QUALIFICATION", one_shot: true,
+      ...recoveryFreshness, boot_session_recovery_binding_candidate: binding(
+        "RECOVERY_CAPABILITY_ISSUANCE_CANDIDATE", 4,
+        recoveryTerminal.record_digest, D("7"), D("a")) as any,
+    },
+  };
+  const available = deriveFarmOsDay150C2bRuntimeProvenanceNextSourceProjection(
+    consumed!, capability,
+    { generation: 4, digest: recoveryTerminal.record_digest, event: terminal });
+  assert.equal(available?.capability_candidate_state, "AVAILABLE_CANDIDATE");
+  const recoveryCapability = seal({
+    schema_version: FARM_OS_DAY150_C2B_RUNTIME_PROVENANCE_RECORD_AUTHORITY,
+    authority_id: FARM_OS_DAY150_C2B_RUNTIME_PROVENANCE_RECORD_AUTHORITY,
+    authority_revision: 1, generation: 5, previous_generation: 4,
+    previous_record_digest: recoveryTerminal.record_digest, source_bindings: bindings,
+    event: capability, projected_source_state_claim: available!,
+  });
+  assert.equal(deriveFarmOsDay150C2bRuntimeProvenanceNextSourceProjection(
+    consumed!, { ...capability, payload: { ...capability.payload,
+      boot_session_recovery_binding_candidate: { ...capability.payload
+        .boot_session_recovery_binding_candidate!, recovery_purpose: "B2" as any } } },
+    { generation: 4, digest: recoveryTerminal.record_digest, event: terminal }), null);
+  const supersession: FarmOsDay150C2bRuntimeProvenanceEvent = {
+    schema_version: FARM_OS_DAY150_C2B_RUNTIME_PROVENANCE_EVENT_AUTHORITY,
+    event_kind: "CLOCK_EPOCH_SUPERSESSION_CANDIDATE", payload: {
+      previous_epoch_reference_digest_candidate: D("e"),
+      proposed_new_epoch_reference_digest_candidate: D("d"),
+      recovery_actor_reference_digest_candidate: D("4"),
+      recovery_capability_reference_digest_candidate: D("a"),
+      proposed_corrected_genesis_timestamp_candidate: T1,
+      proposed_new_floor_timestamp_candidate: T1,
+      affected_record_policy_reference_digest_candidate: D("9"),
+      os_utc_observation_reference_digest_candidate: D("8"),
+      continuous_time_bracket_reference_digest_candidate: D("7"),
+      boot_session_reference_digest_candidate: D("c"),
+    },
+  };
+  const recovered = deriveFarmOsDay150C2bRuntimeProvenanceNextSourceProjection(
+    available!, supersession,
+    { generation: 5, digest: recoveryCapability.record_digest, event: capability });
+  assert.equal(recovered?.epoch_reference_digest_candidate, D("d"));
+  assert.equal(recovered?.capability_candidate_state, "CONSUMED_CANDIDATE");
+  assert.equal(deriveFarmOsDay150C2bRuntimeProvenanceNextSourceProjection(
+    recovered!, supersession,
+    { generation: 5, digest: recoveryCapability.record_digest, event: capability }), null);
+  assert.equal(deriveFarmOsDay150C2bRuntimeProvenanceNextSourceProjection(
+    available!, { ...supersession, payload: { ...supersession.payload,
+      recovery_capability_reference_digest_candidate: D("0") } },
+    { generation: 5, digest: recoveryCapability.record_digest, event: capability }), null);
+  const supersessionRecord = seal({
+    schema_version: FARM_OS_DAY150_C2B_RUNTIME_PROVENANCE_RECORD_AUTHORITY,
+    authority_id: FARM_OS_DAY150_C2B_RUNTIME_PROVENANCE_RECORD_AUTHORITY,
+    authority_revision: 1, generation: 6, previous_generation: 5,
+    previous_record_digest: recoveryCapability.record_digest, source_bindings: bindings,
+    event: supersession, projected_source_state_claim: recovered!,
+  });
+  assert.equal(replayFarmOsDay150C2bRuntimeProvenanceSourceChainCandidate([
+    gen0, challenge, gen2, recoveryChallenge, recoveryTerminal,
+    recoveryCapability, supersessionRecord,
+  ]).classification, "STRUCTURALLY_VALID_RUNTIME_PROVENANCE_CHAIN_CANDIDATE");
+  const replayedSessionEvent = clone(issuance);
+  replayedSessionEvent.payload.challenge_reference_digest_candidate = D("0");
+  replayedSessionEvent.payload.boot_session_recovery_binding_candidate
+    .recovery_challenge_reference_digest_candidate = D("0");
+  replayedSessionEvent.payload.boot_session_recovery_binding_candidate.expected_head_generation = 3;
+  replayedSessionEvent.payload.boot_session_recovery_binding_candidate.expected_head_digest =
+    recoveryChallenge.record_digest;
+  const replayedSessionRecord = seal({
+    schema_version: FARM_OS_DAY150_C2B_RUNTIME_PROVENANCE_RECORD_AUTHORITY,
+    authority_id: FARM_OS_DAY150_C2B_RUNTIME_PROVENANCE_RECORD_AUTHORITY,
+    authority_revision: 1, generation: 4, previous_generation: 3,
+    previous_record_digest: recoveryChallenge.record_digest, source_bindings: bindings,
+    event: replayedSessionEvent, projected_source_state_claim: outstanding!,
+  });
+  replayReason([gen0, challenge, gen2, recoveryChallenge, replayedSessionRecord],
+    "REFERENCE_REPLAY_CANDIDATE");
+  assert.equal(replayFarmOsDay150C2bRuntimeProvenanceSourceChainCandidate(
+    [gen0, challenge, gen2]).classification,
+    "STRUCTURALLY_VALID_RUNTIME_PROVENANCE_CHAIN_CANDIDATE");
+  assert.equal(gen2.record_digest, gen2.record_digest);
 });
 test("caller publication and trusted-readback claims rejected", () => {
   for (const key of ["success", "published", "trusted_readback", "canonical_membership"]) {

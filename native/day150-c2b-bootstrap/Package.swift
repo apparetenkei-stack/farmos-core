@@ -9,6 +9,14 @@ let package = Package(
         .executable(name: "farmos-c2b-ceremony-client", targets: ["FarmOSDay150C2BCeremonyClient"]),
         .executable(name: "farmos-c2b-validator-broker", targets: ["FarmOSDay150C2BValidatorBroker"]),
         .executable(name: "farmos-c2b-writer-worker", targets: ["FarmOSDay150C2BWriterWorker"]),
+        .executable(
+            name: "farmos-c2b-integrated-rehearsal",
+            targets: ["FarmOSDay150C2BIntegratedRehearsal"]
+        ),
+        .executable(
+            name: "farmos-c2b-fresh-auth-probe",
+            targets: ["FarmOSDay150C2BFreshAuthProbe"]
+        ),
     ],
     targets: [
         .target(name: "FarmOSDay150C2BNativeCore"),
@@ -22,6 +30,14 @@ let package = Package(
         ),
         .executableTarget(
             name: "FarmOSDay150C2BWriterWorker",
+            dependencies: ["FarmOSDay150C2BNativeCore"]
+        ),
+        .executableTarget(
+            name: "FarmOSDay150C2BIntegratedRehearsal",
+            dependencies: ["FarmOSDay150C2BNativeCore"]
+        ),
+        .executableTarget(
+            name: "FarmOSDay150C2BFreshAuthProbe",
             dependencies: ["FarmOSDay150C2BNativeCore"]
         ),
         .executableTarget(

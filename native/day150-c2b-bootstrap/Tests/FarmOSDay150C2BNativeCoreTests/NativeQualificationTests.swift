@@ -322,11 +322,34 @@ private func invalid(_ data: Data) -> NativeProtocolFailure? {
                       "stderr_payload", "stack_trace_payload", "connection_string", "dsn_value"] {
         expect(!source.lowercased().contains(forbidden))
     }
+
     expect(!NativeBrokerSource.runtimeActivationEstablished)
     expect(!NativeWriterPolicy.installedWriterIdentityEstablished)
     expect(!NativeWriterPolicy.canonicalLedgerWritePerformed)
     expect(!NativeActorProvenanceSource.actorEstablished)
     expect(!NativeClockProvenanceSource.trustedClockEstablished)
+}
+
+func testIntegratedAuthenticationChildLifetimeIsBounded() throws {
+    let process = Process()
+    process.executableURL = URL(fileURLWithPath: "/bin/sleep")
+    process.arguments = ["30"]
+    let output = Pipe()
+    process.standardOutput = output
+    process.standardError = FileHandle.nullDevice
+    let completion = DispatchSemaphore(value: 0)
+    process.terminationHandler = { _ in completion.signal() }
+    let started = ProcessInfo.processInfo.systemUptime
+    try process.run()
+    expect(NativeIntegratedAuthentication.readAvailableDataBoundedly(
+        output.fileHandleForReading, timeout: 0.05
+    ) == nil, "pre-marker child hang must time out")
+    expect(NativeIntegratedAuthentication.terminateBoundedly(
+        process, completion: completion
+    ), "hung child must terminate within the bounded grace period")
+    expect(!process.isRunning, "bounded termination must leave no running child")
+    expect(ProcessInfo.processInfo.systemUptime - started < 3,
+           "child lifetime fixture exceeded its finite bound")
 }
 
 private func runSourceQualification() throws {
@@ -340,6 +363,7 @@ private func runSourceQualification() throws {
     testActorProvenance()
     testClockProvenance()
     try testPrivacyAndNegativeAuthority()
+    try testIntegratedAuthenticationChildLifetimeIsBounded()
     FileHandle.standardOutput.write(Data("R4-2 native qualification PASS: 10 groups\n".utf8))
 }
 

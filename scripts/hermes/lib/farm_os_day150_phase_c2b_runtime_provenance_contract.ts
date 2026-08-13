@@ -40,10 +40,43 @@ const GENESIS_RECEIPT_DIGEST_DOMAIN =
   "farmos.day150-c2b-bootstrap-runtime-genesis-approval-receipt.v1:body" as const;
 export const FARM_OS_DAY150_C2B_RUNTIME_PROVENANCE_EVENT_AUTHORITY =
   "farmos.day150-c2b-bootstrap-runtime-provenance-event.v1" as const;
+export const FARM_OS_DAY150_POST_GEN0_NORMAL_CAPABILITY_TTL_POLICY_AUTHORITY =
+  "DAY150_POST_GEN0_NORMAL_CAPABILITY_TTL_POLICY_V1" as const;
+export const FARM_OS_DAY150_POST_GEN0_NORMAL_CAPABILITY_TTL_SECONDS = 120 as const;
 export const FARM_OS_DAY150_C2B_RUNTIME_PROVENANCE_SOURCE_PROJECTION_AUTHORITY =
   "farmos.day150-c2b-bootstrap-runtime-provenance-source-projection.v1" as const;
 export const FARM_OS_DAY150_C2B_RUNTIME_PROVENANCE_PURPOSE =
   "DAY150_PHASE_C2B_ISOLATED_DURABILITY_QUALIFICATION" as const;
+export const FARM_OS_DAY150_C2B_CROSS_EPOCH_CHALLENGE_RECOVERY_AUTHORITY =
+  "farmos.day150-c2b-cross-epoch-challenge-recovery-amendment.v1" as const;
+export const FARM_OS_DAY150_C2B_CROSS_EPOCH_CHALLENGE_RECOVERY_REVISION = 1 as const;
+const CROSS_EPOCH_RECOVERY_BODY = Object.freeze({
+  authority_id: FARM_OS_DAY150_C2B_CROSS_EPOCH_CHALLENGE_RECOVERY_AUTHORITY,
+  authority_revision: FARM_OS_DAY150_C2B_CROSS_EPOCH_CHALLENGE_RECOVERY_REVISION,
+  terminal_state: "BOOT_SESSION_INVALIDATED_CANDIDATE",
+  reason: "BOOT_SESSION_CHANGE",
+  scope: "CROSS_EPOCH_TERMINALIZATION_ONLY",
+});
+export const FARM_OS_DAY150_C2B_CROSS_EPOCH_CHALLENGE_RECOVERY_DIGEST =
+  hashFarmOsProductionTargetExecutionContract(
+    FARM_OS_DAY150_C2B_CROSS_EPOCH_CHALLENGE_RECOVERY_AUTHORITY + ":policy",
+    CROSS_EPOCH_RECOVERY_BODY,
+  );
+export const FARM_OS_DAY150_C2B_BOOT_SESSION_RECOVERY_CAPABILITY_AUTHORITY =
+  "farmos.day150-c2b-boot-session-recovery-capability-amendment.v1" as const;
+export const FARM_OS_DAY150_C2B_BOOT_SESSION_RECOVERY_CAPABILITY_REVISION = 1 as const;
+const BOOT_SESSION_RECOVERY_CAPABILITY_BODY = Object.freeze({
+  authority_id: FARM_OS_DAY150_C2B_BOOT_SESSION_RECOVERY_CAPABILITY_AUTHORITY,
+  authority_revision: FARM_OS_DAY150_C2B_BOOT_SESSION_RECOVERY_CAPABILITY_REVISION,
+  eligible_terminal_state: "BOOT_SESSION_INVALIDATED_CANDIDATE",
+  recovery_purpose: "CLOCK_EPOCH_SUPERSESSION_CANDIDATE",
+  scope: "RECOVERY_ELIGIBILITY_ONLY",
+});
+export const FARM_OS_DAY150_C2B_BOOT_SESSION_RECOVERY_CAPABILITY_DIGEST =
+  hashFarmOsProductionTargetExecutionContract(
+    FARM_OS_DAY150_C2B_BOOT_SESSION_RECOVERY_CAPABILITY_AUTHORITY + ":policy",
+    BOOT_SESSION_RECOVERY_CAPABILITY_BODY,
+  );
 
 export const FARM_OS_DAY150_C2B_RUNTIME_PROVENANCE_EVENT_KINDS = Object.freeze([
   "INTEGRATED_RUNTIME_GENESIS_CANDIDATE",
@@ -61,8 +94,10 @@ export type FarmOsDay150C2bRuntimeProvenanceEventKind =
   typeof FARM_OS_DAY150_C2B_RUNTIME_PROVENANCE_EVENT_KINDS[number];
 
 export const FARM_OS_DAY150_C2B_CHALLENGE_TERMINAL_STATES = Object.freeze([
-  "CONSUMED_APPROVAL_SUCCESS_CANDIDATE", "CONSUMED_APPROVAL_FAILURE_CANDIDATE",
+  "CONSUMED_APPROVAL_SUCCESS_CANDIDATE", "CONSUMED_AUTHENTICATION_SUCCESS_CANDIDATE",
+  "CONSUMED_APPROVAL_FAILURE_CANDIDATE",
   "ABANDONED_CANDIDATE", "EXPIRED_CANDIDATE", "OUTCOME_UNKNOWN_CANDIDATE",
+  "BOOT_SESSION_INVALIDATED_CANDIDATE",
 ] as const);
 export const FARM_OS_DAY150_C2B_CAPABILITY_TERMINAL_STATES = Object.freeze([
   "CONSUMED_CANDIDATE", "EXPIRED_CANDIDATE", "REVOKED_CANDIDATE",
@@ -84,6 +119,10 @@ export type FarmOsDay150C2bRuntimeGenesisProposalBody = Readonly<{
   native_ceremony_session_reference_digest_candidate: Digest;
   os_utc_observation_reference_digest_candidate: Digest;
   human_time_plausibility_confirmation_reference_digest: Digest;
+  actor_policy_revision: 1;
+  clock_policy_revision: 1;
+  publication_policy_revision: 1;
+  companion_artifact_reference_digest_candidate: Digest;
 }>;
 export type FarmOsDay150C2bRuntimeGenesisDecisionBody = Readonly<{
   schema_version: typeof FARM_OS_DAY150_C2B_RUNTIME_GENESIS_DECISION_AUTHORITY;
@@ -118,6 +157,31 @@ type Event<K extends FarmOsDay150C2bRuntimeProvenanceEventKind, P> = Readonly<{
   schema_version: typeof FARM_OS_DAY150_C2B_RUNTIME_PROVENANCE_EVENT_AUTHORITY;
   event_kind: K;
   payload: Readonly<P>;
+}>;
+
+export type FarmOsDay150C2bBootSessionRecoveryBinding = Readonly<{
+  amendment_authority: typeof FARM_OS_DAY150_C2B_BOOT_SESSION_RECOVERY_CAPABILITY_AUTHORITY;
+  amendment_revision: typeof FARM_OS_DAY150_C2B_BOOT_SESSION_RECOVERY_CAPABILITY_REVISION;
+  amendment_digest: Digest;
+  recovery_stage: "RECOVERY_CHALLENGE_ISSUANCE_CANDIDATE" |
+    "RECOVERY_CHALLENGE_TERMINALIZATION_CANDIDATE" |
+    "RECOVERY_CAPABILITY_ISSUANCE_CANDIDATE";
+  expected_head_generation: number;
+  expected_head_digest: Digest;
+  gen2_record_digest_candidate: Digest;
+  gen2_terminal_reference_digest_candidate: Digest;
+  historical_challenge_reference_digest_candidate: Digest;
+  historical_session_reference_digest_candidate: Digest;
+  old_epoch_reference_digest_candidate: Digest;
+  old_boot_session_reference_digest_candidate: Digest;
+  current_boot_session_reference_digest_candidate: Digest;
+  recovery_purpose: "CLOCK_EPOCH_SUPERSESSION_CANDIDATE";
+  recovery_policy_revision: 1;
+  recovery_challenge_reference_digest_candidate: Digest;
+  recovery_challenge_terminal_reference_digest_candidate: Digest | null;
+  recovery_capability_reference_digest_candidate: Digest | null;
+  recovery_session_reference_digest_candidate: Digest;
+  recovery_freshness_reference_digest_candidate: Digest;
 }>;
 
 export type FarmOsDay150C2bRuntimeGenesisCandidateEvent = Event<
@@ -163,6 +227,7 @@ export type FarmOsDay150C2bChallengeIssuanceCandidateEvent = Event<
     expires_at_candidate: string | null;
     issued_at_candidate: string | null;
     scope: typeof FARM_OS_DAY150_C2B_RUNTIME_PROVENANCE_PURPOSE;
+    boot_session_recovery_binding_candidate?: FarmOsDay150C2bBootSessionRecoveryBinding;
   } & FarmOsDay150C2bRuntimeMutationFreshnessBinding
 >;
 export type FarmOsDay150C2bChallengeTerminalizationCandidateEvent = Event<
@@ -172,6 +237,20 @@ export type FarmOsDay150C2bChallengeTerminalizationCandidateEvent = Event<
     terminal_reference_digest_candidate: Digest;
     observed_at_candidate: string | null;
     native_ceremony_session_reference_digest_candidate: Digest;
+    cross_epoch_recovery_binding_candidate?: Readonly<{
+      amendment_authority: typeof FARM_OS_DAY150_C2B_CROSS_EPOCH_CHALLENGE_RECOVERY_AUTHORITY;
+      amendment_revision: typeof FARM_OS_DAY150_C2B_CROSS_EPOCH_CHALLENGE_RECOVERY_REVISION;
+      amendment_digest: Digest;
+      expected_head_generation: number;
+      expected_head_digest: Digest;
+      old_epoch_reference_digest_candidate: Digest;
+      old_boot_session_reference_digest_candidate: Digest;
+      current_boot_session_reference_digest_candidate: Digest;
+      recovery_session_reference_digest_candidate: Digest;
+      recovery_freshness_reference_digest_candidate: Digest;
+      terminal_reason: "BOOT_SESSION_CHANGE";
+    }>;
+    boot_session_recovery_binding_candidate?: FarmOsDay150C2bBootSessionRecoveryBinding;
   } & FarmOsDay150C2bRuntimeMutationFreshnessBinding
 >;
 export type FarmOsDay150C2bCapabilityIssuanceCandidateEvent = Event<
@@ -186,6 +265,7 @@ export type FarmOsDay150C2bCapabilityIssuanceCandidateEvent = Event<
     issued_at_candidate: string | null;
     scope: typeof FARM_OS_DAY150_C2B_RUNTIME_PROVENANCE_PURPOSE;
     one_shot: true;
+    boot_session_recovery_binding_candidate?: FarmOsDay150C2bBootSessionRecoveryBinding;
   } & FarmOsDay150C2bRuntimeMutationFreshnessBinding
 >;
 export type FarmOsDay150C2bCapabilityTerminalizationCandidateEvent = Event<
@@ -274,6 +354,7 @@ export type FarmOsDay150C2bRuntimeSourceBindings = Readonly<{
   r3_clock_source_candidate_digest: Digest;
   installation_profile_digest_candidate: Digest;
   native_profile_digest_candidate: Digest;
+  companion_artifact_reference_digest_candidate: Digest;
 }>;
 
 export type FarmOsDay150C2bRuntimeProvenanceSourceProjection = Readonly<{
@@ -340,6 +421,26 @@ const MUTATION_FRESHNESS_KEYS = Object.freeze(["freshness_basis",
   "proposed_monotonic_floor_timestamp_candidate", "os_utc_observation_reference_digest_candidate",
   "continuous_time_bracket_reference_digest_candidate", "boot_session_reference_digest_candidate",
   "native_recovery_session_reference_digest_candidate", "clock_comparison_policy_revision"] as const);
+const CROSS_EPOCH_RECOVERY_BINDING_KEYS = Object.freeze([
+  "amendment_authority", "amendment_revision", "amendment_digest",
+  "expected_head_generation", "expected_head_digest",
+  "old_epoch_reference_digest_candidate", "old_boot_session_reference_digest_candidate",
+  "current_boot_session_reference_digest_candidate", "recovery_session_reference_digest_candidate",
+  "recovery_freshness_reference_digest_candidate", "terminal_reason",
+] as const);
+const BOOT_SESSION_RECOVERY_BINDING_KEYS = Object.freeze([
+  "amendment_authority", "amendment_revision", "amendment_digest", "recovery_stage",
+  "expected_head_generation", "expected_head_digest", "gen2_record_digest_candidate",
+  "gen2_terminal_reference_digest_candidate",
+  "historical_challenge_reference_digest_candidate",
+  "historical_session_reference_digest_candidate", "old_epoch_reference_digest_candidate",
+  "old_boot_session_reference_digest_candidate", "current_boot_session_reference_digest_candidate",
+  "recovery_purpose", "recovery_policy_revision",
+  "recovery_challenge_reference_digest_candidate",
+  "recovery_challenge_terminal_reference_digest_candidate",
+  "recovery_capability_reference_digest_candidate", "recovery_session_reference_digest_candidate",
+  "recovery_freshness_reference_digest_candidate",
+] as const);
 const EVENT_KEYS: Readonly<Record<FarmOsDay150C2bRuntimeProvenanceEventKind,
 readonly string[]>> = Object.freeze({
   INTEGRATED_RUNTIME_GENESIS_CANDIDATE: ["proposal_reference_digest", "proposal_body_candidate",
@@ -447,11 +548,77 @@ function validIssuanceTime(payload: Readonly<Record<string, unknown>>): boolean 
       Date.parse(payload.expires_at_candidate as string) > Date.parse(payload.issued_at_candidate as string)
     : payload.issued_at_candidate === null && payload.expires_at_candidate === null;
 }
+function validNormalCapabilityTTL(payload: Readonly<Record<string, unknown>>): boolean {
+  return typeof payload.issued_at_candidate === "string" &&
+    typeof payload.expires_at_candidate === "string" &&
+    Date.parse(payload.expires_at_candidate) - Date.parse(payload.issued_at_candidate) ===
+      FARM_OS_DAY150_POST_GEN0_NORMAL_CAPABILITY_TTL_SECONDS * 1000;
+}
 function validObservationTime(payload: Readonly<Record<string, unknown>>): boolean {
   return payload.freshness_basis === "ACTIVE_TRUSTED_CLOCK_CANDIDATE"
     ? timestamp(payload.observed_at_candidate) &&
       payload.observed_at_candidate === payload.proposed_monotonic_floor_timestamp_candidate
     : payload.observed_at_candidate === null;
+}
+function validCrossEpochRecoveryBinding(payload: Readonly<Record<string, unknown>>): boolean {
+  const binding = record(payload.cross_epoch_recovery_binding_candidate as
+    FarmOsDay150C2bBootstrapDataSnapshot);
+  return payload.terminal_state === "BOOT_SESSION_INVALIDATED_CANDIDATE" && binding !== null &&
+    exactKeys(binding, CROSS_EPOCH_RECOVERY_BINDING_KEYS) &&
+    binding.amendment_authority === FARM_OS_DAY150_C2B_CROSS_EPOCH_CHALLENGE_RECOVERY_AUTHORITY &&
+    binding.amendment_revision === FARM_OS_DAY150_C2B_CROSS_EPOCH_CHALLENGE_RECOVERY_REVISION &&
+    binding.amendment_digest === FARM_OS_DAY150_C2B_CROSS_EPOCH_CHALLENGE_RECOVERY_DIGEST &&
+    integer(binding.expected_head_generation) &&
+    allDigests(binding, ["expected_head_digest", "old_epoch_reference_digest_candidate",
+      "old_boot_session_reference_digest_candidate", "current_boot_session_reference_digest_candidate",
+      "recovery_session_reference_digest_candidate", "recovery_freshness_reference_digest_candidate"]) &&
+    binding.old_boot_session_reference_digest_candidate !==
+      binding.current_boot_session_reference_digest_candidate &&
+    binding.terminal_reason === "BOOT_SESSION_CHANGE" &&
+    payload.freshness_basis === "CLOCK_RECOVERY_NATIVE_SESSION_CANDIDATE" &&
+    payload.native_recovery_session_reference_digest_candidate ===
+      binding.recovery_session_reference_digest_candidate;
+}
+function validBootSessionRecoveryBinding(
+  payload: Readonly<Record<string, unknown>>,
+  expectedStage: FarmOsDay150C2bBootSessionRecoveryBinding["recovery_stage"],
+): boolean {
+  const binding = record(payload.boot_session_recovery_binding_candidate as
+    FarmOsDay150C2bBootstrapDataSnapshot);
+  if (!binding || !exactKeys(binding, BOOT_SESSION_RECOVERY_BINDING_KEYS) ||
+    binding.amendment_authority !== FARM_OS_DAY150_C2B_BOOT_SESSION_RECOVERY_CAPABILITY_AUTHORITY ||
+    binding.amendment_revision !== FARM_OS_DAY150_C2B_BOOT_SESSION_RECOVERY_CAPABILITY_REVISION ||
+    binding.amendment_digest !== FARM_OS_DAY150_C2B_BOOT_SESSION_RECOVERY_CAPABILITY_DIGEST ||
+    binding.recovery_stage !== expectedStage || !integer(binding.expected_head_generation) ||
+    binding.recovery_purpose !== "CLOCK_EPOCH_SUPERSESSION_CANDIDATE" ||
+    binding.recovery_policy_revision !== 1 ||
+    !allDigests(binding, ["expected_head_digest", "gen2_record_digest_candidate",
+      "gen2_terminal_reference_digest_candidate", "historical_challenge_reference_digest_candidate",
+      "historical_session_reference_digest_candidate", "old_epoch_reference_digest_candidate",
+      "old_boot_session_reference_digest_candidate", "current_boot_session_reference_digest_candidate",
+      "recovery_challenge_reference_digest_candidate", "recovery_session_reference_digest_candidate",
+      "recovery_freshness_reference_digest_candidate"]) ||
+    binding.old_boot_session_reference_digest_candidate ===
+      binding.current_boot_session_reference_digest_candidate ||
+    payload.freshness_basis !== "CLOCK_RECOVERY_NATIVE_SESSION_CANDIDATE" ||
+    payload.native_recovery_session_reference_digest_candidate !==
+      binding.recovery_session_reference_digest_candidate) return false;
+  const terminal = binding.recovery_challenge_terminal_reference_digest_candidate;
+  const capability = binding.recovery_capability_reference_digest_candidate;
+  if (expectedStage === "RECOVERY_CHALLENGE_ISSUANCE_CANDIDATE") {
+    return terminal === null && capability === null &&
+      payload.challenge_reference_digest_candidate ===
+        binding.recovery_challenge_reference_digest_candidate;
+  }
+  if (!digest(terminal)) return false;
+  if (expectedStage === "RECOVERY_CHALLENGE_TERMINALIZATION_CANDIDATE") {
+    return capability === null && payload.challenge_reference_digest_candidate ===
+      binding.recovery_challenge_reference_digest_candidate &&
+      payload.terminal_reference_digest_candidate === terminal;
+  }
+  return digest(capability) && payload.challenge_reference_digest_candidate ===
+    binding.recovery_challenge_reference_digest_candidate &&
+    payload.capability_reference_digest_candidate === capability;
 }
 function validGenesisLineage(payload: Readonly<Record<string, FarmOsDay150C2bBootstrapDataSnapshot>>):
 boolean {
@@ -463,7 +630,9 @@ boolean {
       "actor_reference_digest_candidate", "challenge_reference_digest_candidate",
       "native_ceremony_session_reference_digest_candidate",
       "os_utc_observation_reference_digest_candidate",
-      "human_time_plausibility_confirmation_reference_digest"]) ||
+      "human_time_plausibility_confirmation_reference_digest",
+      "actor_policy_revision", "clock_policy_revision", "publication_policy_revision",
+      "companion_artifact_reference_digest_candidate"]) ||
     !exactKeys(decision, ["schema_version", "decision", "proposal_reference_digest",
       "actor_reference_digest_candidate", "challenge_reference_digest_candidate",
       "authentication_mechanism_revision"]) ||
@@ -473,6 +642,8 @@ boolean {
       "capability_reference_digest_candidate", "capability_terminal_state"])) return false;
   if (proposal.schema_version !== FARM_OS_DAY150_C2B_RUNTIME_GENESIS_PROPOSAL_AUTHORITY ||
     proposal.purpose !== FARM_OS_DAY150_C2B_RUNTIME_PROVENANCE_PURPOSE ||
+    proposal.actor_policy_revision !== 1 || proposal.clock_policy_revision !== 1 ||
+    proposal.publication_policy_revision !== 1 ||
     decision.schema_version !== FARM_OS_DAY150_C2B_RUNTIME_GENESIS_DECISION_AUTHORITY ||
     decision.decision !== "APPROVE" || decision.authentication_mechanism_revision !== 1 ||
     receipt.schema_version !== FARM_OS_DAY150_C2B_RUNTIME_GENESIS_RECEIPT_AUTHORITY ||
@@ -504,6 +675,9 @@ boolean {
       payload.os_utc_observation_reference_digest_candidate &&
     proposal.human_time_plausibility_confirmation_reference_digest ===
       payload.human_time_plausibility_confirmation_reference_digest &&
+    proposal.actor_policy_revision === payload.actor_policy_revision &&
+    proposal.clock_policy_revision === payload.clock_policy_revision &&
+    proposal.publication_policy_revision === payload.publication_policy_revision &&
     decision.proposal_reference_digest === payload.proposal_reference_digest &&
     decision.actor_reference_digest_candidate === payload.actor_reference_digest_candidate &&
     decision.challenge_reference_digest_candidate ===
@@ -528,7 +702,7 @@ Readonly<Record<string, FarmOsDay150C2bBootstrapDataSnapshot>> | null {
     "r2_genesis_source_candidate_digest", "r3_actor_source_authority",
     "r3_actor_source_candidate_digest", "r3_clock_source_authority",
     "r3_clock_source_candidate_digest", "installation_profile_digest_candidate",
-    "native_profile_digest_candidate"])) return null;
+    "native_profile_digest_candidate", "companion_artifact_reference_digest_candidate"])) return null;
   if (body.manifest_authority !== FARM_OS_DAY150_C2B_BOOTSTRAP_MANIFEST_AUTHORITY ||
     body.manifest_digest !== FARM_OS_DAY150_C2B_BOOTSTRAP_MANIFEST_SOURCE_CANDIDATE.manifest_digest ||
     body.r2_record_authority !== FARM_OS_DAY150_C2B_BOOTSTRAP_LEDGER_RECORD_AUTHORITY ||
@@ -552,7 +726,15 @@ FarmOsDay150C2bRuntimeProvenanceEvent | null {
   }
   const kind = envelope.event_kind as FarmOsDay150C2bRuntimeProvenanceEventKind;
   const payload = record(envelope.payload);
-  if (!payload || !exactKeys(payload, EVENT_KEYS[kind])) return null;
+  const normalKeys = payload !== null && exactKeys(payload, EVENT_KEYS[kind]);
+  const crossEpochKeys = kind === "CHALLENGE_TERMINALIZATION_CANDIDATE" && payload !== null &&
+    exactKeys(payload, [...EVENT_KEYS[kind], "cross_epoch_recovery_binding_candidate"]);
+  const bootSessionRecoveryKeys = payload !== null &&
+    (kind === "CHALLENGE_ISSUANCE_CANDIDATE" ||
+      kind === "CHALLENGE_TERMINALIZATION_CANDIDATE" ||
+      kind === "CAPABILITY_ISSUANCE_CANDIDATE") &&
+    exactKeys(payload, [...EVENT_KEYS[kind], "boot_session_recovery_binding_candidate"]);
+  if (!payload || (!normalKeys && !crossEpochKeys && !bootSessionRecoveryKeys)) return null;
   const d = (keys: readonly string[]) => allDigests(payload, keys);
   let valid = false;
   switch (kind) {
@@ -602,14 +784,22 @@ FarmOsDay150C2bRuntimeProvenanceEvent | null {
     case "CHALLENGE_ISSUANCE_CANDIDATE":
       valid = d(EVENT_KEYS[kind].slice(0, 3)) && validIssuanceTime(payload) &&
         payload.scope === FARM_OS_DAY150_C2B_RUNTIME_PROVENANCE_PURPOSE &&
-        validMutationFreshness(payload);
+        validMutationFreshness(payload) && (bootSessionRecoveryKeys
+          ? validBootSessionRecoveryBinding(payload, "RECOVERY_CHALLENGE_ISSUANCE_CANDIDATE")
+          : payload.boot_session_recovery_binding_candidate === undefined);
       break;
     case "CHALLENGE_TERMINALIZATION_CANDIDATE":
       valid = d(["challenge_reference_digest_candidate", "terminal_reference_digest_candidate"]) &&
         digest(payload.native_ceremony_session_reference_digest_candidate) &&
-        validObservationTime(payload) &&
+        (crossEpochKeys ? validCrossEpochRecoveryBinding(payload) : validObservationTime(payload)) &&
         (FARM_OS_DAY150_C2B_CHALLENGE_TERMINAL_STATES as readonly unknown[])
-          .includes(payload.terminal_state) && validMutationFreshness(payload);
+          .includes(payload.terminal_state) && validMutationFreshness(payload) &&
+        (crossEpochKeys || payload.terminal_state !== "BOOT_SESSION_INVALIDATED_CANDIDATE") &&
+        (bootSessionRecoveryKeys
+          ? payload.terminal_state === "CONSUMED_APPROVAL_SUCCESS_CANDIDATE" &&
+            validBootSessionRecoveryBinding(
+              payload, "RECOVERY_CHALLENGE_TERMINALIZATION_CANDIDATE")
+          : payload.boot_session_recovery_binding_candidate === undefined);
       break;
     case "CAPABILITY_ISSUANCE_CANDIDATE":
       valid = d(["capability_reference_digest_candidate", "actor_reference_digest_candidate",
@@ -618,8 +808,11 @@ FarmOsDay150C2bRuntimeProvenanceEvent | null {
         (payload.previous_capability_or_revocation_reference_digest_candidate === null ||
           digest(payload.previous_capability_or_revocation_reference_digest_candidate)) &&
         validIssuanceTime(payload) &&
+        (bootSessionRecoveryKeys || validNormalCapabilityTTL(payload)) &&
         payload.scope === FARM_OS_DAY150_C2B_RUNTIME_PROVENANCE_PURPOSE && payload.one_shot === true &&
-        validMutationFreshness(payload);
+        validMutationFreshness(payload) && (bootSessionRecoveryKeys
+          ? validBootSessionRecoveryBinding(payload, "RECOVERY_CAPABILITY_ISSUANCE_CANDIDATE")
+          : payload.boot_session_recovery_binding_candidate === undefined);
       break;
     case "CAPABILITY_TERMINALIZATION_CANDIDATE":
       valid = d(["capability_reference_digest_candidate", "terminal_reference_digest_candidate"]) &&
@@ -787,7 +980,10 @@ export function parseFarmOsDay150C2bRuntimeProvenanceRecordSourceCandidate(
   const bindings = parseBindings(body.source_bindings);
   if (!bindings) return invalid("INVALID_SOURCE_BINDINGS");
   if (!digest(bindings.installation_profile_digest_candidate) ||
-    !digest(bindings.native_profile_digest_candidate)) return invalid("INVALID_PROFILE_REFERENCE");
+    !digest(bindings.native_profile_digest_candidate) ||
+    !digest(bindings.companion_artifact_reference_digest_candidate)) {
+    return invalid("INVALID_PROFILE_REFERENCE");
+  }
   const safeBindings: FarmOsDay150C2bRuntimeSourceBindings = Object.freeze({
     manifest_authority: FARM_OS_DAY150_C2B_BOOTSTRAP_MANIFEST_AUTHORITY,
     manifest_digest: FARM_OS_DAY150_C2B_BOOTSTRAP_MANIFEST_SOURCE_CANDIDATE.manifest_digest,
@@ -800,6 +996,8 @@ export function parseFarmOsDay150C2bRuntimeProvenanceRecordSourceCandidate(
     r3_clock_source_candidate_digest: bindings.r3_clock_source_candidate_digest as Digest,
     installation_profile_digest_candidate: bindings.installation_profile_digest_candidate as Digest,
     native_profile_digest_candidate: bindings.native_profile_digest_candidate as Digest,
+    companion_artifact_reference_digest_candidate:
+      bindings.companion_artifact_reference_digest_candidate as Digest,
   });
   if (!integer(body.generation)) return invalid("INVALID_GENERATION");
   if (!(body.previous_generation === null || integer(body.previous_generation)) ||
@@ -852,6 +1050,8 @@ export function parseFarmOsDay150C2bRuntimeProvenanceRecordSourceCandidate(
       quarantine_candidate_state: "NOT_QUARANTINED_CANDIDATE" as const,
       publication_outcome_candidate: "KNOWN_SOURCE_CANDIDATE" as const,
     }) : null;
+  const genesisProposal = event.event_kind === "INTEGRATED_RUNTIME_GENESIS_CANDIDATE"
+    ? record(event.payload.proposal_body_candidate) : null;
   if ((safeBody.generation === 0) !==
       (safeBody.event.event_kind === "INTEGRATED_RUNTIME_GENESIS_CANDIDATE") ||
     (safeBody.generation === 0 && (safeBody.previous_generation !== null ||
@@ -861,6 +1061,9 @@ export function parseFarmOsDay150C2bRuntimeProvenanceRecordSourceCandidate(
     (event.event_kind === "INTEGRATED_RUNTIME_GENESIS_CANDIDATE" &&
       event.payload.proposal_target_binding_digest !==
         computeFarmOsDay150C2bRuntimeSourceBindingsDigest(safeBindings)) ||
+    (event.event_kind === "INTEGRATED_RUNTIME_GENESIS_CANDIDATE" &&
+      genesisProposal?.companion_artifact_reference_digest_candidate !==
+        safeBindings.companion_artifact_reference_digest_candidate) ||
     (exactGenesisProjection !== null &&
       canonicalizeFarmOsProductionTargetExecutionContract(exactGenesisProjection) !==
         canonicalizeFarmOsProductionTargetExecutionContract(projection))) {
