@@ -273,7 +273,7 @@ public enum DisposableRecordValidator {
         Set(value.keys) == bindingsKeys &&
         value["manifest_authority"] as? String == "farmos.day150-c2b-bootstrap-manifest.v1" &&
         value["manifest_digest"] as? String ==
-            "sha256:a332368cbdca6461e11f538085a8bea3bfbd63f20cc0066302412d309e9e11be" &&
+            "sha256:4f40823d671ded21d01d19f88b512e2ba4b75cb20b56d2bd5ae0a723c4bd28b9" &&
         value["r2_record_authority"] as? String ==
             "farmos.day150-c2b-bootstrap-ledger-record.v1" &&
         value["r2_genesis_source_candidate_digest"] as? String ==
@@ -701,7 +701,7 @@ public enum DisposableRecordValidator {
         [
             "manifest_authority": "farmos.day150-c2b-bootstrap-manifest.v1",
             "manifest_digest":
-                "sha256:a332368cbdca6461e11f538085a8bea3bfbd63f20cc0066302412d309e9e11be",
+                "sha256:4f40823d671ded21d01d19f88b512e2ba4b75cb20b56d2bd5ae0a723c4bd28b9",
             "r2_record_authority": "farmos.day150-c2b-bootstrap-ledger-record.v1",
             "r2_genesis_source_candidate_digest":
                 "sha256:98e57a4f41639b64e1b992e3e6ccf56c3f0b625916ded4d2b2c4fc56760376f4",

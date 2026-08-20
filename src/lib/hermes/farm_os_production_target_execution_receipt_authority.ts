@@ -38,7 +38,7 @@ export const FARM_OS_PRODUCTION_TARGET_EXECUTION_RECEIPT_AUTHORITY = Object.free
   unknown_outcome_receipt_required: true,
   production_evidence_receipt_authority: false,
   establishes_gate2_production_receipt: false,
-  implementation_status: "SOURCE_ONLY_CONTRACT_CANDIDATE",
+  implementation_status: "ISOLATED_STORAGE_QUALIFIED",
 } as const);
 
 export type FarmOsProductionTargetExecutionReceipt = Readonly<{

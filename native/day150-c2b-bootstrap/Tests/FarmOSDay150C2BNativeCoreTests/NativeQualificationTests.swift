@@ -132,6 +132,25 @@ private func invalid(_ data: Data) -> NativeProtocolFailure? {
     expect(!NativeBrokerSource.networkAuthority)
 }
 
+private final class InjectedWriterPrivilegePort: WriterPrivilegeSyscallPort {
+    var calls: [String] = []
+    let failureIndex: Int?
+    init(failureIndex: Int? = nil) { self.failureIndex = failureIndex }
+    private func step(_ name: String) -> Bool {
+        calls.append(name); return failureIndex != calls.count - 1
+    }
+    func closeUnrelatedFileDescriptors() -> Bool { step("close") }
+    func removeSupplementaryGroups() -> Bool { step("groups") }
+    func setDedicatedGroup(_ gid: gid_t) -> Bool { step("setgid:\(gid)") }
+    func setDedicatedUser(_ uid: uid_t) -> Bool { step("setuid:\(uid)") }
+    func verifyRootRegainRejected() -> Bool { step("root-regain") }
+    func changeWorkingDirectoryToRoot() -> Bool { step("chdir") }
+    func setUmask0077() -> Bool { step("umask") }
+    func installNetworkDenial() -> Bool { step("network-deny") }
+    func installGenericExecDenial() -> Bool { step("exec-deny") }
+    func acceptBoundedLedgerOperation() -> Bool { step("bounded-operation") }
+}
+
     func testWriterPolicy() {
     let good = WriterQualificationPlan(
         steps: NativeWriterPolicy.requiredSequence,
@@ -158,6 +177,20 @@ private func invalid(_ data: Data) -> NativeProtocolFailure? {
         == .unsupportedOperation)
     expect(!NativeWriterPolicy.livePrivilegeDropPerformed)
     expect(!NativeWriterPolicy.canonicalLedgerWritePerformed)
+    let runtime = InjectedWriterPrivilegePort()
+    expect(WriterPrivilegeRuntime.execute(port: runtime, dedicatedUID: 250, dedicatedGID: 250) == nil)
+    expect(runtime.calls == ["close", "groups", "setgid:250", "setuid:250", "root-regain",
+                             "chdir", "umask", "network-deny", "exec-deny", "bounded-operation"])
+    for failureIndex in 0..<10 {
+        let failing = InjectedWriterPrivilegePort(failureIndex: failureIndex)
+        expect(WriterPrivilegeRuntime.execute(
+            port: failing, dedicatedUID: 250, dedicatedGID: 250
+        ) != nil, "writer syscall failure must fail closed at step \(failureIndex)")
+        expect(failing.calls.count == failureIndex + 1, "writer continued after failed syscall")
+    }
+    expect(WriterPrivilegeRuntime.execute(
+        port: InjectedWriterPrivilegePort(), dedicatedUID: 0, dedicatedGID: 0
+    ) == .invalidIdentity)
 }
 
     func testStoragePolicy() {
@@ -1023,7 +1056,7 @@ private func runStorageChild() -> Never {
 
 private func runDisposableStorageQualification() throws {
     let args = CommandLine.arguments
-    guard args.count >= 6, args[1] == "--disposable-storage",
+    guard args.count >= 2, args[1] == "--disposable-storage",
           (args.count - 2).isMultiple(of: 4) else {
         throw DisposableQualificationFailure.invalidArguments
     }

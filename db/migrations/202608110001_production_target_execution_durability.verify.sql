@@ -156,7 +156,7 @@ begin
           'PUBLIC','farmos_core_production_target_execution_transaction','anon','authenticated'))
   then raise exception using errcode = 'P0001', message = 'pte_verify:V006A'; end if;
   if exists (select 1 from pg_catalog.pg_default_acl default_acl
-      cross join lateral pg_catalog.aclexplode(pg_catalog.coalesce(
+      cross join lateral pg_catalog.aclexplode(coalesce(
         default_acl.defaclacl,
         pg_catalog.acldefault(default_acl.defaclobjtype, default_acl.defaclrole))) grant_row
       where default_acl.defaclnamespace in (0, pg_catalog.to_regnamespace('ai'))
@@ -228,7 +228,7 @@ begin
       or exists (select 1 from pg_catalog.pg_proc procedure_row
         where procedure_row.oid = pg_catalog.to_regprocedure(function_name)
           and (procedure_row.proowner <> metadata_owner
-            or not pg_catalog.coalesce(
+            or not coalesce(
               'search_path=pg_catalog' = any(procedure_row.proconfig), false)))
     then
       raise exception using errcode = 'P0001', message = 'pte_verify:V007A';
@@ -267,7 +267,8 @@ begin
             pg_catalog.pg_get_triggerdef(trigger_row.oid) like '%BEFORE DELETE%'
           when trigger_name like '%_cas' then
             pg_catalog.pg_get_triggerdef(trigger_row.oid) like '%BEFORE UPDATE%'
-          else pg_catalog.pg_get_triggerdef(trigger_row.oid) like '%BEFORE UPDATE OR DELETE%'
+          else pg_catalog.pg_get_triggerdef(trigger_row.oid) like '%BEFORE%UPDATE%'
+            and pg_catalog.pg_get_triggerdef(trigger_row.oid) like '%DELETE%'
         end)
     then raise exception using errcode = 'P0001', message = 'pte_verify:V008'; end if;
   end loop;

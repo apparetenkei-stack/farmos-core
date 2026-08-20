@@ -1,5 +1,9 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
+import {
+  consumeFarmOsDay150LiveExecutionFence,
+  type FarmOsDay150LiveExecutionFence,
+} from "./farm_os_day150_durable_authority_bridge";
 
 import {
   FARM_OS_PTE_C2B_IMAGE_REPOSITORY,
@@ -21,6 +25,34 @@ const DIGEST = /^sha256:[a-f0-9]{64}$/u;
 const CONTAINER_ID = /^[a-f0-9]{64}$/u;
 const PATH_VALUE = "/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin";
 const DOCKER_SOCKET = "unix:///var/run/docker.sock";
+export const FARM_OS_PTE_C2B_POSTGRES_RUNTIME_MAJOR_QUERY =
+  "select current_setting('server_version_num')::integer as server_version_num" as const;
+
+export function parseFarmOsPteC2bPostgresRuntimeMajorResult(value: unknown):
+  Readonly<{ accepted: true; server_version_num: number; postgres_major: 17 }> |
+  Readonly<{ accepted: false; reason: string }> {
+  if (typeof value !== "object" || value === null || Array.isArray(value) ||
+    Object.keys(value).length !== 2 || !Object.hasOwn(value, "rows") ||
+    !Object.hasOwn(value, "rowCount")) {
+    return Object.freeze({ accepted: false, reason: "RUNTIME_MAJOR_RESULT_SCHEMA_INVALID" });
+  }
+  const result = value as Readonly<{ rows?: unknown; rowCount?: unknown }>;
+  if (result.rowCount !== 1 || !Array.isArray(result.rows) || result.rows.length !== 1) {
+    return Object.freeze({ accepted: false, reason: "RUNTIME_MAJOR_EXACT_ROW_REQUIRED" });
+  }
+  const row = result.rows[0];
+  if (typeof row !== "object" || row === null || Array.isArray(row) ||
+    Object.keys(row).length !== 1 || !Object.hasOwn(row, "server_version_num")) {
+    return Object.freeze({ accepted: false, reason: "RUNTIME_MAJOR_ROW_INVALID" });
+  }
+  const raw = (row as { server_version_num?: unknown }).server_version_num;
+  const version = typeof raw === "number" ? raw :
+    typeof raw === "string" && /^[0-9]{6}$/u.test(raw) ? Number(raw) : NaN;
+  if (!Number.isSafeInteger(version) || version < 170000 || version >= 180000) {
+    return Object.freeze({ accepted: false, reason: "POSTGRES_RUNTIME_MAJOR_17_REQUIRED" });
+  }
+  return Object.freeze({ accepted: true, server_version_num: version, postgres_major: 17 });
+}
 
 export type FarmOsPteC2bDockerCommand = Readonly<{
   argv: readonly string[];
@@ -597,39 +629,73 @@ declare const REAL_CAPABILITY_BRAND: unique symbol;
 export type FarmOsPteC2bRealExecutionCapability = Readonly<{
   [REAL_CAPABILITY_BRAND]: true;
 }>;
-const REAL_CAPABILITY_BINDINGS = new WeakMap<object, object>();
+type RealCapabilityBinding = { capability: object; unused: boolean };
+const REAL_CAPABILITY_BINDINGS = new WeakMap<object, RealCapabilityBinding>();
 
-class FailClosedRealDockerQualificationAdapter {
-  async preflight(): Promise<never> { throw new Error("B2_REAL_ADAPTER_NOT_BOUND"); }
-  async prepareFixture(): Promise<never> { throw new Error("B2_REAL_ADAPTER_NOT_BOUND"); }
-  async applyExactMigration(): Promise<never> { throw new Error("B2_REAL_ADAPTER_NOT_BOUND"); }
+class FarmOsPteC2bGatewayBoundAdapter implements FarmOsPteC2bQualificationAdapter {
+  async preflight(): Promise<never> { throw new Error("B2_GATEWAY_LIVE_CONTEXT_REQUIRED"); }
+  async prepareFixture(): Promise<never> { throw new Error("B2_GATEWAY_LIVE_CONTEXT_REQUIRED"); }
+  async applyExactMigration(): Promise<never> { throw new Error("B2_GATEWAY_LIVE_CONTEXT_REQUIRED"); }
   async recordAndVerifyMigrationHistory(): Promise<never> {
-    throw new Error("B2_REAL_ADAPTER_NOT_BOUND");
+    throw new Error("B2_GATEWAY_LIVE_CONTEXT_REQUIRED");
   }
   async executeExactReadOnlyVerifier(): Promise<never> {
-    throw new Error("B2_REAL_ADAPTER_NOT_BOUND");
+    throw new Error("B2_GATEWAY_LIVE_CONTEXT_REQUIRED");
   }
-  async executeCase(): Promise<never> { throw new Error("B2_REAL_ADAPTER_NOT_BOUND"); }
+  async executeCase(): Promise<never> { throw new Error("B2_GATEWAY_LIVE_CONTEXT_REQUIRED"); }
   async cleanupExactOwnedResources(): Promise<never> {
-    throw new Error("B2_REAL_ADAPTER_NOT_BOUND");
+    throw new Error("B2_GATEWAY_LIVE_CONTEXT_REQUIRED");
   }
 }
 
-export function createFarmOsPteC2bFailClosedRealDockerBoundary(): Readonly<{
-  adapter: FarmOsPteC2bQualificationAdapter;
-  capability: FarmOsPteC2bRealExecutionCapability;
-}> {
-  const adapter: FarmOsPteC2bQualificationAdapter =
-    Object.freeze(new FailClosedRealDockerQualificationAdapter());
-  const capability = Object.freeze(Object.create(null)) as FarmOsPteC2bRealExecutionCapability;
-  REAL_CAPABILITY_BINDINGS.set(adapter, capability);
-  return Object.freeze({ adapter, capability });
+export const FARM_OS_PTE_C2B_EXECUTION_GATEWAY_AUTHORITY =
+  "farmos.day150-b2-execution-gateway.v1" as const;
+export class FarmOsPteC2bExecutionGateway {
+  readonly authority_id = FARM_OS_PTE_C2B_EXECUTION_GATEWAY_AUTHORITY;
+  readonly #targetDigest: `sha256:${string}`;
+  readonly #imageDigest: `sha256:${string}`;
+  readonly #adapter = Object.freeze(new FarmOsPteC2bGatewayBoundAdapter());
+  #issued = false;
+
+  constructor(input: Readonly<{ adapter_revision: "farmos.day150-b2-postgres17-adapter.v1";
+    target_digest: `sha256:${string}`; image_digest: `sha256:${string}` }>) {
+    if (input.adapter_revision !== "farmos.day150-b2-postgres17-adapter.v1" ||
+      !DIGEST.test(input.target_digest) || !DIGEST.test(input.image_digest) ||
+      input.image_digest !==
+        "sha256:7958605b474b3d264a969cb3a123d6aa00ad1e1fe9da8a69984dabb704d93317") {
+      throw new Error("B2_GATEWAY_EXACT_ADAPTER_TARGET_IMAGE_REQUIRED");
+    }
+    this.#targetDigest = input.target_digest; this.#imageDigest = input.image_digest;
+  }
+
+  authorizeFirstMutation(input: Readonly<{ fence: FarmOsDay150LiveExecutionFence | unknown;
+    attempt_id: string; attempt_digest: `sha256:${string}`; observed_at: string;
+    target_digest: `sha256:${string}`; image_digest: `sha256:${string}` }>): Readonly<{
+      adapter: FarmOsPteC2bQualificationAdapter;
+      capability: FarmOsPteC2bRealExecutionCapability;
+    }> {
+    if (this.#issued || input.target_digest !== this.#targetDigest ||
+      input.image_digest !== this.#imageDigest) {
+      throw new Error("B2_GATEWAY_BINDING_REJECTED");
+    }
+    const consumed = consumeFarmOsDay150LiveExecutionFence({ fence: input.fence,
+      attempt_id: input.attempt_id, attempt_digest: input.attempt_digest,
+      observed_at: input.observed_at });
+    if (!consumed.accepted) throw new Error(consumed.reason);
+    this.#issued = true;
+    const capability = Object.freeze(Object.create(null)) as FarmOsPteC2bRealExecutionCapability;
+    REAL_CAPABILITY_BINDINGS.set(this.#adapter, { capability, unused: true });
+    return Object.freeze({ adapter: this.#adapter, capability });
+  }
 }
 
 export function validateFarmOsPteC2bRealExecutionCapability(
   adapter: object,
   capability: unknown,
 ): capability is FarmOsPteC2bRealExecutionCapability {
-  return typeof capability === "object" && capability !== null &&
-    REAL_CAPABILITY_BINDINGS.get(adapter) === capability;
+  if (typeof capability !== "object" || capability === null) return false;
+  const binding = REAL_CAPABILITY_BINDINGS.get(adapter);
+  if (!binding || !binding.unused || binding.capability !== capability) return false;
+  binding.unused = false;
+  return true;
 }

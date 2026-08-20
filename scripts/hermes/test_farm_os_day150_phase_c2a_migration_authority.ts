@@ -97,9 +97,12 @@ assert.match(applySql, /farmos\.production-target-phase-b-authority-bundle\.v1/)
 assert.match(applySql, /g2cmd_/);
 assert.match(applySql, /probecmd_/);
 assert.match(applySql, /farmos\.production-target-identity-minimal-observation-query\.v1/);
-assert.match(applySql, /array_agg\(class_row\.relname order by class_row\.relname\)/);
-assert.match(applySql, /oidvectortypes\(procedure_row\.proargtypes\)/);
-assert.match(applySql, /array_agg\(trigger_row\.tgname order by trigger_row\.tgname\)/);
+assert.match(applySql, /class_row\.relname like 'production\\_target\\_execution\\_%'/);
+assert.match(applySql, /procedure_row\.proname like '%production\\_target\\_execution%'/);
+assert.match(applySql, /not trigger_row\.tgisinternal\) = 34/);
+assert.match(applySql, /metadata\.relation_registry_digest =/);
+assert.match(applySql, /metadata\.function_registry_digest =/);
+assert.match(applySql, /metadata\.trigger_registry_digest =/);
 assert.match(applySql, /expected_approval_digest' <> approval_row\.approval_digest/);
 assert.match(applySql, /old\.state in \('RESERVATION_OUTCOME_UNKNOWN','CONSUMED_SUCCESS'/);
 assert.match(applySql, /old\.binding_state in \('QUARANTINED','CONSUMED'\)/);

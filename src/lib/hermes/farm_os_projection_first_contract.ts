@@ -185,11 +185,21 @@ function parseGroundingRef(
 ): FarmOsProjectionFirstGroundingRef | null {
   if (
     !isRecord(value) ||
-    !hasExactKeys(value, GROUNDING_REF_KEYS) ||
+    !hasExactKeys(value, GROUNDING_REF_KEYS)
+  ) {
+    return null;
+  }
+  const sourceRecordId = value.source_record_id;
+  const parsedSourceRecordId = sourceRecordId === null
+    ? null
+    : isReference(sourceRecordId)
+    ? sourceRecordId
+    : undefined;
+  if (parsedSourceRecordId === undefined) return null;
+  if (
     (value.source_type !== "projection" &&
       value.source_type !== "lineage_snapshot") ||
     !isReference(value.reference_id) ||
-    !(value.source_record_id === null || isReference(value.source_record_id)) ||
     !isFarmOsProjectionFirstCalendarDate(value.business_date)
   ) {
     return null;
@@ -197,7 +207,7 @@ function parseGroundingRef(
   return {
     source_type: value.source_type,
     reference_id: value.reference_id,
-    source_record_id: value.source_record_id,
+    source_record_id: parsedSourceRecordId,
     business_date: value.business_date,
   };
 }
@@ -284,20 +294,45 @@ export function parseFarmOsProjectionFirstResponse(
 ): FarmOsProjectionFirstParseResult<FarmOsProjectionFirstResponse> {
   if (
     !isRecord(value) ||
-    !hasExactKeys(value, RESPONSE_KEYS) ||
+    !hasExactKeys(value, RESPONSE_KEYS)
+  ) {
+    return invalid();
+  }
+  const answer = value.answer;
+  const businessDate = value.business_date;
+  const projectionId = value.projection_id;
+  const asOf = value.as_of;
+  const parsedAnswer = answer === null
+    ? null
+    : typeof answer === "string" && answer.length > 0 && answer.length <= 4_000
+    ? answer
+    : undefined;
+  const parsedProjectionId = projectionId === null
+    ? null
+    : isReference(projectionId)
+    ? projectionId
+    : undefined;
+  const parsedAsOf = asOf === null
+    ? null
+    : isFarmOsProjectionFirstTimestamp(asOf)
+    ? asOf
+    : undefined;
+  if (
+    parsedAnswer === undefined ||
+    parsedProjectionId === undefined ||
+    parsedAsOf === undefined
+  ) {
+    return invalid();
+  }
+  if (
     value.contract_version !== FARM_OS_PROJECTION_FIRST_RESPONSE_CONTRACT ||
     !RESULTS.includes(value.result as FarmOsProjectionFirstResult) ||
     (value.mode_requested !== "fast" && value.mode_requested !== "deep") ||
     (value.mode_used !== "fast" && value.mode_used !== "none") ||
-    !(value.answer === null ||
-      (typeof value.answer === "string" && value.answer.length > 0 &&
-        value.answer.length <= 4_000)) ||
-    !isFarmOsProjectionFirstCalendarDate(value.business_date) ||
-    !(value.projection_id === null || isReference(value.projection_id)) ||
+    !isFarmOsProjectionFirstCalendarDate(businessDate) ||
     !PROJECTION_STATUSES.includes(
       value.projection_status as FarmOsProjectionFirstProjectionStatus,
     ) ||
-    !(value.as_of === null || isFarmOsProjectionFirstTimestamp(value.as_of)) ||
     !Array.isArray(value.grounding_refs) ||
     value.grounding_refs.length > FARM_OS_PROJECTION_FIRST_HARD_DRILLDOWN_LIMIT ||
     typeof value.drilldown_used !== "boolean" ||
@@ -314,13 +349,13 @@ export function parseFarmOsProjectionFirstResponse(
     groundingRefs.some((reference) => reference === null) ||
     guard === null ||
     (result === "answered" &&
-      (value.answer === null ||
+      (parsedAnswer === null ||
         value.mode_used !== "fast" ||
         projectionStatus !== "active" ||
         guard.status !== "passed" ||
         groundingRefs.length === 0)) ||
     (result !== "answered" &&
-      (value.answer !== null ||
+      (parsedAnswer !== null ||
         value.mode_used !== "none" ||
         groundingRefs.length !== 0)) ||
     (result === "guard_rejected" && guard.status !== "rejected") ||
@@ -348,11 +383,11 @@ export function parseFarmOsProjectionFirstResponse(
       result,
       mode_requested: value.mode_requested,
       mode_used: value.mode_used,
-      answer: value.answer,
-      business_date: value.business_date,
-      projection_id: value.projection_id,
+      answer: parsedAnswer,
+      business_date: businessDate,
+      projection_id: parsedProjectionId,
       projection_status: projectionStatus,
-      as_of: value.as_of,
+      as_of: parsedAsOf,
       grounding_refs:
         groundingRefs as FarmOsProjectionFirstGroundingRef[],
       drilldown_used: value.drilldown_used,

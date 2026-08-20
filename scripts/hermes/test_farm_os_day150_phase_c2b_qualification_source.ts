@@ -58,15 +58,16 @@ import {
 } from "./lib/farm_os_production_target_execution_postgres_qualification_fixture";
 import {
   FARM_OS_PTE_C2B_DOCKER_OPERATION_ALLOWLIST,
+  FARM_OS_PTE_C2B_POSTGRES_RUNTIME_MAJOR_QUERY,
   buildFarmOsPteC2bDockerPlan,
   buildFarmOsPteC2bOwnedCleanupPlan,
   classifyFarmOsPteC2bImageInspect,
-  createFarmOsPteC2bFailClosedRealDockerBoundary,
   executeFarmOsPteC2bOwnedCleanupPlan,
   projectFarmOsPteC2bContainerInspect,
   projectFarmOsPteC2bImageInspect,
   projectFarmOsPteC2bNetworkInspect,
   projectFarmOsPteC2bVolumeInspect,
+  parseFarmOsPteC2bPostgresRuntimeMajorResult,
   validateFarmOsPteC2bRealExecutionCapability,
   validateFarmOsPteC2bDockerCommand,
 } from "./lib/farm_os_production_target_execution_postgres_qualification_docker_adapter";
@@ -100,15 +101,28 @@ assert.equal(FARM_OS_PTE_C2A_SOURCE_COMMIT,
 assert.equal(FARM_OS_PTE_C2B_MIGRATION_PLAN.migration_id,
   "202608110001_production_target_execution_durability");
 assert.equal(FARM_OS_PTE_C2B_MIGRATION_PLAN.apply_sha256,
-  "sha256:f97eca5134c44c5a144523ea19b44b679051f3592f9fd28dbf38c441be7b8131");
+  "sha256:e230647582fc3b1fb26d017034227cdf9b86384f6be7767f0c266ba4768ebc34");
 assert.equal(FARM_OS_PTE_C2B_MIGRATION_PLAN.verify_sha256,
-  "sha256:f5294d29b6407d6ed789e2c229c394e62be09b0d31407065d99ca620e2473036");
+  "sha256:ef8484ea130e930cd65e3b847869749727f00b2bf6ee373a2dc1d6d8fca0384f");
 assert.equal(FARM_OS_PTE_C2B_CASE_REGISTRY_AUTHORITY,
   "farmos.production-target-execution-postgres-qualification-case-registry.v1");
 assert.equal(FARM_OS_PTE_C2B_EVIDENCE_VERSION,
   "farmos.production-target-execution-postgres-isolated-qualification-evidence.v2");
 assert.equal(FARM_OS_PTE_C2B_EVIDENCE_AUTHORITY_STATE, "V2_SOURCE_CANDIDATE");
 assert.equal(FARM_OS_PTE_C2B_CASE_REGISTRY.length, 66);
+assert.equal(FARM_OS_PTE_C2B_POSTGRES_RUNTIME_MAJOR_QUERY,
+  "select current_setting('server_version_num')::integer as server_version_num");
+assert.deepEqual(parseFarmOsPteC2bPostgresRuntimeMajorResult({
+  rows: [{ server_version_num: 170010 }], rowCount: 1,
+}), { accepted: true, server_version_num: 170010, postgres_major: 17 });
+for (const spoofed of [
+  { rows: [{ server_version_num: 160999 }], rowCount: 1 },
+  { rows: [{ server_version_num: 180000 }], rowCount: 1 },
+  { rows: [{ server_version_num: "17" }], rowCount: 1 },
+  { rows: [], rowCount: 0 },
+  { rows: [{ server_version_num: 170010, caller_supplied_major: 17 }], rowCount: 1 },
+  { server_version_num: 170010 },
+]) assert.equal(parseFarmOsPteC2bPostgresRuntimeMajorResult(spoofed).accepted, false);
 assert.match(FARM_OS_PTE_C2B_CASE_REGISTRY_DIGEST, /^sha256:[a-f0-9]{64}$/u);
 assert.equal(FARM_OS_PTE_C2B_CASE_REGISTRY_DIGEST, digestFarmOsPteC2b(
   FARM_OS_PTE_C2B_CASE_REGISTRY_AUTHORITY, FARM_OS_PTE_C2B_CASE_REGISTRY));
@@ -408,8 +422,10 @@ assert.equal(FARM_OS_PTE_C2B_CONTRACT.image_authority_state, "V2_SOURCE_CANDIDAT
 assert.equal(FARM_OS_PTE_C2B_CONTRACT.evidence_authority_state, "V2_SOURCE_CANDIDATE");
 for (const state of ["isolated_migration_qualified", "durable_approval_sot_established",
   "durable_reservation_finalization_established", "storage_backed_concurrency_tested",
-  "storage_backed_crash_semantics_tested", "storage_backed_restart_tested",
-  "trusted_clock_established", "gate_2_authorized", "runtime_bound",
+  "storage_backed_crash_semantics_tested", "storage_backed_restart_tested"] as const) {
+  assert.equal(FARM_OS_PTE_C2B_CONTRACT[state], true);
+}
+for (const state of ["trusted_clock_established", "gate_2_authorized", "runtime_bound",
   "production_authorized"] as const) assert.equal(FARM_OS_PTE_C2B_CONTRACT[state], false);
 
 assert.equal(FARM_OS_PTE_C2B_SYNTHETIC_FIXTURE.production_data_count, 0);
@@ -665,12 +681,8 @@ assert.deepEqual(sourceValidation, { status: "SOURCE_VALIDATION_PASS", executed_
   docker_operations: 0, postgres_operations: 0, evidence_created: false });
 assert.deepEqual(fakeEvents, FARM_OS_PTE_C2B_CASE_REGISTRY.map((entry) => entry[0]));
 
-const failClosedRealBoundary = createFarmOsPteC2bFailClosedRealDockerBoundary();
-assert.equal(Object.isFrozen(failClosedRealBoundary.adapter), true);
-assert.equal(validateFarmOsPteC2bRealExecutionCapability(failClosedRealBoundary.adapter,
-  failClosedRealBoundary.capability), true);
-assert.equal(validateFarmOsPteC2bRealExecutionCapability(fakeAdapter,
-  failClosedRealBoundary.capability), false);
+const unboundCapability = Object.freeze(Object.create(null));
+assert.equal(validateFarmOsPteC2bRealExecutionCapability(fakeAdapter, unboundCapability), false);
 const forgedAdapter = Object.freeze({ ...fakeAdapter,
   adapter_kind: "REAL_ISOLATED_DOCKER_B2_ONLY" as const });
 let forgedAdapterOperations = 0;
@@ -685,7 +697,7 @@ const baseExecutionInput = Object.freeze({ execution_nonce: NONCE, image_authori
   ended_at_metadata: "2026-08-11T00:01:00.000Z", authorization,
   source_lineage_resolver: pinnedResolver });
 const forgedQualification = await executeFarmOsPteC2bQualification({ ...baseExecutionInput,
-  adapter: forgedBehavior, real_execution_capability: failClosedRealBoundary.capability });
+  adapter: forgedBehavior, real_execution_capability: unboundCapability });
 assert.equal(forgedQualification.classification, "BLOCKED_ENVIRONMENT");
 assert.equal(forgedQualification.failure_code, "REAL_CAPABILITY_INVALID");
 assert.equal(forgedQualification.evidence, null);
@@ -704,14 +716,14 @@ const authorizationWith = (overrides: Partial<Omit<FarmOsPteC2bAuthorizationEnve
 const wrongImageAuthorization = authorizationWith({
   image_repository_digest: `sha256:${"9".repeat(64)}` });
 const wrongImageResult = await executeFarmOsPteC2bQualification({ ...baseExecutionInput,
-  adapter: forgedBehavior, real_execution_capability: failClosedRealBoundary.capability,
+  adapter: forgedBehavior, real_execution_capability: unboundCapability,
   authorization: wrongImageAuthorization });
 assert.equal(wrongImageResult.failure_code, "INPUT_INVALID");
 assert.equal(forgedAdapterOperations, 0);
 const wrongSourceAuthorization = authorizationWith({
   expected_c2b_source_commit: "9".repeat(40) });
 const wrongSourceResult = await executeFarmOsPteC2bQualification({ ...baseExecutionInput,
-  adapter: forgedBehavior, real_execution_capability: failClosedRealBoundary.capability,
+  adapter: forgedBehavior, real_execution_capability: unboundCapability,
   authorization: wrongSourceAuthorization });
 assert.equal(wrongSourceResult.failure_code, "SOURCE_IDENTITY_MISMATCH");
 assert.equal(forgedAdapterOperations, 0);
@@ -719,7 +731,7 @@ const mismatchedResolver = Object.freeze({ async resolveExecutingSourceLineage()
   return Object.freeze({ status: "PINNED_B1_COMMIT" as const, commit_sha: "8".repeat(40) });
 } });
 const lineageMismatchResult = await executeFarmOsPteC2bQualification({ ...baseExecutionInput,
-  adapter: forgedBehavior, real_execution_capability: failClosedRealBoundary.capability,
+  adapter: forgedBehavior, real_execution_capability: unboundCapability,
   source_lineage_resolver: mismatchedResolver });
 assert.equal(lineageMismatchResult.failure_code, "SOURCE_IDENTITY_MISMATCH");
 assert.equal(forgedAdapterOperations, 0);

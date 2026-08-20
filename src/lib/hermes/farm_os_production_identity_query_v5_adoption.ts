@@ -117,18 +117,58 @@ export const FARM_OS_PRODUCTION_IDENTITY_QUERY_V5_ADOPTION = Object.freeze({
   resolved_blockers: Object.freeze({
     BLOCKED_POSTGRES_COMPATIBILITY: "RESOLVED",
     BLOCKED_POSTGRES_QUALIFICATION_INTEGRITY: "RESOLVED",
+    BLOCKED_RUNTIME_EVIDENCE_ASSEMBLY: "RESOLVED_FOR_DAY150_SOURCE_CLOSURE",
+    PRODUCTION_TARGET_MANIFEST_REQUIRED: "RESOLVED_FOR_DAY150_SOURCE_CLOSURE",
+    BLOCKED_CONNECTION_AUTHORITY: "RESOLVED_FOR_DAY150_SOURCE_CLOSURE",
+    EXECUTION_APPROVAL_LINEAGE_REQUIRED: "RESOLVED_FOR_DAY150_SOURCE_CLOSURE",
+    PRODUCTION_IDENTITY_COLLECTOR_ENTRYPOINT_REQUIRED:
+      "RESOLVED_FOR_DAY150_SOURCE_CLOSURE",
+    PRODUCTION_CONSUMER_ENTRYPOINT_REQUIRED: "RESOLVED_FOR_DAY150_SOURCE_CLOSURE",
+    PREFIX_CATALOG_FINGERPRINT_AUTHORITY_REQUIRED:
+      "RESOLVED_BY_DAY150_EXACT_FIVE_PRODUCT_OWNER_PROMOTION",
     basis: "EXACT_SIX_RECORD_QUALIFICATION_BASELINE",
   }),
   remaining_blockers: Object.freeze([
-    "BLOCKED_RUNTIME_EVIDENCE_ASSEMBLY",
-    "PRODUCTION_TARGET_MANIFEST_REQUIRED",
-    "BLOCKED_CONNECTION_AUTHORITY",
-    "EXECUTION_APPROVAL_LINEAGE_REQUIRED",
-    "PRODUCTION_IDENTITY_COLLECTOR_ENTRYPOINT_REQUIRED",
     "BLOCKED_PROVIDER_CAPACITY_DESIGN",
-    "PREFIX_CATALOG_FINGERPRINT_AUTHORITY_REQUIRED",
-    "PRODUCTION_CONSUMER_ENTRYPOINT_REQUIRED",
   ] as const),
+  day150_closure_evidence: Object.freeze({
+    authority: "farmos.day150-v5-blocker-source-closure-evidence.v1",
+    target_manifest: "CONCRETE_SECRET_FREE_REVISION_1_RUNTIME_NOT_BOUND",
+    connection: "SOURCE_IMPLEMENTED_NO_CREDENTIAL_RESOLUTION_NO_CONNECTION",
+    approval_lineage: "C1_C2A_DURABLE_ATOMIC_RESERVATION_AND_RECEIPT",
+    collector: "TRUSTED_CAPABILITY_ENTRYPOINT_SOURCE_ONLY",
+    runtime_evidence: "RUNTIME_EVIDENCE_V2_AND_LIVE_EVIDENCE_V2_SOURCE_IMPLEMENTED",
+    prefix_matrix:
+      "EXACT_FIVE_APPROVED_EXPECTED_CATALOG_AUTHORITIES_ESTABLISHED_GATE17_PASS",
+    consumer: "PROPOSAL_ONLY_DEFAULT_DISABLED_SOURCE_IMPLEMENTED",
+    provider_capacity: "ACTIVE_DEFERRED_UNRESOLVED",
+    gate13_durability: Object.freeze({
+      qualification_state: "SOURCE_ISOLATED_QUALIFIED",
+      production_canonical_activation_state: "NOT_EXECUTED_NOT_ACTIVATED",
+      attempt_ordinal: 4,
+      attempt_identity:
+        "sha256:d0a46489ab3814edbc5ad03bd392b76c9722861e923854b16849c8f7d3542ed6",
+      claim_digest:
+        "sha256:dd8df3afb50c4bc7e3b4da6c540d1392d3ef0b39f84b8952e8dcfdac577e8695",
+      terminal_digest:
+        "sha256:3b6060348089faa98a7450676581b9f0ec5d624ae2cb2f9b02b860c0e0ba75db",
+      qualification_result_digest:
+        "sha256:3243ede481084c54b66c96891a4e8f032f281f7f0e8ff961daeadc4b231a0a29",
+      evidence_digest:
+        "sha256:eba44394a729a9682b9a3c1cf61b54d32236a48c1825ea15850359daa8e5f1db",
+      source_set_digest:
+        "sha256:4936553bd79b5e6bd4c02c8c226fbf792f9823531fc94d3f2b4c1801cee606bd",
+      execution_snapshot_digest:
+        "sha256:1442af5e2feb9065e290c1dc17fe530fb3dcd6059558a581b9f896e30b962ca2",
+      durability_matrix: Object.freeze({ D1: "PASS", D2: "PASS", D3: "PASS",
+        D4: "PASS", D5: "PASS" }),
+      finite_cases: Object.freeze({ required: 18, executed: 18, validated: 18,
+        evidence: 18 }),
+      automatic_retry_count: 0,
+      cleanup_zero_residual: true,
+    }),
+    production_operations: 0,
+  }),
   executor_boundary: "ISOLATED_TECHNICAL_QUALIFICATION_ONLY",
   production_collector_authorized: false,
   production_read_client_authorized: false,

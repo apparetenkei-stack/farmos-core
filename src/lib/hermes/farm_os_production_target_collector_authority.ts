@@ -51,13 +51,13 @@ export const FARM_OS_PRODUCTION_TARGET_COLLECTOR_POLICY = Object.freeze({
   automatic_latest_selection: false,
   fallback: "PROHIBITED",
   contract_state: "DEFINED",
-  review_status: "CANDIDATE_FOR_APPROVAL",
-  implementation_state: "NONE",
+  review_status: "DAY150_SOURCE_CLOSURE_APPROVED",
+  implementation_state: "SOURCE_IMPLEMENTED_TRUSTED_CAPABILITY_ONLY",
   execution_enabled: false,
   production_callable: false,
   probe_use_state: "NOT_AUTHORIZED",
-  qualification_state: "NOT_ESTABLISHED",
-  adoption_state: "NOT_ADOPTED",
+  qualification_state: "QUALIFIED_SOURCE_ONLY_PRODUCTION_CALLS_ZERO",
+  adoption_state: "SOURCE_ADOPTED_RUNTIME_NOT_BOUND",
   runtime_binding_state: "NOT_BOUND",
 } as const);
 

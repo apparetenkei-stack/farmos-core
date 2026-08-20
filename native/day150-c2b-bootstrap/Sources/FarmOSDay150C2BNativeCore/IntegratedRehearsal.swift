@@ -719,7 +719,7 @@ public enum IntegratedRehearsalRecordFactory {
         [
             "manifest_authority": "farmos.day150-c2b-bootstrap-manifest.v1",
             "manifest_digest":
-                "sha256:a332368cbdca6461e11f538085a8bea3bfbd63f20cc0066302412d309e9e11be",
+                "sha256:4f40823d671ded21d01d19f88b512e2ba4b75cb20b56d2bd5ae0a723c4bd28b9",
             "r2_record_authority": "farmos.day150-c2b-bootstrap-ledger-record.v1",
             "r2_genesis_source_candidate_digest":
                 "sha256:98e57a4f41639b64e1b992e3e6ccf56c3f0b625916ded4d2b2c4fc56760376f4",
@@ -756,7 +756,7 @@ public enum IntegratedRehearsalRecordFactory {
             "source_discriminator": "ACTOR_AUTHORIZATION_INTENT_SOURCE_CANDIDATE",
             "candidate_kind": "DAY150_PHASE_C2B_BOOTSTRAP_AUTHORIZATION_INTENT",
             "bootstrap_manifest_digest":
-                "sha256:a332368cbdca6461e11f538085a8bea3bfbd63f20cc0066302412d309e9e11be",
+                "sha256:4f40823d671ded21d01d19f88b512e2ba4b75cb20b56d2bd5ae0a723c4bd28b9",
             "expected_r2_source_base_generation": 0,
             "expected_r2_source_base_head_digest":
                 "sha256:98e57a4f41639b64e1b992e3e6ccf56c3f0b625916ded4d2b2c4fc56760376f4",
@@ -785,7 +785,7 @@ public enum IntegratedRehearsalRecordFactory {
             "source_discriminator": "CLOCK_TRANSITION_INTENT_SOURCE_CANDIDATE",
             "intent_kind": "CLOCK_GENESIS_INTENT",
             "bootstrap_manifest_digest":
-                "sha256:a332368cbdca6461e11f538085a8bea3bfbd63f20cc0066302412d309e9e11be",
+                "sha256:4f40823d671ded21d01d19f88b512e2ba4b75cb20b56d2bd5ae0a723c4bd28b9",
             "installation_identity_digest_candidate": installationProfileDigest,
             "expected_r2_source_base_generation": 0,
             "expected_r2_source_base_head_digest":

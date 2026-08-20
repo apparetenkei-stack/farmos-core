@@ -1125,27 +1125,34 @@ export class FarmOsOperationalMemoryPostgresRepository {
       observe("exact_readback_validation");
       try {
         verifyExactCollection(expectedAfter.snapshots, after.snapshots,
-          (row) => row.snapshot_id, isDeepStrictEqual);
+          (row) => row.snapshot_id,
+          (expectedRow, actualRow) =>
+            isDeepStrictEqual(expectedRow, actualRow));
         verifyExactCollection(
           expectedAfter.snapshot_state_events,
           after.snapshot_state_events,
           (row) => row.event_id,
-          isDeepStrictEqual,
+          (expectedRow, actualRow) =>
+            isDeepStrictEqual(expectedRow, actualRow),
         );
         verifyExactCollection(expectedAfter.projections, after.projections,
-          (row) => row.projection_id, isDeepStrictEqual);
+          (row) => row.projection_id,
+          (expectedRow, actualRow) =>
+            isDeepStrictEqual(expectedRow, actualRow));
         verifyExactCollection(
           expectedAfter.projection_state_events,
           after.projection_state_events,
           (row) => row.event_id,
-          isDeepStrictEqual,
+          (expectedRow, actualRow) =>
+            isDeepStrictEqual(expectedRow, actualRow),
         );
         verifyExactLineage(expectedAfter.lineage, after.lineage);
         verifyExactCollection(
           expectedAfter.review_decisions,
           after.review_decisions,
           (row) => row.review_id,
-          isDeepStrictEqual,
+          (expectedRow, actualRow) =>
+            isDeepStrictEqual(expectedRow, actualRow),
         );
       } catch {
         throw new Error("projection_command_exact_readback_invalid");

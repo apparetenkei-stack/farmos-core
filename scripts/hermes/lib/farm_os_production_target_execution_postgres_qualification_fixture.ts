@@ -228,7 +228,7 @@ const lifecycle = createInitialFarmOsProductionTargetExecutionLifecycleRecord({ 
 const reservationIdentity = deriveFarmOsProductionTargetExecutionPostgresReservationIdentity({
   command_id: command.command_id, execution_binding_digest: command.execution_binding_digest,
   approval_id: command.approval_id, approval_receipt_id: command.approval_receipt_id,
-  clock_evidence_id: clockEvidence.evidence_id, lifecycle_version: lifecycle.state_version });
+  clock_evidence_id: clockEvidence.evidence_id, lifecycle_version: lifecycle.state_version + 1 });
 const attemptId = "attempt.c2b-fixture-001";
 const attemptDigest = deriveFarmOsProductionTargetExecutionPostgresAttemptDigest({
   attempt_id: attemptId, reservation_id: reservationIdentity.reservation_id,
@@ -257,6 +257,39 @@ const executionReceipt: FarmOsProductionTargetExecutionReceipt = Object.freeze({
   ...receiptMaterial,
   receipt_digest: computeFarmOsProductionTargetExecutionReceiptDigest(receiptMaterial) });
 
+function terminalReceipt(input: Readonly<{
+  receipt_id: string;
+  terminal_state: "CONSUMED_SUCCESS" | "CONSUMED_FAILURE";
+  result_classification: "SUCCEEDED" | "FAILED";
+  manual_review_required: boolean;
+  result_evidence_reference_digest: `sha256:${string}`;
+}>): FarmOsProductionTargetExecutionReceipt {
+  const material = Object.freeze({ ...receiptMaterial,
+    receipt_id: input.receipt_id,
+    terminal_state: input.terminal_state,
+    result_classification: input.result_classification,
+    unknown_stage: "NONE" as const,
+    result_evidence_reference_digest: input.result_evidence_reference_digest,
+    manual_review_required: input.manual_review_required });
+  return Object.freeze({ ...material,
+    receipt_digest: computeFarmOsProductionTargetExecutionReceiptDigest(material) });
+}
+
+const successReceipt = terminalReceipt({
+  receipt_id: "execution-receipt.c2b-fixture-success-001",
+  terminal_state: "CONSUMED_SUCCESS",
+  result_classification: "SUCCEEDED",
+  manual_review_required: false,
+  result_evidence_reference_digest: D("a"),
+});
+const failureReceipt = terminalReceipt({
+  receipt_id: "execution-receipt.c2b-fixture-failure-001",
+  terminal_state: "CONSUMED_FAILURE",
+  result_classification: "FAILED",
+  manual_review_required: true,
+  result_evidence_reference_digest: D("b"),
+});
+
 export const FARM_OS_PTE_C2B_SYNTHETIC_FIXTURE = Object.freeze({
   fixture_authority: FARM_OS_PTE_C2B_FIXTURE_AUTHORITY,
   c2a_source_commit: FARM_OS_PTE_C2A_SOURCE_COMMIT,
@@ -273,6 +306,8 @@ export const FARM_OS_PTE_C2B_SYNTHETIC_FIXTURE = Object.freeze({
     reservation_id: reservationIdentity.reservation_id,
     reservation_digest: reservationIdentity.reservation_digest }),
   receipt: executionReceipt,
+  success_receipt: successReceipt,
+  failure_receipt: failureReceipt,
   clock_evidence: clockEvidence,
   clock_floor: Object.freeze({ clock_authority_id: clockEvidence.clock_authority_id,
     clock_authority_revision: clockEvidence.clock_authority_revision, floor_version: 0,

@@ -441,6 +441,62 @@ function validateG(rows: readonly JsonRecord[]): boolean {
   return true;
 }
 
+export function validateFarmOsProductionIdentityCatalogReferenceResultSets(input: Readonly<{
+  acl: unknown; catalog: unknown;
+}>): boolean {
+  if (!record(input.acl) || !exact(input.acl, ["section_id", "rows"]) ||
+    input.acl.section_id !== "F_ACL_PRINCIPAL_INVENTORY" || !Array.isArray(input.acl.rows) ||
+    !input.acl.rows.every((row) => baseRow(row, "F_ACL_PRINCIPAL_INVENTORY")) ||
+    !rowOrderValid(input.acl.rows as JsonRecord[]) ||
+    !record(input.catalog) || !exact(input.catalog, ["section_id", "rows"]) ||
+    input.catalog.section_id !== "G_MIGRATION_CATALOG_INVENTORY" ||
+    !Array.isArray(input.catalog.rows) ||
+    !input.catalog.rows.every((row) => baseRow(row, "G_MIGRATION_CATALOG_INVENTORY")) ||
+    !rowOrderValid(input.catalog.rows as JsonRecord[])) return false;
+  return validateF(input.acl.rows as JsonRecord[]) && validateG(input.catalog.rows as JsonRecord[]);
+}
+
+export type FarmOsProductionIdentityCatalogReferenceSanitizedResultSets = Readonly<{
+  acl: Readonly<{ section_id: "F_ACL_PRINCIPAL_INVENTORY"; rows: readonly Readonly<{
+    row_key: string; payload: JsonRecord; sanitization_class: "SAFE_STRUCTURAL";
+  }>[] }>;
+  catalog: Readonly<{ section_id: "G_MIGRATION_CATALOG_INVENTORY"; rows: readonly Readonly<{
+    row_key: string; payload: JsonRecord;
+    sanitization_class: "DIGEST_ONLY" | "SAFE_STRUCTURAL";
+  }>[] }>;
+}>;
+
+export function transformFarmOsProductionIdentityCatalogReferenceResultSets(input: Readonly<{
+  acl: unknown; catalog: unknown;
+}>): FarmOsProductionIdentityCatalogReferenceSanitizedResultSets | null {
+  if (!validateFarmOsProductionIdentityCatalogReferenceResultSets(input)) return null;
+  const acl = input.acl as FarmOsProductionIdentityCandidateResultSet;
+  const catalog = input.catalog as FarmOsProductionIdentityCandidateResultSet;
+  return {
+    acl: {
+      section_id: "F_ACL_PRINCIPAL_INVENTORY",
+      rows: acl.rows.map((row) => ({ row_key: row.row_key,
+        payload: { ...row.payload }, sanitization_class: "SAFE_STRUCTURAL" as const })),
+    },
+    catalog: {
+      section_id: "G_MIGRATION_CATALOG_INVENTORY",
+      rows: catalog.rows.map((row) => {
+        if (row.row_key === "__collection_status__") return { row_key: row.row_key,
+          payload: { ...row.payload }, sanitization_class: "SAFE_STRUCTURAL" as const };
+        const raw = row.payload.raw_sensitive_texts as JsonRecord;
+        const sensitiveDigests = Object.fromEntries(Object.entries(raw).map(([key, rawValue]) =>
+          [`${key}_digest`, sha256(rawValue)]));
+        const { raw_sensitive_texts: discarded, ...safePayload } = row.payload;
+        void discarded;
+        return { row_key: row.row_key,
+          payload: { ...safePayload, sensitive_digests: sensitiveDigests },
+          sanitization_class: Object.keys(raw).length > 0
+            ? "DIGEST_ONLY" as const : "SAFE_STRUCTURAL" as const };
+      }),
+    },
+  };
+}
+
 function validateH1(rows: readonly JsonRecord[]): boolean {
   const payload = rows[0]?.payload;
   return rows.length === 1 && rows[0]?.row_key === "core_schema.migration_history" && rows[0]?.sanitization_class === "SAFE_STRUCTURAL" &&

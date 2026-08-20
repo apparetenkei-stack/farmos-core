@@ -42,7 +42,7 @@ begin
         message = 'production_target_execution_object_already_exists';
     end if;
   end loop;
-end
+end;
 $pte_preflight$;
 
 do $pte_role$
@@ -73,7 +73,7 @@ begin
     raise exception using errcode = '42501',
       message = 'production_target_execution_role_membership_invalid';
   end if;
-end
+end;
 $pte_role$;
 
 create table ai.production_target_execution_schema_metadata (
@@ -499,7 +499,7 @@ as $pte_append_only$
 begin
   raise exception using errcode = '55000',
     message = 'production_target_execution_append_only';
-end
+end;
 $pte_append_only$;
 
 create function ai.enforce_production_target_execution_cas_progression()
@@ -530,7 +530,8 @@ begin
     raise exception using errcode = 'PTE05',
       message = 'STALE_EXPECTED_VERSION';
   end if;
-  if tg_table_name = 'production_target_execution_approval_revocation_heads' and (
+  if tg_table_name = 'production_target_execution_approval_revocation_heads' then
+    if (
       new.approval_id <> old.approval_id
       or new.approval_digest <> old.approval_digest
       or new.approval_receipt_id <> old.approval_receipt_id
@@ -539,9 +540,9 @@ begin
       or old.latest_event_id is not null or old.latest_event_digest is not null
       or new.latest_event_id is null or new.latest_event_digest is null
       or new.effective_revoked_at is null)
-  then
-    raise exception using errcode = 'PTE06', message = 'REVOCATION_CONFLICT';
-  elsif tg_table_name = 'production_target_execution_approval_uses' and (
+    then raise exception using errcode = 'PTE06', message = 'REVOCATION_CONFLICT'; end if;
+  elsif tg_table_name = 'production_target_execution_approval_uses' then
+    if (
       new.approval_id <> old.approval_id
       or new.approval_digest <> old.approval_digest
       or new.approval_receipt_id <> old.approval_receipt_id
@@ -553,9 +554,9 @@ begin
         new.command_id is distinct from old.command_id
         or new.reservation_id is distinct from old.reservation_id
         or new.execution_binding_digest is distinct from old.execution_binding_digest)))
-  then
-    raise exception using errcode = 'PTE07', message = 'APPROVAL_BOUND';
-  elsif tg_table_name = 'production_target_execution_lifecycles' and (
+    then raise exception using errcode = 'PTE07', message = 'APPROVAL_BOUND'; end if;
+  elsif tg_table_name = 'production_target_execution_lifecycles' then
+    if (
       new.command_id <> old.command_id
       or new.command_record_digest <> old.command_record_digest
       or new.execution_binding_digest <> old.execution_binding_digest
@@ -571,17 +572,16 @@ begin
           'ATTEMPT_STARTED','CANCELLED_PRE_START','EXPIRED_PRE_START'))
         or (old.state = 'ATTEMPT_STARTED' and new.state in (
           'CONSUMED_SUCCESS','CONSUMED_FAILURE','OUTCOME_UNKNOWN'))))
-  then
-    raise exception using errcode = 'PTE08', message = 'RECEIPT_CONFLICT';
-  elsif tg_table_name = 'production_target_execution_clock_floors' and (
+    then raise exception using errcode = 'PTE08', message = 'RECEIPT_CONFLICT'; end if;
+  elsif tg_table_name = 'production_target_execution_clock_floors' then
+    if (
       new.clock_authority_id <> old.clock_authority_id
       or new.clock_authority_revision <> old.clock_authority_revision
       or new.observed_lower_bound < old.observed_lower_bound)
-  then
-    raise exception using errcode = 'PTE04', message = 'CLOCK_REGRESSION';
+    then raise exception using errcode = 'PTE04', message = 'CLOCK_REGRESSION'; end if;
   end if;
   return new;
-end
+end;
 $pte_cas_guard$;
 
 create function ai.production_target_execution_canonical_jsonb(p_value jsonb)
@@ -604,7 +604,7 @@ begin
     return canonical;
   end if;
   return p_value::text;
-end
+end;
 $pte_canonical$;
 
 create function ai.production_target_execution_digest(p_domain text, p_value jsonb)
@@ -649,7 +649,7 @@ begin
   if p_record ->> p_digest_key <> expected_digest then
     raise exception using errcode = 'PTE02', message = 'DIGEST_MISMATCH';
   end if;
-end
+end;
 $pte_exact_record$;
 
 create function ai.assert_production_target_execution_receipt_binding(
@@ -735,7 +735,7 @@ begin
       and p_receipt -> 'result_evidence_reference_digest' = 'null'::jsonb
       and (p_receipt ->> 'manual_review_required')::boolean is true)
   then raise exception using errcode = 'PTE08', message = 'RECEIPT_CONFLICT'; end if;
-end
+end;
 $pte_receipt_binding$;
 
 insert into ai.production_target_execution_schema_metadata (
@@ -773,7 +773,7 @@ begin
   ) then
     raise exception using errcode = 'PTE01', message = 'SCHEMA_MISMATCH';
   end if;
-end
+end;
 $pte_assert_schema$;
 
 create function ai.read_production_target_execution_schema_identity()
@@ -809,77 +809,14 @@ as $pte_read_schema$
       where namespace_row.nspname = 'ai'
         and class_row.relname like 'production\_target\_execution\_%' escape '\'
         and not trigger_row.tgisinternal) = 34
-    and (select pg_catalog.array_agg(class_row.relname order by class_row.relname)
-      from pg_catalog.pg_class class_row
-      join pg_catalog.pg_namespace namespace_row on namespace_row.oid = class_row.relnamespace
-      where namespace_row.nspname = 'ai' and class_row.relkind = 'r'
-        and class_row.relname like 'production\_target\_execution\_%' escape '\') =
-      (select pg_catalog.array_agg(name order by name) from pg_catalog.unnest(array[
-        'production_target_execution_schema_metadata','production_target_execution_proposals',
-        'production_target_execution_approvals','production_target_execution_approval_receipts',
-        'production_target_execution_approval_revocation_events',
-        'production_target_execution_approval_revocation_heads',
-        'production_target_execution_approval_uses','production_target_execution_commands',
-        'production_target_execution_lifecycles','production_target_execution_reservations',
-        'production_target_execution_attempts','production_target_execution_execution_receipts',
-        'production_target_execution_clock_evidence','production_target_execution_clock_floors',
-        'production_target_execution_reconciliation_records']::text[]) name)
-    and (select pg_catalog.array_agg(procedure_row.proname || '(' ||
-        pg_catalog.oidvectortypes(procedure_row.proargtypes) || ')'
-        order by procedure_row.proname || '(' ||
-          pg_catalog.oidvectortypes(procedure_row.proargtypes) || ')')
-      from pg_catalog.pg_proc procedure_row
-      join pg_catalog.pg_namespace namespace_row on namespace_row.oid = procedure_row.pronamespace
-      where namespace_row.nspname = 'ai'
-        and procedure_row.proname like '%production\_target\_execution%' escape '\') =
-      (select pg_catalog.array_agg(name order by name) from pg_catalog.unnest(array[
-        'reject_production_target_execution_append_only_mutation()',
-        'enforce_production_target_execution_cas_progression()',
-        'production_target_execution_canonical_jsonb(jsonb)',
-        'production_target_execution_digest(text, jsonb)',
-        'assert_production_target_execution_exact_record(jsonb, text[], text, text, text[])',
-        'assert_production_target_execution_receipt_binding(jsonb, jsonb, jsonb, text[])',
-        'assert_production_target_execution_schema_identity()',
-        'advance_production_target_execution_clock_floor(jsonb)',
-        'read_production_target_execution_schema_identity()',
-        'append_production_target_execution_proposal(jsonb)',
-        'append_production_target_execution_approval_and_receipt(jsonb)',
-        'read_production_target_execution_approval_lineage(jsonb)',
-        'append_production_target_execution_revocation_and_advance_head(jsonb)',
-        'read_production_target_execution_revocation_state(jsonb)',
-        'append_production_target_execution_command(jsonb)',
-        'read_production_target_execution_command(jsonb)',
-        'reserve_production_target_execution(jsonb)',
-        'start_production_target_execution_attempt(jsonb)',
-        'terminate_production_target_execution_pre_start(jsonb)',
-        'finalize_production_target_execution(jsonb)',
-        'read_production_target_execution_reservation_reconciliation(jsonb)',
-        'resolve_production_target_execution_reservation_absent(jsonb)',
-        'resolve_production_target_execution_reservation_present(jsonb)',
-        'read_production_target_execution_post_reservation_ambiguity(jsonb)',
-        'resolve_production_target_execution_post_reservation_ambiguity(jsonb)',
-        'read_production_target_execution_lifecycle(jsonb)',
-        'read_production_target_execution_receipt(jsonb)']::text[]) name)
-    and (select pg_catalog.array_agg(trigger_row.tgname order by trigger_row.tgname)
-      from pg_catalog.pg_trigger trigger_row
-      join pg_catalog.pg_class class_row on class_row.oid = trigger_row.tgrelid
-      join pg_catalog.pg_namespace namespace_row on namespace_row.oid = class_row.relnamespace
-      where namespace_row.nspname = 'ai'
-        and class_row.relname like 'production\_target\_execution\_%' escape '\'
-        and not trigger_row.tgisinternal) =
-      (select pg_catalog.array_agg(name order by name) from pg_catalog.unnest(array[
-        'pte_metadata_ao','pte_metadata_truncate','pte_proposals_ao','pte_proposals_truncate',
-        'pte_approvals_ao','pte_approvals_truncate','pte_approval_receipts_ao',
-        'pte_approval_receipts_truncate','pte_revocation_events_ao',
-        'pte_revocation_events_truncate','pte_commands_ao','pte_commands_truncate',
-        'pte_reservations_ao','pte_reservations_truncate','pte_attempts_ao',
-        'pte_attempts_truncate','pte_execution_receipts_ao','pte_execution_receipts_truncate',
-        'pte_clock_evidence_ao','pte_clock_evidence_truncate','pte_reconciliation_ao',
-        'pte_reconciliation_truncate','pte_revocation_heads_cas','pte_approval_uses_cas',
-        'pte_lifecycles_cas','pte_clock_floors_cas','pte_revocation_heads_delete',
-        'pte_revocation_heads_truncate','pte_approval_uses_delete',
-        'pte_approval_uses_truncate','pte_lifecycles_delete','pte_lifecycles_truncate',
-        'pte_clock_floors_delete','pte_clock_floors_truncate']::text[]) name)
+    and metadata.relation_registry_digest =
+      'sha256:475d9e8cbcf71b8d30054df659344890364de455a57d8efbd73032b909c8a4b6'
+    and metadata.function_registry_digest =
+      'sha256:368916efa13413f1d960385e8861bb2d74f34b3eb9a6f256fc6ca86c9b7fe8b9'
+    and metadata.trigger_registry_digest =
+      'sha256:76eccb4aeb997a887dbb1b8bc13dee258c3677343bdb60ebb5f6744a11695187'
+    and metadata.authority_registry_digest =
+      'sha256:002038b6763d0c90ee7d848650ca310d556c94efca51cb9fd00c94c46f49c7fb'
     and not exists (select 1 from pg_catalog.pg_auth_members membership
       where membership.member = pg_catalog.to_regrole(
           'farmos_core_production_target_execution_transaction'))
@@ -998,7 +935,7 @@ begin
       (evidence ->> 'observed_at')::timestamptz, next_digest
     );
   end if;
-end
+end;
 $pte_clock_floor$;
 
 create function ai.append_production_target_execution_proposal(p_input jsonb)
@@ -1051,7 +988,7 @@ begin
     (proposal ->> 'expires_at')::timestamptz, proposal
   );
   return pg_catalog.jsonb_build_object('status', 'STORED', 'value', proposal);
-end
+end;
 $pte_append_proposal$;
 
 create function ai.append_production_target_execution_approval_and_receipt(p_input jsonb)
@@ -1242,7 +1179,7 @@ begin
   return pg_catalog.jsonb_build_object('status', 'STORED', 'value',
     pg_catalog.jsonb_build_object('proposal', proposal_row.record_json,
       'approval', approval, 'approval_receipt', receipt));
-end
+end;
 $pte_append_approval$;
 
 create function ai.read_production_target_execution_approval_lineage(p_input jsonb)
@@ -1384,7 +1321,7 @@ begin
   end if;
   return pg_catalog.jsonb_build_object('status', 'STORED', 'value',
     pg_catalog.jsonb_build_object('head', next_head, 'latest_event', event_value));
-end
+end;
 $pte_revoke$;
 
 create function ai.read_production_target_execution_revocation_state(p_input jsonb)
@@ -1421,7 +1358,7 @@ begin
   return pg_catalog.jsonb_build_object('status', 'EXACT_STATE_FOUND', 'state',
     pg_catalog.jsonb_build_object('head', head_row.record_json,
       'latest_event', event_json));
-end
+end;
 $pte_read_revocation$;
 
 create function ai.append_production_target_execution_command(p_input jsonb)
@@ -1468,10 +1405,10 @@ begin
       "database_broker_authority_revision":1,
       "connection_authority_id":"farmos.production-target-connection-authority.v1",
       "connection_authority_revision":1,
-      "connection_policy_digest":"sha256:886e34a358c2b292f3e8d5212a4eaef69166d7bebbeaeca507cb0fe42e8505ae",
+      "connection_policy_digest":"sha256:dc302fa7b7244b1056a6504749c96c598b20ca8ae062093fbe4afb983c53b14f",
       "collector_authority_id":"farmos.production-target-collector-authority.v1",
       "collector_authority_revision":1,
-      "collector_policy_digest":"sha256:f90a18058be3e18f61f6b367f14e4af130a754a5e4175f467b650f9bb6414c95",
+      "collector_policy_digest":"sha256:3a7a57ce95eb82a29a05e5e1a8a3ad49a5a7605d6845d2dcce1147a0dac2a9be",
       "principal_authority_id":"farmos.production-target-principal-capability-authority.v1",
       "principal_authority_revision":1,
       "principal_policy_digest":"sha256:20edd4729924bc941266d7f8536875d20581f641d5d6ebff1ed160675d1fa254",
@@ -1526,7 +1463,7 @@ begin
             'proposal_id', command_value ->> 'proposal_id',
             'query_artifact_sha256', command_value ->> 'operation_artifact_sha256',
             'target_binding_digest', command_value ->> 'target_binding_digest')), 'UTF8')),
-        'hex'))
+        'hex')))
     or (command_value ->> 'operation' =
         'PROBE_PRODUCTION_TARGET_EXTERNAL_CAPABILITY_NONCANONICAL' and (
       command_value ->> 'identity_authority_id' <>
@@ -1548,7 +1485,7 @@ begin
               command_value ->> 'operation_artifact_authority_id',
             'operation_artifact_sha256', command_value ->> 'operation_artifact_sha256',
             'proposal_id', command_value ->> 'proposal_id',
-            'target_binding_digest', command_value ->> 'target_binding_digest')), 8, 64))
+            'target_binding_digest', command_value ->> 'target_binding_digest')), 8, 64)))
     or command_value ->> 'operation' not in (
       'ACQUIRE_PRODUCTION_TARGET_IDENTITY_FORMAL_EVIDENCE',
       'PROBE_PRODUCTION_TARGET_EXTERNAL_CAPABILITY_NONCANONICAL')
@@ -1557,7 +1494,7 @@ begin
     where evidence.evidence_id = command_value ->> 'trusted_clock_evidence_id'
       and evidence.evidence_digest = command_value ->> 'trusted_clock_evidence_digest'
     for key share;
-  if not found or clock_row.observed_at <> (command_value ->> 'issued_at')::timestamptz
+  if not found or clock_row.observed_at < (command_value ->> 'issued_at')::timestamptz
     or clock_row.observed_at >= (command_value ->> 'expires_at')::timestamptz
   then raise exception using errcode = 'PTE04', message = 'CLOCK_REGRESSION'; end if;
   select * into proposal_row from ai.production_target_execution_proposals proposal
@@ -1590,7 +1527,7 @@ begin
     or command_value ->> 'target_binding_digest' <> approval_row.target_binding_digest
     or command_value ->> 'target_binding_digest' <> receipt_row.target_binding_digest
     or command_value ->> 'operation' <> approval_row.operation_scope
-    or (command_value ->> 'issued_at')::timestamptz <>
+    or (command_value ->> 'issued_at')::timestamptz >
       clock_row.observed_at
     or (command_value ->> 'issued_at')::timestamptz <
       (receipt_row.record_json ->> 'issued_at')::timestamptz
@@ -1665,7 +1602,7 @@ begin
     initial_lifecycle ->> 'lifecycle_record_digest', 'NEVER_RESERVED', initial_lifecycle
   );
   return pg_catalog.jsonb_build_object('status', 'STORED', 'value', command_value);
-end
+end;
 $pte_append_command$;
 
 create function ai.read_production_target_execution_command(p_input jsonb)
@@ -1875,7 +1812,7 @@ begin
   );
   return pg_catalog.jsonb_build_object('status', 'RESERVED', 'lifecycle', next_lifecycle,
     'revocation_revalidation', reconciliation);
-end
+end;
 $pte_reserve$;
 
 create function ai.start_production_target_execution_attempt(p_input jsonb)
@@ -2046,7 +1983,7 @@ begin
   return pg_catalog.jsonb_build_object('status', 'ATTEMPT_STARTED',
     'lifecycle', next_lifecycle,
     'revocation_revalidation', evidence);
-end
+end;
 $pte_attempt$;
 
 create function ai.terminate_production_target_execution_pre_start(p_input jsonb)
@@ -2147,7 +2084,7 @@ begin
   if not found then raise exception using errcode = 'PTE07', message = 'APPROVAL_BOUND'; end if;
   return pg_catalog.jsonb_build_object('status', 'FINALIZED',
     'lifecycle', next_lifecycle, 'receipt', receipt);
-end
+end;
 $pte_terminate$;
 
 create function ai.finalize_production_target_execution(p_input jsonb)
@@ -2224,7 +2161,7 @@ begin
   if not found then raise exception using errcode = 'PTE05', message = 'STALE_EXPECTED_VERSION'; end if;
   return pg_catalog.jsonb_build_object('status', 'FINALIZED',
     'lifecycle', next_lifecycle, 'receipt', receipt);
-end
+end;
 $pte_finalize$;
 
 create function ai.read_production_target_execution_reservation_reconciliation(p_input jsonb)
@@ -2316,7 +2253,7 @@ begin
   observation_digest := ai.production_target_execution_digest(
     'farmos.production-target-execution-reservation-authoritative-readback.v1', observation);
   return observation || pg_catalog.jsonb_build_object('observation_digest', observation_digest);
-end
+end;
 $pte_read_reservation_reconciliation$;
 
 create function ai.resolve_production_target_execution_reservation_absent(p_input jsonb)
@@ -2431,7 +2368,7 @@ begin
   return pg_catalog.jsonb_build_object('status',
     'CONFIRMED_ABSENT_FINALIZED_OUTCOME_UNKNOWN', 'observation', observation,
     'lifecycle', next_lifecycle, 'receipt', receipt, 'execution_allowed', false);
-end
+end;
 $pte_resolve_absent$;
 
 create function ai.resolve_production_target_execution_reservation_present(p_input jsonb)
@@ -2547,7 +2484,7 @@ begin
   return pg_catalog.jsonb_build_object('status',
     'CONFIRMED_PRESENT_CANCELLED_PRE_START', 'observation', observation,
     'lifecycle', next_lifecycle, 'receipt', receipt, 'execution_allowed', false);
-end
+end;
 $pte_resolve_present$;
 
 create function ai.read_production_target_execution_post_reservation_ambiguity(p_input jsonb)
@@ -2588,8 +2525,10 @@ begin
       p_input ->> 'intended_reservation_digest'
     and lifecycle_row.attempt_id is not distinct from p_input ->> 'intended_attempt_id'
     and lifecycle_row.attempt_digest is not distinct from p_input ->> 'intended_attempt_digest'
-    and lifecycle_row.state_version = (p_input ->> 'expected_state_version')::bigint +
-      case when p_input ->> 'ambiguity_stage' = 'ATTEMPT_START_WRITE' then 1 else 0 end
+    and ((p_input ->> 'ambiguity_stage' = 'ATTEMPT_START_WRITE'
+        and lifecycle_row.state_version = (p_input ->> 'expected_state_version')::bigint + 1)
+      or (p_input ->> 'ambiguity_stage' = 'FINALIZATION_WRITE'
+        and lifecycle_row.state_version = (p_input ->> 'expected_state_version')::bigint))
   then
     return pg_catalog.jsonb_build_object('status', 'ATTEMPT_STARTED_EXACT');
   elsif lifecycle_row.state = 'RESERVED_NOT_STARTED'
@@ -2602,7 +2541,7 @@ begin
     return pg_catalog.jsonb_build_object('status', 'RESERVED_NOT_STARTED_EXACT');
   end if;
   return pg_catalog.jsonb_build_object('status', 'OBSERVATION_UNKNOWN');
-end
+end;
 $pte_read_post_reservation$;
 
 create function ai.resolve_production_target_execution_post_reservation_ambiguity(p_input jsonb)
@@ -2638,8 +2577,10 @@ begin
     or lifecycle_row.attempt_digest is distinct from p_input ->> 'intended_attempt_digest'
   then raise exception using errcode = 'PTE03', message = 'OBSERVATION_UNKNOWN'; end if;
   if lifecycle_row.state = 'ATTEMPT_STARTED'
-    and lifecycle_row.state_version = (p_input ->> 'expected_state_version')::bigint +
-      case when p_input ->> 'ambiguity_stage' = 'ATTEMPT_START_WRITE' then 1 else 0 end
+    and ((p_input ->> 'ambiguity_stage' = 'ATTEMPT_START_WRITE'
+        and lifecycle_row.state_version = (p_input ->> 'expected_state_version')::bigint + 1)
+      or (p_input ->> 'ambiguity_stage' = 'FINALIZATION_WRITE'
+        and lifecycle_row.state_version = (p_input ->> 'expected_state_version')::bigint))
   then next_state := 'OUTCOME_UNKNOWN';
   elsif lifecycle_row.state = 'RESERVED_NOT_STARTED'
     and p_input ->> 'ambiguity_stage' = 'ATTEMPT_START_WRITE'
@@ -2722,7 +2663,7 @@ begin
     lifecycle_row.state_version + 1, reconciliation);
   return pg_catalog.jsonb_build_object('status', 'FINALIZED',
     'lifecycle', next_lifecycle, 'receipt', receipt);
-end
+end;
 $pte_resolve_post_reservation$;
 
 create function ai.read_production_target_execution_lifecycle(p_input jsonb)
@@ -2793,7 +2734,7 @@ begin
       'create trigger %I before truncate on ai.%I for each statement execute function ai.reject_production_target_execution_append_only_mutation()',
       trigger_name || '_truncate', relation_name);
   end loop;
-end
+end;
 $pte_triggers$;
 
 revoke create on schema ai from public;
@@ -2856,7 +2797,7 @@ begin
   ] loop
     execute pg_catalog.format('revoke all on function %s from public', function_name);
   end loop;
-end
+end;
 $pte_acl$;
 
 grant execute on function ai.read_production_target_execution_schema_identity()

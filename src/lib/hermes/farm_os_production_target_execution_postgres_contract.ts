@@ -25,9 +25,9 @@ export const FARM_OS_PRODUCTION_TARGET_EXECUTION_POSTGRES_APPLY_PATH =
 export const FARM_OS_PRODUCTION_TARGET_EXECUTION_POSTGRES_VERIFY_PATH =
   `db/migrations/${FARM_OS_PRODUCTION_TARGET_EXECUTION_POSTGRES_MIGRATION_ID}.verify.sql` as const;
 export const FARM_OS_PRODUCTION_TARGET_EXECUTION_POSTGRES_APPLY_SHA256 =
-  "sha256:f97eca5134c44c5a144523ea19b44b679051f3592f9fd28dbf38c441be7b8131" as const;
+  "sha256:e230647582fc3b1fb26d017034227cdf9b86384f6be7767f0c266ba4768ebc34" as const;
 export const FARM_OS_PRODUCTION_TARGET_EXECUTION_POSTGRES_VERIFY_SHA256 =
-  "sha256:f5294d29b6407d6ed789e2c229c394e62be09b0d31407065d99ca620e2473036" as const;
+  "sha256:ef8484ea130e930cd65e3b847869749727f00b2bf6ee373a2dc1d6d8fca0384f" as const;
 
 export const FARM_OS_PRODUCTION_TARGET_EXECUTION_POSTGRES_SCHEMA = "ai" as const;
 export const FARM_OS_PRODUCTION_TARGET_EXECUTION_POSTGRES_SCHEMA_VERSION =
@@ -243,7 +243,7 @@ export const FARM_OS_PRODUCTION_TARGET_EXECUTION_POSTGRES_EXPECTED_SCHEMA_IDENTI
   } satisfies FarmOsProductionTargetExecutionPostgresSchemaIdentity);
 
 export const FARM_OS_PRODUCTION_TARGET_EXECUTION_POSTGRES_CONTRACT = Object.freeze({
-  status: "SOURCE_ARTIFACT_CREATED",
+  status: "ISOLATED_MIGRATION_QUALIFIED",
   migration_id: FARM_OS_PRODUCTION_TARGET_EXECUTION_POSTGRES_MIGRATION_ID,
   schema_version: FARM_OS_PRODUCTION_TARGET_EXECUTION_POSTGRES_SCHEMA_VERSION,
   persistence_port_version: FARM_OS_PRODUCTION_TARGET_EXECUTION_PERSISTENCE_PORT_VERSION,
@@ -260,8 +260,8 @@ export const FARM_OS_PRODUCTION_TARGET_EXECUTION_POSTGRES_CONTRACT = Object.free
   database_connection_implemented_by_contract: false,
   environment_lookup: false,
   trusted_clock_producer_established: false,
-  isolated_migration_qualified: false,
-  durability_established: false,
+  isolated_migration_qualified: true,
+  durability_established: true,
   external_execution_authorized: false,
 } as const);
 

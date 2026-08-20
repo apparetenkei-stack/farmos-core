@@ -142,7 +142,9 @@ expectBodyRejection((body) => {
 expectBodyRejection((body) => { body.policy.integrity.sufficiency = "HASH_ALWAYS_SUFFICIENT"; });
 expectBodyRejection((body) => { body.policy.privacy.persisted_allowlist.pop(); });
 expectBodyRejection((body) => { body.policy.privacy.password = "synthetic-secret"; });
-expectBodyRejection((body) => { body.implementation_profile.writer_binary_sha256.status = "ESTABLISHED"; });
+expectBodyRejection((body) => { body.implementation_profile.artifact_policy.executable_mode = "0777"; });
+assert.equal(JSON.stringify(FARM_OS_DAY150_C2B_BOOTSTRAP_MANIFEST_BODY)
+  .includes("UNRESOLVED_IMPLEMENTATION_PROFILE"), false);
 expectBodyRejection((body) => { body.runtime_claims.manifest_instance_created = true; });
 expectBodyRejection((body) => { body.target = []; });
 

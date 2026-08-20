@@ -23,7 +23,7 @@ export const FARM_OS_PRODUCTION_TARGET_EXECUTION_REVALIDATION_CONTRACT = Object.
   required_provenance: "PERSISTENCE_TRANSACTION_AUTHORITATIVE_RESOLUTION",
   caller_asserted_status_is_authority: false,
   standalone_digest_is_authority_proof: false,
-  storage_implementation_status: "NOT_ESTABLISHED",
+  storage_implementation_status: "ISOLATED_STORAGE_QUALIFIED",
   external_execution_authorized: false,
 } as const);
 

@@ -72,7 +72,8 @@ assert.equal(FARM_OS_PRODUCTION_TARGET_PROVIDER_CREDENTIAL_BROKER_POLICY
   .handle_request_correlation, "ESTABLISHED_BY_CONTRACT");
 assert.equal(FARM_OS_PRODUCTION_TARGET_DATABASE_CREDENTIAL_BROKER_POLICY
   .handle_durable_single_use, "NOT_ESTABLISHED");
-assert.equal(FARM_OS_PRODUCTION_TARGET_COLLECTOR_POLICY.implementation_state, "NONE");
+assert.equal(FARM_OS_PRODUCTION_TARGET_COLLECTOR_POLICY.implementation_state,
+  "SOURCE_IMPLEMENTED_TRUSTED_CAPABILITY_ONLY");
 assert.equal(FARM_OS_PRODUCTION_TARGET_COLLECTOR_POLICY.production_callable, false);
 assert.equal(FARM_OS_PRODUCTION_TARGET_COLLECTOR_POLICY.runtime_binding_state, "NOT_BOUND");
 assert.match(brokerSource, /FarmOsProviderOpaqueCredentialHandle/u);

@@ -13,9 +13,7 @@ export const FARM_OS_DAY150_C2B_BOOTSTRAP_PURPOSE =
 export const FARM_OS_DAY150_C2B_BOOTSTRAP_SOURCE_STATE =
   "BOOTSTRAP_MANIFEST_SOURCE_CONTRACT" as const;
 
-const UNRESOLVED_IMPLEMENTATION_PROFILE = Object.freeze({
-  status: "UNRESOLVED_IMPLEMENTATION_PROFILE",
-} as const);
+const FUTURE_INSTALL_EVIDENCE = "ASSIGNED_AND_RECORDED_ONLY_BY_SEPARATELY_AUTHORIZED_INSTALL" as const;
 
 function deepFreeze<T>(value: T): T {
   if (typeof value !== "object" || value === null || Object.isFrozen(value)) return value;
@@ -54,8 +52,8 @@ export const FARM_OS_DAY150_C2B_BOOTSTRAP_MANIFEST_BODY = deepFreeze({
     },
     migration: {
       migration_id: "202608110001_production_target_execution_durability",
-      apply_sha256: "sha256:f97eca5134c44c5a144523ea19b44b679051f3592f9fd28dbf38c441be7b8131",
-      verify_sha256: "sha256:f5294d29b6407d6ed789e2c229c394e62be09b0d31407065d99ca620e2473036",
+      apply_sha256: "sha256:e230647582fc3b1fb26d017034227cdf9b86384f6be7767f0c266ba4768ebc34",
+      verify_sha256: "sha256:ef8484ea130e930cd65e3b847869749727f00b2bf6ee373a2dc1d6d8fca0384f",
     },
   },
   policy: {
@@ -289,21 +287,72 @@ export const FARM_OS_DAY150_C2B_BOOTSTRAP_MANIFEST_BODY = deepFreeze({
     },
   },
   implementation_profile: {
-    writer_binary_sha256: UNRESOLVED_IMPLEMENTATION_PROFILE,
-    writer_built_artifact: UNRESOLVED_IMPLEMENTATION_PROFILE,
-    numeric_uid_gid: UNRESOLVED_IMPLEMENTATION_PROFILE,
-    apfs_device_identity: UNRESOLVED_IMPLEMENTATION_PROFILE,
-    filesystem_qualification: UNRESOLVED_IMPLEMENTATION_PROFILE,
-    authorization_right_identifier: UNRESOLVED_IMPLEMENTATION_PROFILE,
-    security_framework_api: UNRESOLVED_IMPLEMENTATION_PROFILE,
-    open_directory_api: UNRESOLVED_IMPLEMENTATION_PROFILE,
-    launch_configuration_digest: UNRESOLVED_IMPLEMENTATION_PROFILE,
-    installed_executable_path: UNRESOLVED_IMPLEMENTATION_PROFILE,
-    writer_availability: UNRESOLVED_IMPLEMENTATION_PROFILE,
-    ledger_root_existence: UNRESOLVED_IMPLEMENTATION_PROFILE,
-    actor_capability: UNRESOLVED_IMPLEMENTATION_PROFILE,
-    clock_genesis: UNRESOLVED_IMPLEMENTATION_PROFILE,
-    manifest_adoption_record: UNRESOLVED_IMPLEMENTATION_PROFILE,
+    profile_authority: "farmos.day150-c2b-canonical-installation-profile.v1",
+    installed_targets: {
+      ceremony_client: "/Library/Application Support/FarmOS/day150-c2b-bootstrap/v1/bin/farmos-c2b-ceremony-client",
+      validator_broker: "/Library/Application Support/FarmOS/day150-c2b-bootstrap/v1/bin/farmos-c2b-validator-broker",
+      writer_worker: "/Library/Application Support/FarmOS/day150-c2b-bootstrap/v1/bin/farmos-c2b-writer-worker",
+      fresh_auth_companion: "/Library/Application Support/FarmOS/day150-c2b-bootstrap/v1/bin/farmos-c2b-fresh-auth-probe",
+      configuration: "/Library/Application Support/FarmOS/day150-c2b-bootstrap/v1/profile/canonical-installation.json",
+    },
+    artifact_policy: {
+      writer_binary_sha256: "SHA256_OF_EXACT_NOTARIZED_BUILD_ARTIFACT_RECORDED_AT_INSTALL",
+      writer_built_artifact: "SWIFT_RELEASE_PRODUCT_FARMOS_C2B_WRITER_WORKER",
+      signature: "VALID_APPLE_CODESIGN_DESIGNATED_REQUIREMENT_AND_TEAM_ID_EXACT_MATCH",
+      bundle_identity: "org.farmos.day150.c2b-bootstrap",
+      owner: "root",
+      group: "wheel",
+      executable_mode: "0555",
+      configuration_mode: "0444",
+      symlink: "PROHIBITED",
+      hardlink: "PROHIBITED_NLINK_MUST_EQUAL_1",
+      same_object_verification: "OPEN_FD_FSTAT_AND_PATH_LSTAT_DEVICE_INODE_EXACT_MATCH",
+    },
+    numeric_uid_gid: {
+      selection: "OPENDIRECTORY_LOWEST_FREE_LOCAL_SYSTEM_UID_AND_GID_IN_200_TO_499",
+      acceptable_domain: "INTEGER_200_THROUGH_499_EXCLUDING_EXISTING_UID_GID_AND_RESERVED_IDENTITIES",
+      collision_rejection: "ANY_NAME_UID_GID_GENERATEDUID_OR_PRIMARY_GROUP_COLLISION_FAILS_CLOSED",
+      primary_group: "DEDICATED_FARMOS_C2B_BOOTSTRAP_GROUP_SAME_DYNAMIC_GID",
+      evidence: FUTURE_INSTALL_EVIDENCE,
+    },
+    principal: {
+      account_api: "OPENDIRECTORY_ODSESSION_LOCAL_NODE_ODRECORD_USER_AND_GROUP",
+      principal_name: "farmos_c2b_bootstrap",
+      login_shell: "/usr/bin/false",
+      home_directory: "/var/empty",
+      hidden_account: true,
+      supplementary_groups: "NONE",
+      generic_execution_and_network_authority: "PROHIBITED",
+      rerun: "EXACT_ADOPTED_IDENTITY_ONLY_OTHERWISE_FAIL_CLOSED",
+    },
+    filesystem: {
+      apfs_device_identity: "FSTATFS_MNT_LOCAL_AND_APFS_DEVICE_RECORDED_AT_INSTALL",
+      qualification: "DISPOSABLE_LOCAL_APFS_PRIMITIVE_QUALIFICATION_REQUIRED_BEFORE_ADOPTION",
+      ledger_root_existence: "MUST_NOT_PREEXIST_EXCEPT_EXACT_VERIFIED_ADOPTED_INSTALLATION",
+      ancestor_policy: "ROOT_OWNED_NON_WRITABLE_NO_SYMLINK_LOCAL_APFS_SAME_DEVICE",
+      evidence: FUTURE_INSTALL_EVIDENCE,
+    },
+    authorization: {
+      right_identifier: "org.farmos.day150.c2b-bootstrap.ceremony",
+      security_framework_api: "AUTHORIZATIONCREATE_AUTHORIZATIONCOPYRIGHTS_INTERACTION_ALLOWED_EXTEND_RIGHTS",
+      open_directory_api: "ODSESSION_DEFAULT_LOCAL_NODE_RECORD_LOOKUP_GENERATEDUID",
+      actor_capability: "ONE_SHOT_GENERATION_BOUND_TO_FRESH_AUTH_CHALLENGE_AND_ADOPTED_PROFILE_DIGEST",
+      clock_genesis: "OS_UTC_PLUS_MACH_CONTINUOUS_TIME_BRACKET_AND_BOOT_SESSION_AFTER_DURABLE_GEN0_READBACK",
+    },
+    launch_configuration: {
+      mechanism: "ROOT_OWNED_LAUNCHD_PLISTS_WITH_EXACT_PROGRAMARGUMENTS_NO_PATH_LOOKUP",
+      digest: "SHA256_OF_CANONICAL_PLIST_BYTES_RECORDED_AT_INSTALL",
+      writer_availability: "INDEPENDENT_CODESIGN_DIGEST_OWNER_MODE_AND_LAUNCHD_LABEL_VERIFICATION",
+      environment: "EMPTY_EXCEPT_EXACT_PROFILE_ALLOWLIST",
+      evidence: FUTURE_INSTALL_EVIDENCE,
+    },
+    manifest_adoption_record: {
+      schema: "farmos.day150-c2b-installation-adoption-record.v1",
+      format: "CANONICAL_JSON_APPEND_ONLY_DIGEST_BOUND_TO_PROFILE_ARTIFACTS_IDENTITIES_AND_APFS_DEVICE",
+      authority_transition: "ONLY_AFTER_ALL_POST_INSTALL_INDEPENDENT_VERIFICATIONS_PASS",
+      compensation: "PRE_AUTHORITY_ATTEMPT_CREATED_RESOURCES_ONLY_REVERSE_ORDER_NO_HISTORY_ERASURE",
+      unexpected_preexisting_state: "FAIL_CLOSED",
+    },
   },
   runtime_claims: {
     manifest_instance_created: false,

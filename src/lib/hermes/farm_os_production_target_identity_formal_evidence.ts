@@ -38,8 +38,11 @@ export const FARM_OS_PRODUCTION_TARGET_MANIFEST_POLICY_RESERVATION = Object.free
     "day150-phase-a-production-target-identity-v1-approval",
   manifest_revision_approval_reference:
     "day150-phase-a-production-target-manifest-r1-approval",
-  concrete_manifest_revision_exists: false,
-  production_target_manifest_required_resolved: false,
+  concrete_manifest_revision_exists: true,
+  production_target_manifest_required_resolved: true,
+  source_closure_status: "CONCRETE_SECRET_FREE_MANIFEST_REVISION_1",
+  runtime_binding_status: "NOT_RUNTIME_BOUND",
+  production_execution_authorized: false,
   execution_approval_effect: "NONE",
 } as const);
 

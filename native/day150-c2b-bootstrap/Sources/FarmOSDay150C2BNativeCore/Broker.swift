@@ -51,6 +51,22 @@ public enum NativeBrokerSource {
         return .boundedDispatchCandidate(operation: request.operation)
     }
 
+    public static func validateInstalledPeer(
+        identity: InstalledBrokerIdentityCapability,
+        requestData: Data
+    ) -> BrokerCandidateDecision {
+        guard FarmOSCanonicalDigest.isDigest(identity.identityDigest),
+              FarmOSCanonicalDigest.isDigest(identity.adoptionProfileDigest)
+        else { return .rejected(.malformedPeer) }
+        guard case let .structurallyValidCandidate(request) = NativeProtocolCodec.parse(requestData),
+              request.messageKind == "BOUNDED_REQUEST_CANDIDATE"
+        else { return .rejected(.malformedRequest) }
+        guard brokerOperations.contains(request.operation) else {
+            return .rejected(.unsupportedOperation)
+        }
+        return .boundedDispatchCandidate(operation: request.operation)
+    }
+
     public static let ledgerWriteAuthority = false
     public static let shellAuthority = false
     public static let dockerAuthority = false

@@ -29,7 +29,7 @@ import { FARM_OS_DAY150_C2B_BOOTSTRAP_MANIFEST_SOURCE_CANDIDATE } from
   "./lib/farm_os_day150_phase_c2b_bootstrap_manifest_contract";
 
 const EXPECTED_MANIFEST_DIGEST =
-  "sha256:a332368cbdca6461e11f538085a8bea3bfbd63f20cc0066302412d309e9e11be";
+  "sha256:4f40823d671ded21d01d19f88b512e2ba4b75cb20b56d2bd5ae0a723c4bd28b9";
 
 function clone<T>(value: T): any {
   return JSON.parse(JSON.stringify(value));

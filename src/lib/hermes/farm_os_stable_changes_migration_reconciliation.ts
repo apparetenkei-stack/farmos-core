@@ -415,22 +415,25 @@ export type FarmOsMigrationRegistryEntry = {
   role: "prefix" | "target";
 };
 
-const MIGRATION_METADATA = [
+const FARM_OS_STABLE_CHANGES_MIGRATION_METADATA_VALUES = [
   ["202607260001_eligible_proposal_persistence", "sha256:41fbbfb931f03ad42c0c52159749fa8529c84321d6fcc643930c2b03c5c2ee4b", "sha256:b4f4bbad446a975210aa7e7ab18ef56e96a5bfe903c05819f695bdd3734acbe1", "5b6a1a635f3dd4835546ddd3d9e6ebe5b8211c3e", "prefix"],
   ["202607300001_daily_operational_projection_candidate_foundation", "sha256:350489282b921b879a9c4fab8280cfd38ff7432ed75cc70a905a7dabd45846bf", "sha256:183a3fff47bce5d9cbbf9675c21fd57e398f87fc7628e87ec93127d78c0c9edf", "d92a3a9fbeed33346f99dc6ca5b72a9137dfc41a", "prefix"],
   ["202607310001_daily_operational_projection_candidate_activation", "sha256:e55b7b2c33d432b37d9733d599f8ed4dd7de99a82fb64c5f90158dae7addbbc2", "sha256:2b7108045ab34e5790b6d6381f9e6d2ca2399380a5dc05a9b80d7cf8af337b89", "6b53b1c5b35590518bf73526f89cc7e5cf4f7f90", "prefix"],
   ["202608030001_daily_operational_projection_command_ledger", "sha256:98504d23be1922d339acf0c7384ad1a5f9b6257e44a07a9073200b21bd79ef0a", "sha256:daddee61d384bb5f93662152bb52a760f2733ccc11dec026c5911ffd66524093", "a99ba6f063bb086f68c2aa2645d473b4db85fcd1", "prefix"],
   ["202608070001_stable_changes_consumer_persistence", "sha256:835b76ba23380d388c3532136564a5c83d04a2e9decf473726ef971ced8c6de0", "sha256:cc335aaf952fd4bbd57febe24eb19a6866d6e06a144428574f5bc0e9530474ee", "1437eb3f7aed210bb12d2f59fab9a39effe2a6c6", "target"],
 ] as const;
+export const FARM_OS_STABLE_CHANGES_MIGRATION_METADATA = Object.freeze(
+  FARM_OS_STABLE_CHANGES_MIGRATION_METADATA_VALUES.map((entry) => Object.freeze([...entry])),
+) as unknown as typeof FARM_OS_STABLE_CHANGES_MIGRATION_METADATA_VALUES;
 
 export function deriveFarmOsStableChangesMigrationRegistry(
   value: unknown,
 ): readonly FarmOsMigrationRegistryEntry[] | null {
   const manifest = parseFarmOsCoreMigrationManifest(value);
-  if (manifest === null || manifest.migrations.length < MIGRATION_METADATA.length) return null;
+  if (manifest === null || manifest.migrations.length < FARM_OS_STABLE_CHANGES_MIGRATION_METADATA.length) return null;
   const registry: FarmOsMigrationRegistryEntry[] = [];
-  for (let index = 0; index < MIGRATION_METADATA.length; index += 1) {
-    const metadata = MIGRATION_METADATA[index];
+  for (let index = 0; index < FARM_OS_STABLE_CHANGES_MIGRATION_METADATA.length; index += 1) {
+    const metadata = FARM_OS_STABLE_CHANGES_MIGRATION_METADATA[index];
     const entry = manifest.migrations[index];
     if (!entry || entry.migration_id !== metadata[0] || entry.checksum !== metadata[1]) return null;
     registry.push({
@@ -609,7 +612,9 @@ export type FarmOsObjectValidationResult = {
 export type FarmOsExpectedCatalogFingerprintAuthority = {
   schema_version: "farmos.expected-catalog-fingerprint-authority.v1";
   migration_id: string;
-  fingerprint_version: "farmos.pg-catalog-fingerprint.v1";
+  fingerprint_version: "farmos.pg-catalog-fingerprint.v1" |
+    "farmos.pg-catalog-semantic-principal-fingerprint.v2" |
+    "farmos.pg-catalog-semantic-principal-fingerprint.v3";
   expected_fingerprint: `sha256:${string}`;
   artifact_sha256: `sha256:${string}`;
   catalog_query_sha256: `sha256:${string}`;
@@ -620,7 +625,7 @@ export type FarmOsExpectedCatalogFingerprintAuthority = {
   approved_at: string;
 };
 
-function validExpectedCatalogAuthority(value: unknown): value is FarmOsExpectedCatalogFingerprintAuthority {
+export function validExpectedCatalogAuthority(value: unknown): value is FarmOsExpectedCatalogFingerprintAuthority {
   return record(value) && exact(value, [
     "schema_version", "migration_id", "fingerprint_version",
     "expected_fingerprint", "artifact_sha256", "catalog_query_sha256",
@@ -628,7 +633,9 @@ function validExpectedCatalogAuthority(value: unknown): value is FarmOsExpectedC
     "approval_reference", "approved_at",
   ]) && value.schema_version === "farmos.expected-catalog-fingerprint-authority.v1" &&
     typeof value.migration_id === "string" && MIGRATION_ID.test(value.migration_id) &&
-    value.fingerprint_version === "farmos.pg-catalog-fingerprint.v1" &&
+    (value.fingerprint_version === "farmos.pg-catalog-fingerprint.v1" ||
+      value.fingerprint_version === "farmos.pg-catalog-semantic-principal-fingerprint.v2" ||
+      value.fingerprint_version === "farmos.pg-catalog-semantic-principal-fingerprint.v3") &&
     digest(value.expected_fingerprint) && digest(value.artifact_sha256) &&
     digest(value.catalog_query_sha256) && digest(value.object_universe_digest) &&
     Number.isSafeInteger(value.expected_object_count) && Number(value.expected_object_count) > 0 &&
@@ -1355,8 +1362,9 @@ export type FarmOsApplyDryRunInput = {
 };
 
 function registryMatchesRepositoryAuthority(registry: readonly FarmOsMigrationRegistryEntry[]): boolean {
-  return registry.length === MIGRATION_METADATA.length && registry.every((entry, index) => {
-    const expected = MIGRATION_METADATA[index];
+  return registry.length === FARM_OS_STABLE_CHANGES_MIGRATION_METADATA.length &&
+    registry.every((entry, index) => {
+    const expected = FARM_OS_STABLE_CHANGES_MIGRATION_METADATA[index];
     return expected !== undefined && entry.migration_id === expected[0] &&
       entry.sequence === Number(expected[0].slice(0, 12)) && entry.apply_sha256 === expected[1] &&
       entry.verify_sha256 === expected[2] && entry.git_authority === expected[3] && entry.role === expected[4] &&

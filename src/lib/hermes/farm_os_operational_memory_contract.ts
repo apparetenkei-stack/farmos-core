@@ -285,7 +285,9 @@ export function parseFarmOsStableChangesPage(
   const changes: FarmOsStableChange[] = [];
   for (const candidate of value.changes) {
     const parsed = parseFarmOsStableChange(candidate);
-    if (!parsed.valid) return parsed;
+    if (!parsed.valid) {
+      return invalid(parsed.failure_code);
+    }
     changes.push(parsed.value);
   }
   for (let index = 1; index < changes.length; index += 1) {

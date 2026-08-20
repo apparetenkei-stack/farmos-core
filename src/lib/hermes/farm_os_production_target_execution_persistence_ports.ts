@@ -36,10 +36,10 @@ export const FARM_OS_PRODUCTION_TARGET_EXECUTION_REVOCATION_REVALIDATION_EVIDENC
 
 export const FARM_OS_PRODUCTION_TARGET_EXECUTION_PERSISTENCE_CONTRACT = Object.freeze({
   port_version: FARM_OS_PRODUCTION_TARGET_EXECUTION_PERSISTENCE_PORT_VERSION,
-  implementation_status: "NOT_ESTABLISHED",
-  storage_backed_concurrency_tested: false,
-  storage_backed_crash_semantics_tested: false,
-  storage_backed_restart_tested: false,
+  implementation_status: "ISOLATED_STORAGE_QUALIFIED",
+  storage_backed_concurrency_tested: true,
+  storage_backed_crash_semantics_tested: true,
+  storage_backed_restart_tested: true,
   atomic_approval_revalidation_and_reservation_required: true,
   atomic_attempt_start_compare_and_set_required: true,
   atomic_terminal_state_and_append_only_receipt_required: true,

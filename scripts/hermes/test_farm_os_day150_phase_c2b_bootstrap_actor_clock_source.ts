@@ -34,7 +34,7 @@ import { FARM_OS_DAY150_C2B_BOOTSTRAP_MANIFEST_SOURCE_CANDIDATE } from
 
 const D = (digit: string): `sha256:${string}` => `sha256:${digit.repeat(64)}`;
 const clone = <T>(value: T): any => JSON.parse(JSON.stringify(value));
-const MANIFEST = "sha256:a332368cbdca6461e11f538085a8bea3bfbd63f20cc0066302412d309e9e11be";
+const MANIFEST = "sha256:4f40823d671ded21d01d19f88b512e2ba4b75cb20b56d2bd5ae0a723c4bd28b9";
 
 function actorBody(): FarmOsDay150C2bBootstrapActorIntentSourceCandidateBody {
   return {

@@ -82,10 +82,10 @@ assert.deepEqual(FARM_OS_PRODUCTION_TARGET_IDENTITY_APPROVED_BINDING, {
 assert.deepEqual(FARM_OS_PRODUCTION_TARGET_MANIFEST_POLICY_RESERVATION.approved_target_schema_scope,
   ["ai", "audit", "core_schema"]);
 assert.equal(FARM_OS_PRODUCTION_TARGET_MANIFEST_POLICY_RESERVATION.concrete_manifest_revision_exists,
-  false);
+  true);
 assert.equal(
   FARM_OS_PRODUCTION_TARGET_MANIFEST_POLICY_RESERVATION.production_target_manifest_required_resolved,
-  false,
+  true,
 );
 assert.equal(FARM_OS_PRODUCTION_TARGET_MANIFEST_POLICY_RESERVATION.execution_approval_effect, "NONE");
 

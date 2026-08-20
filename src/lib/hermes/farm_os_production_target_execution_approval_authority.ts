@@ -41,8 +41,8 @@ export const FARM_OS_PRODUCTION_TARGET_EXECUTION_APPROVAL_CONTRACT = Object.free
   client_role_or_boolean_is_authority: false,
   approval_reuse: "PROHIBITED",
   automatic_latest_selection: false,
-  durable_approval_sot_established: false,
-  implementation_status: "SOURCE_ONLY_CONTRACT_CANDIDATE",
+  durable_approval_sot_established: true,
+  implementation_status: "ISOLATED_STORAGE_QUALIFIED",
 } as const);
 
 export const FARM_OS_PRODUCTION_TARGET_EXECUTION_APPROVAL_REVOCATION_REASONS = Object.freeze([
@@ -65,7 +65,7 @@ export const FARM_OS_PRODUCTION_TARGET_EXECUTION_APPROVAL_REVOCATION_CONTRACT = 
   monotonic_event_sequence_required: true,
   compare_and_set_head_required: true,
   trusted_clock_evidence_required: true,
-  storage_implementation_status: "NOT_ESTABLISHED",
+  storage_implementation_status: "ISOLATED_STORAGE_QUALIFIED",
 } as const);
 
 export type FarmOsProductionTargetExecutionProposal = Readonly<{
