@@ -1,0 +1,156 @@
+schema_version: farmos.ef1-capability-matrix.v1
+recorded_at: '2026-08-21T03:59:17Z'
+reconciled_at: '2026-08-21T06:58:05Z'
+capability_matrix_finalized_at: '2026-08-21T06:40:52Z'
+result: DAY150_5_A_COMPLETE_PENDING_PUBLICATION
+finalized_at: '2026-08-21T07:02:18Z'
+codex:
+  normal_cli_operation:
+    status: SUPPORTED
+    evidence: codex-cli 0.149.0 help and version completed successfully
+  auto_review:
+    status: SUPPORTED
+    evidence: active runtime approvals_reviewer=auto_review and CLI --approve-for-me capability
+  permission_request_approval_flow:
+    status: SUPPORTED
+    evidence: managed escalation flow approved read-only git remote, Docker Engine and Ollama queries
+  permission_profile:
+    status: SUPPORTED
+    evidence: active workspace-write managed profile; CLI exposes named permission-profile application
+  permission_request_hook:
+    status: NOT_CONFIGURED
+    classification: KNOWN_OPTIONAL_UNAVAILABLE
+    authority: EF-1 v1.0 A requires empirical availability discovery, not configured hook operation
+    evidence: hooks feature is stable/enabled; both Mac repository and Windows evidence show no PermissionRequest hook configuration
+  luna_class_execution:
+    status: SUPPORTED
+    evidence: runtime advertises farmos_luna_inspector custom agent; no extra agent was started in A
+  terra_class_execution:
+    status: SUPPORTED
+    evidence: current parent applies Terra-class execution and runtime advertises farmos_terra_worker
+  sol_class_independent_review:
+    status: SUPPORTED
+    evidence: runtime advertises farmos_sol_reviewer; one independent review is reserved for the final A gate
+  subagent_delegation:
+    status: SUPPORTED
+    evidence: multi_agent feature stable/enabled and collaboration runtime exposes bounded spawn/review controls
+  app_server_protocol_tooling:
+    status: SUPPORTED
+    evidence: codex app-server exposes stdio/unix/ws transports and JSON-schema generation
+  app_server_running_daemon_or_usage_endpoint:
+    status: AVAILABLE_EXPERIMENTAL
+    classification: NOT_APPLICABLE
+    authority: EF-1 v1.0 A requires App Server usage/capability availability discovery, not an already running daemon
+    evidence: Mac CLI exposes protocol tooling; Windows evidence records codex app-server command surface as AVAILABLE_EXPERIMENTAL; no daemon was started
+  safe_external_git_metadata:
+    status: SUPPORTED
+    evidence: approved read-only git ls-remote returned exact origin/main
+  workspace_write_boundary:
+    status: SUPPORTED
+    evidence: repository root is writable; external authority-input roots remain read-only
+  unrestricted_mode:
+    status: NOT_APPLICABLE
+    evidence: danger-full-access and yolo were not used and are prohibited by scope lock
+spec_kit:
+  status: QUALIFIED_USER_LOCAL
+  version_lock: artifacts/day150-5/ef1-a/spec-kit-version.lock
+  capability_matrix: artifacts/day150-5/ef1-a/spec-kit-capability-matrix.yaml
+  qualification_report: artifacts/day150-5/ef1-a/spec-kit-core-qualification-report.md
+providers_and_egress:
+  cloud_inference_provider_capability:
+    status: NONE_CONFIGURED
+    classification: DEFERRED_TO_AUTHORIZED_LATER_EF1_SUBDAY
+    authority: EF-1 v1.2 A requires inventory; B/E/L own authority, environment identity and assurance implementation
+    evidence: Windows evidence finds NONE_CONFIGURED managed-cloud direct adapters; no Core/App named adapter and zero approved Provider Assurance Registry entries
+  local_ollama_provider:
+    status: SUPPORTED_INVENTORY_ONLY
+    evidence: Ollama client/server 0.32.9 and four local model identities observed read-only
+    models:
+      - name: gemma4:12b-mlx
+        identity: 117d0d84cf2a
+      - name: qwen3.5:9b-64k
+        identity: b7b9afeaf023
+      - name: qwen3.5:9b
+        identity: 6488c96fa5fa
+      - name: qwen3.5:4b
+        identity: 2a654d98e6fb
+  local_lm_studio_provider:
+    status: OBSERVED_WINDOWS_RUNTIME
+    classification: IEG_RUNTIME_READY_GAP
+    evidence: Mac is NOT_INSTALLED; Windows runtime supplement verifies LM Studio 0.4.21+2 x64 RUNNING and inventories listener 0.0.0.0:1234 without remediation authority in A
+  core_provider_adapter:
+    status: SUPPORTED_LEGACY_INVENTORY_ONLY
+    evidence: scripts/hermes/llm_runtime/hermes_llm_provider_adapter.ts supports ollama and mock
+    source_sha256: e9468001d86214ec37d7fafd98ab22182a461177028914e6a36508cb66eab38b
+  local_runtime_smoke_contract:
+    status: SUPPORTED_LEGACY_INVENTORY_ONLY
+    evidence: contract recognizes ollama, LM Studio OpenAI-compatible and mock; primary adapter currently exposes ollama/mock only
+    source_sha256: bd004651eb6fe14ebe42c8b447ed52e2e014cdb0478240ccef1a7cd1b09ef233
+  existing_model_router:
+    status: DEFERRED_TO_DAY150_5_K
+    evidence: existing pure worker selection router is not the R2 policy-gateway-constrained Allowed Provider Set router
+    source_sha256: 24e4c18bc90e6d37fa937f5a5357623eb9f1a94e084fe4c78591a2e85b243cb4
+  legacy_business_prompt_policy_gate:
+    status: SUPPORTED_LEGACY_DRY_RUN_ONLY
+    evidence: existing Day50 local dry-run redaction boundary performs no model call and is not the R2 egress policy gateway
+    source_sha256: e43b634a5b7c65fd5f96b2bf9ddcead03e5f041627aa57ce084a1c6af32db44c
+  r2_policy_gateway:
+    status: DEFERRED_TO_DAY150_5_B_H_I_K_M
+    evidence: no R2 Inference/Data Egress gateway implementation found in Core or App; active A contract requires inventory only
+  current_core_direct_provider_path:
+    status: DEFERRED_TO_DAY150_5_H_M
+    evidence: Core Hermes chat directly calls the current provider adapter; App evidence separately identifies a direct Core Hermes server path
+    route_sha256: f53571694f2bea548de5c3ed5bf398ff74e6156b12dc1edda7e8552d4911b96d
+  fallback_non_widening_runtime_proof:
+    status: DEFERRED_TO_DAY150_5_I_K_M
+    evidence: active R2 authority prohibits widening; current runtime proof is not complete and A does not implement it
+  redaction_runtime_proof:
+    status: DEFERRED_TO_DAY150_5_I_M
+    evidence: legacy dry-run redaction exists but R2 deterministic egress redaction enforcement is not implemented
+  installation_farm_binding_runtime_proof:
+    status: DEFERRED_TO_IEG_RUNTIME_READY
+    evidence: App V2 states NOT_PROVEN_FROM_CURRENT_APP_SOURCE; browser client selectable tenant is false
+  provider_assurance_metadata:
+    status: DEFERRED_TO_DAY150_5_B_E_L
+    evidence: registry schema is present and versioned but contains zero approved providers
+  current_unknowns:
+    status: NOT_APPLICABLE
+    items: []
+    evidence: Windows input unknown_count is zero; known absent/not-configured/deferred states are explicit
+windows_evidence_ingest:
+  status: PASS
+  source_path: /Users/hayate/farmos-authority-inputs/ef1-a/windows/FarmOS_Day150_5_A_Windows_Capability_Evidence_2026-08-21.json
+  source_sha256: ac1255951b74d240975bc0b8b3a86dd962058208cac0ea6556f4a4064a96566a
+  source_generated_at: '2026-08-21T01:19:10.2139086Z'
+  historical_ingested_at: NOT_RETAINED
+  historical_ingestion_time_status: UNKNOWN_NOT_DURABLY_RECORDED
+  reconciled_at: '2026-08-21T06:58:05Z'
+  unknown_count: 0
+  secret_scan: PASS
+  a_required_blockers: []
+  runtime_identity_supplement:
+    status: PASS
+    source_path: /Users/hayate/farmos-authority-inputs/ef1-a/windows/FarmOS_Day150_5_A_Windows_Runtime_Identity_Supplement_2026-08-21.json
+    source_sha256: feafaf1a5d8183b89d7aa997cc171b326b4b7564eded864ce3460202303b512c
+    generated_at: '2026-08-21T06:36:11.3271507Z'
+    ingested_at: '2026-08-21T06:40:52Z'
+    unresolved_required_identity_count: 0
+    docker_desktop: Docker Desktop 4.83.0 / launcher 4.83.0.234302 / x64 / RUNNING; bundled Docker CLI 29.6.2 is AVAILABLE_BUNDLED_NOT_ON_PATH
+    lm_studio: LM Studio 0.4.21+2 / x64 / RUNNING; listener 0.0.0.0:1234 is CURRENT_RUNTIME_INVENTORY_FINDING and IEG_RUNTIME_READY_GAP, not an A blocker
+  known_optional_unavailable:
+    - Windows pnpm, Supabase CLI, Docker CLI, Ollama CLI, GitHub CLI, Vercel CLI, pipx
+    - Mac Supabase CLI, Vercel CLI, LM Studio
+    - PermissionRequest hook configuration
+  deferred_to_authorized_later_ef1_subday:
+    - managed cloud adapter, provider assurance, R2 Policy Gateway, direct-path denial, fallback/redaction proof
+  ieg_runtime_ready_gaps:
+    - installation/farm runtime binding proof
+    - LM Studio 0.0.0.0:1234 listener security disposition
+coordination:
+  status: VERIFIED_SHADOW_COMPATIBILITY
+  pinned_commit: 3e9103c46f627666b09dd3f742ea96de3481bdac
+  adoption: SHADOW
+unknown_handling:
+  silent_unknown_count: 0
+  explicit_blocked_or_deferred_count: 9
+  exit_rule: Spec Kit qualification is established; the additional independent Sol timestamp-provenance review returned P1=0, P2=0, GO=YES at 2026-08-21T07:02:18Z; A is complete pending authorized publication

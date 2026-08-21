@@ -1,0 +1,42 @@
+schema_version: farmos.ef1-scope-lock.v1
+subday: Day150.5-A
+state: A_COMPLETE_PENDING_AUTHORIZED_PUBLICATION
+reconciled_at: '2026-08-21T06:40:52Z'
+finalized_at: '2026-08-21T07:02:18Z'
+authority_commit: c0ef326417731cb84b28b9237b5ff16da6b04060
+scope:
+  allowed:
+    - READ_ONLY_DISCOVERY
+    - EVIDENCE_MATERIALIZATION
+    - DETERMINISTIC_VALIDATION
+    - ONE_INDEPENDENT_SOL_REVIEW
+  prohibited:
+    - DAY150_REOPEN
+    - DAY150_5_B_EXECUTION
+    - DAY151_EXECUTION
+    - PRODUCTION_DB_CONNECTION_OR_DATA_WRITE
+    - PRODUCTION_RELEASE
+    - PRODUCTION_CREDENTIAL_MUTATION
+    - EXISTING_FEATURE_CODE_MODIFICATION
+    - RUNTIME_IMPLEMENTATION
+    - EXTERNAL_INFERENCE_ACTIVATION
+    - DANGER_FULL_ACCESS
+    - YOLO
+  maximum_working_budget_hours: 8
+  scope_expansion_behavior: PROPOSAL_OR_BLOCKED
+operation_ceilings:
+  production_db_data_write: 0
+  production_release: 0
+  production_credential_mutation: 0
+  existing_feature_code_modification: 0
+  external_inference_activation: 0
+inference_egress_boundaries:
+  policy_before_inference: true
+  direct_hermes_to_provider_path: PROHIBITED_BY_ACTIVE_R2_POLICY
+  unknown_external_egress: DENY
+  fallback_may_widen_allowed_provider_set: false
+  local_provider_automatically_trusted: false
+  runtime_enforcement: DEFERRED_TO_AUTHORIZED_EF1_SUBDAYS_AND_IEG_RUNTIME_READY
+rollback:
+  behavior: PRESERVE_EVIDENCE_AND_STOP_PENDING_FINAL_REVIEW
+  destructive_git_operation_allowed: false

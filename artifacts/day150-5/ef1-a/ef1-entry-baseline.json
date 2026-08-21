@@ -1,0 +1,166 @@
+{
+  "schema_version": "farmos.ef1-entry-baseline.v1",
+  "recorded_at": "2026-08-21T05:10:00Z",
+  "reconciled_at": "2026-08-21T06:58:05Z",
+  "finalized_at": "2026-08-21T07:02:18Z",
+  "final_evidence_finalization_status": "FINAL_SOL_GO_PENDING_PUBLICATION",
+  "subday": "Day150.5-A",
+  "result": "DAY150_5_A_QUALIFICATION_COMPLETE_FINAL_REVIEW_PENDING",
+  "authority": {
+    "activation_commit": "c0ef326417731cb84b28b9237b5ff16da6b04060",
+    "canonical_roadmap": {
+      "path": "docs/roadmap/v5-r2-authority/FarmOS_Canonical_Master_Roadmap_v5_0_Candidate_R2.md",
+      "sha256": "c496b1fdb192c3fcdd974ccce5f4d2b660aa53e1ea345e33c915149f8a5090b6",
+      "state_after_product_owner_activation": "ACTIVE"
+    },
+    "legacy_v4_state_after_product_owner_activation": "SUPERSEDED_LEGACY",
+    "current_position": {
+      "path": "docs/roadmap/post-day150-current-state-candidate-r2.yaml",
+      "sha256": "a61729d7985c72404e86be333042928f8adf08f0db866d6ac992963571ce43ea",
+      "state_after_product_owner_activation": "VERIFIED"
+    },
+    "activation_manifest": {
+      "path": "docs/roadmap/v5-r2-activation-candidate/v5-r2-activation-manifest-candidate.json",
+      "sha256": "e9a12e67123fc8f0302b8cb0823c5ed30cc382e14058c4ddcbc2f508c3f824cc"
+    },
+    "ef1": {
+      "v1_0_path": "docs/roadmap/v5-r2-authority/ef1/FarmOS_Day150_5_EF1_Roadmap_v1.0.pdf",
+      "v1_0_sha256": "c58b52c48fb1c6fa49213a4d57b2187da30187fa7230c6e2e381bfb898c5e546",
+      "v1_1_path": "docs/roadmap/v5-r2-authority/ef1/Day150_5_EF1_v1_1_Amendment_Integration_Record.md",
+      "v1_1_sha256": "87060e0f03331539cc4e78ffb872d8bc95f12c69b8c115abdd9685b9b6cdc070",
+      "v1_2_path": "docs/roadmap/v5-r2-authority/ef1/Day150_5_EF1_v1_2_Composite_Amendment_Integration_Record_Candidate_R2.md",
+      "v1_2_sha256": "9c45ae7c07b3c0d5b3a5dc96ac22e826f5c126ccaec50d1c0cbf0eb7b1ec2aaf",
+      "entry_status": "NOT_STARTED",
+      "execution_started": "Day150.5-A",
+      "next_subday_started": false
+    }
+  },
+  "core_git": {
+    "repository": "/Users/hayate/projects/farmos-core",
+    "branch": "main",
+    "head": "c0ef326417731cb84b28b9237b5ff16da6b04060",
+    "head_tree": "06805584b14fa27329d308dc75c24e67d01b64e7",
+    "head_parent": "a5fff660001487850ba8ed143d1b0d1cf6a1c5c0",
+    "local_origin_main": "c0ef326417731cb84b28b9237b5ff16da6b04060",
+    "remote_main": "c0ef326417731cb84b28b9237b5ff16da6b04060",
+    "ahead": 0,
+    "behind": 0,
+    "staged_paths_at_entry": 0,
+    "tracked_modified_paths_at_entry": 0,
+    "untracked_paths_at_entry": 5
+  },
+  "day150": {
+    "status": "FORMALLY_CLOSED",
+    "closure_commit": "a5fff660001487850ba8ed143d1b0d1cf6a1c5c0",
+    "completion_authority_path": "artifacts/day150/day150-completion-record-candidate.json",
+    "completion_authority_sha256": "f52b7eacfdf493b06dafc54f89e93bccfe9149940ff8302f4ca0491ea36b279c",
+    "reopened": false,
+    "test_result_baseline": {
+      "authority_path": "docs/architecture/day150-closure-authority-lock.md",
+      "authority_sha256": "4f7104bb063fbc1dc7b425773e228d8ab6b17b8291559d9218c4ec270609e35f",
+      "authority_commit": "a5fff660001487850ba8ed143d1b0d1cf6a1c5c0",
+      "gate": 18,
+      "result": "PASS_ASSERTED_BY_COMMITTED_CLOSURE_AUTHORITY",
+      "assertion": "Targeted regressions, typechecks, static checks, and security checks pass.",
+      "aggregate_machine_readable_result": "NOT_PERSISTED",
+      "interpretation": "This freezes the narrowest committed Day150 test-result authority without fabricating a nonexistent aggregate result object."
+    }
+  },
+  "protected_untracked_resources": [
+    {
+      "path": "artifacts/day150/prefix-expected-catalog/reference-runs/v1/reference-catalog-run-receipt-candidate.json.authorization-attempt-claim",
+      "sha256": "fbd94748b9c39a666120a440f7e606122fe22316eb0d44b5d1b8699bbd41a4b0"
+    },
+    {
+      "path": "artifacts/day150/prefix-expected-catalog/reference-runs/v1/reference-catalog-run-receipt-candidate.json.authorization-consumed",
+      "sha256": "9c01aaa44c07ba0fc648a9c71b4ec0a02dc422b5dff532fd1e886d916407615e"
+    },
+    {
+      "path": "scripts/sql/day150_active_projection_read_runtime_select.rollback.sql",
+      "sha256": "cc426dd8e60d751d9b79604ccc3dc774319af83d6329aa9cf97fe880c377ba58"
+    },
+    {
+      "path": "scripts/sql/day150_active_projection_read_runtime_select.sql",
+      "sha256": "71c5003048a687104cdb82190c353c09112a8b71da8f4d68ead906a9f76701e9"
+    },
+    {
+      "path": "tsconfig.tsbuildinfo",
+      "sha256": "5238a5fa72b92fb951cfff46bba595004f7705d0fb302186c4c95a66cdba12e7"
+    }
+  ],
+  "farming_app": {
+    "evidence_class": "EXTERNAL_READ_ONLY_LIVE_EVIDENCE",
+    "evidence_path": "/Users/hayate/farmos-authority-inputs/r2-2026-08-11/app-evidence/FarmOS_R2_App_M0_Evidence_2026-08-21_v2.json",
+    "evidence_sha256": "03adb8f7f78f4e04f7323c710d2759c0939c64ef565f19b57ff93e090c362e99",
+    "head": "b8dc5438aa6f28fb502f371f3c47d7abbd510779",
+    "local_origin_main": "b8dc5438aa6f28fb502f371f3c47d7abbd510779",
+    "independently_verified_remote_main": "b8dc5438aa6f28fb502f371f3c47d7abbd510779",
+    "ahead": 0,
+    "behind": 0,
+    "client_selectable_tenant": false,
+    "installation_to_farm_binding": "NOT_PROVEN_FROM_CURRENT_APP_SOURCE",
+    "r2_policy_gateway": "NOT_IMPLEMENTED",
+    "windows_toolchain_evidence_present": true,
+    "windows_capability_evidence": {
+      "path": "/Users/hayate/farmos-authority-inputs/ef1-a/windows/FarmOS_Day150_5_A_Windows_Capability_Evidence_2026-08-21.json",
+      "sha256": "ac1255951b74d240975bc0b8b3a86dd962058208cac0ea6556f4a4064a96566a",
+      "source_generated_at": "2026-08-21T01:19:10.2139086Z",
+      "historical_ingested_at": "NOT_RETAINED",
+      "historical_ingestion_time_status": "UNKNOWN_NOT_DURABLY_RECORDED",
+      "reconciled_at": "2026-08-21T06:58:05Z",
+      "json_parse": "PASS",
+      "bounded_secret_scan": "PASS",
+      "unknown_count": 0,
+      "operation_counts_zero": true
+    },
+    "windows_runtime_identity_supplement": {
+      "path": "/Users/hayate/farmos-authority-inputs/ef1-a/windows/FarmOS_Day150_5_A_Windows_Runtime_Identity_Supplement_2026-08-21.json",
+      "sha256": "feafaf1a5d8183b89d7aa997cc171b326b4b7564eded864ce3460202303b512c",
+      "generated_at": "2026-08-21T06:36:11.3271507Z",
+      "ingested_at": "2026-08-21T06:40:52Z",
+      "json_parse": "PASS",
+      "bounded_secret_scan": "PASS",
+      "unresolved_required_identity_count": 0
+    }
+  },
+  "coordination": {
+    "core_lock_path": "coordination.lock",
+    "core_lock_sha256": "13ccf2b4e00eb245805a8d525029bbb80ae5d6761924ae0e1f32a1e9b20adda5",
+    "app_lock_sha256": "f2d0467a64ad823c61d3a9865199e3f764b57e1fe1a19af99e131e2b1d588546",
+    "pinned_commit": "3e9103c46f627666b09dd3f742ea96de3481bdac",
+    "coordination_repository_head": "3e9103c46f627666b09dd3f742ea96de3481bdac",
+    "adoption": "SHADOW",
+    "disposition": "VERIFIED_SHADOW_COMPATIBILITY"
+  },
+  "resume_point": {
+    "sequence": ["Day150.5-A", "Day150.5-B", "Day150.5-C", "Day150.5-D", "Day150.5-E", "Day150.5-F", "Day150.5-G", "Day150.5-H", "Day150.5-I", "Day150.5-J", "Day150.5-K", "Day150.5-L", "Day150.5-M", "Day150.5-N", "roadmap-resume-lock verification", "Day151"],
+    "active_roadmap_commit": "c0ef326417731cb84b28b9237b5ff16da6b04060",
+    "active_roadmap_sha256": "c496b1fdb192c3fcdd974ccce5f4d2b660aa53e1ea345e33c915149f8a5090b6",
+    "current_state_sha256": "a61729d7985c72404e86be333042928f8adf08f0db866d6ac992963571ce43ea",
+    "day151_objective": "Canonical Entity Reference & Unit Registry v1",
+    "day151_completion_outcome": "field/crop/crop-cycle/material/machine/person and kg/L/ha/time exact parser",
+    "dependency": "BLOCKED_UNTIL_EF1_RESUME_LOCK"
+  },
+  "operation_counts": {
+    "production_db_connections": 0,
+    "production_db_data_writes": 0,
+    "production_releases": 0,
+    "production_credential_mutations": 0,
+    "runtime_mutations": 0,
+    "external_inference_activations": 0,
+    "feature_code_modifications": 0
+  },
+  "required_unknown_counts": {
+    "tool_version": 0,
+    "distribution_identity": 0,
+    "execution_identity": 0,
+    "capability_availability": 0,
+    "windows_runtime_unresolved_identity": 0
+  },
+  "exit_gate": {
+    "status": "PASS_FINAL_SOL_GO_PENDING_PUBLICATION",
+    "required_tool_records_unresolved": 0,
+    "blocking_reasons": [],
+    "sol_review": {"reviewed_at":"2026-08-21T07:02:18Z","p1":0,"p2":0,"go":"YES","scope":"timestamp provenance correction and deterministic non-regression only"}
+  }
+}

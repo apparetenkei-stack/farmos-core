@@ -1,0 +1,135 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://farmos.local/schemas/ef1-windows-capability-evidence-request.v1.json",
+  "title": "FarmOS EF-1 Day150.5-A Windows capability evidence response",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "generated_at", "source_repository", "operating_system", "tools", "provider_runtime_inventory", "operation_counts", "validation"],
+  "properties": {
+    "schema_version": {"const": "farmos.ef1-windows-capability-evidence.v1"},
+    "generated_at": {"type": "string", "format": "date-time"},
+    "source_repository": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["root", "branch", "head", "local_origin_main", "ahead", "behind"],
+      "properties": {
+        "root": {"type": "string", "minLength": 1},
+        "branch": {"const": "main"},
+        "head": {"const": "b8dc5438aa6f28fb502f371f3c47d7abbd510779"},
+        "local_origin_main": {"const": "b8dc5438aa6f28fb502f371f3c47d7abbd510779"},
+        "ahead": {"const": 0},
+        "behind": {"const": 0}
+      }
+    },
+    "operating_system": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["caption", "version", "build", "architecture"],
+      "properties": {
+        "caption": {"type": "string", "minLength": 1},
+        "version": {"type": "string", "minLength": 1},
+        "build": {"type": "string", "minLength": 1},
+        "architecture": {"type": "string", "minLength": 1}
+      }
+    },
+    "tools": {
+      "type": "array",
+      "minItems": 10,
+      "maxItems": 10,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["tool", "availability", "version", "executable_path", "distribution_identity", "executable_sha256", "capabilities", "evidence_commands", "command_exit_codes"],
+        "properties": {
+          "tool": {"enum": ["codex_cli", "node", "pnpm", "git", "github_cli", "supabase_cli", "docker_cli_and_engine", "vercel_cli", "lm_studio_or_local_llm", "spec_kit"]},
+          "availability": {"enum": ["AVAILABLE", "NOT_INSTALLED", "BLOCKED"]},
+          "version": {"type": ["string", "null"]},
+          "executable_path": {"type": ["string", "null"]},
+          "distribution_identity": {"type": ["string", "null"]},
+          "executable_sha256": {"type": ["string", "null"], "pattern": "^[a-f0-9]{64}$"},
+          "capabilities": {"type": "array", "items": {"type": "string", "minLength": 1}},
+          "evidence_commands": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}},
+          "command_exit_codes": {"type": "array", "minItems": 1, "items": {"type": "integer"}}
+        },
+        "allOf": [
+          {
+            "if": {"properties": {"availability": {"const": "AVAILABLE"}}, "required": ["availability"]},
+            "then": {
+              "properties": {
+                "version": {"type": "string", "minLength": 1},
+                "executable_path": {"type": "string", "minLength": 1},
+                "distribution_identity": {"type": "string", "minLength": 1},
+                "executable_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+                "capabilities": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}}
+              }
+            }
+          },
+          {
+            "if": {"properties": {"availability": {"const": "NOT_INSTALLED"}}, "required": ["availability"]},
+            "then": {
+              "properties": {
+                "version": {"const": null},
+                "executable_path": {"const": null},
+                "distribution_identity": {"const": null},
+                "executable_sha256": {"const": null}
+              }
+            }
+          }
+        ]
+      },
+      "allOf": [
+        {"contains": {"properties": {"tool": {"const": "codex_cli"}}, "required": ["tool"]}, "minContains": 1, "maxContains": 1},
+        {"contains": {"properties": {"tool": {"const": "node"}}, "required": ["tool"]}, "minContains": 1, "maxContains": 1},
+        {"contains": {"properties": {"tool": {"const": "pnpm"}}, "required": ["tool"]}, "minContains": 1, "maxContains": 1},
+        {"contains": {"properties": {"tool": {"const": "git"}}, "required": ["tool"]}, "minContains": 1, "maxContains": 1},
+        {"contains": {"properties": {"tool": {"const": "github_cli"}}, "required": ["tool"]}, "minContains": 1, "maxContains": 1},
+        {"contains": {"properties": {"tool": {"const": "supabase_cli"}}, "required": ["tool"]}, "minContains": 1, "maxContains": 1},
+        {"contains": {"properties": {"tool": {"const": "docker_cli_and_engine"}}, "required": ["tool"]}, "minContains": 1, "maxContains": 1},
+        {"contains": {"properties": {"tool": {"const": "vercel_cli"}}, "required": ["tool"]}, "minContains": 1, "maxContains": 1},
+        {"contains": {"properties": {"tool": {"const": "lm_studio_or_local_llm"}}, "required": ["tool"]}, "minContains": 1, "maxContains": 1},
+        {"contains": {"properties": {"tool": {"const": "spec_kit"}}, "required": ["tool"]}, "minContains": 1, "maxContains": 1}
+      ]
+    },
+    "provider_runtime_inventory": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["cloud_providers", "local_private_providers", "provider_adapters", "model_router", "policy_gateway", "direct_egress_paths", "provider_assurance_metadata", "unknowns", "evidence_paths"],
+      "properties": {
+        "cloud_providers": {"type": "array", "items": {"type": "object"}},
+        "local_private_providers": {"type": "array", "items": {"type": "object"}},
+        "provider_adapters": {"type": "array", "items": {"type": "string", "minLength": 1}},
+        "model_router": {"enum": ["FOUND", "NOT_FOUND", "BLOCKED"]},
+        "policy_gateway": {"enum": ["FOUND", "NOT_FOUND", "BLOCKED"]},
+        "direct_egress_paths": {"type": "array", "items": {"type": "string", "minLength": 1}},
+        "provider_assurance_metadata": {"enum": ["AVAILABLE", "NOT_FOUND", "INCOMPLETE", "BLOCKED"]},
+        "unknowns": {"type": "array", "items": {"type": "string", "minLength": 1}},
+        "evidence_paths": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}}
+      }
+    },
+    "operation_counts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["repository_mutations", "credential_reads", "credential_mutations", "db_connections", "db_writes", "docker_mutations", "runtime_mutations", "production_deployments"],
+      "properties": {
+        "repository_mutations": {"const": 0},
+        "credential_reads": {"const": 0},
+        "credential_mutations": {"const": 0},
+        "db_connections": {"const": 0},
+        "db_writes": {"const": 0},
+        "docker_mutations": {"const": 0},
+        "runtime_mutations": {"const": 0},
+        "production_deployments": {"const": 0}
+      }
+    },
+    "validation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["duplicate_tool_count", "secret_values_displayed", "source_state_unchanged"],
+      "properties": {
+        "duplicate_tool_count": {"const": 0},
+        "secret_values_displayed": {"const": 0},
+        "source_state_unchanged": {"const": true}
+      }
+    }
+  }
+}

@@ -1,0 +1,57 @@
+schema_version: farmos.spec-kit-capability-matrix.v1
+result: QUALIFIED_USER_LOCAL
+qualified_at: '2026-08-21T05:10:00Z'
+reconciled_at: '2026-08-21T06:40:52Z'
+active_authority_citation: Day150_5_EF1_v1_1_Amendment_Integration_Record.md section A
+canonical_product_name: GitHub Spec Kit
+official_upstream: https://github.com/github/spec-kit
+distribution_package: specify-cli
+executable: specify
+version: 0.16.5
+release_commit: 87a0e9715d59079e46b44208ba009bf1a6976643
+codex_integration_key: codex
+python_requirement: '>=3.11'
+python_runtime_on_mac: 3.11.16
+python_requirement_status: PASS
+installation_presence:
+  status: PASS
+  evidence: user-local executable readback returns 'specify 0.16.5'
+exact_version:
+  status: PASS
+  evidence: installed specify --version and uv tool list both report 0.16.5
+distribution_fingerprint:
+  status: PASS
+  installed_tree_sha256: 929574077d44c9e5145e58719888a15ab48f017e18a9481316d3d59e6f33de40
+  direct_url_sha256: da41ca411b93c5e1ae080f2dc9a88b713d92d7875798f89211494ac4ff72bf6f
+  direct_url_commit: 87a0e9715d59079e46b44208ba009bf1a6976643
+supported_commands:
+  status: PASS
+  commands: [init, check, version, self, extension, integration, event, preset, bundle, workflow]
+  evidence: specify --help readback
+relevant_output_schemas:
+  status: PASS
+  schemas: [CLI help command schema, integration subcommand schema]
+  evidence: specify --help and specify integration --help; project-scoped schemas are intentionally not materialized because specify init is prohibited
+repository_toolchain_compatibility:
+  status: PASS
+  evidence: specify version reports CPython 3.11.16 on Darwin arm64; no repository project initialization or dependency mutation occurred
+coordination_sot_compatibility:
+  status: PASS
+  coordination_commit: 3e9103c46f627666b09dd3f742ea96de3481bdac
+  evidence: qualification is external user-local only; no coordination pin or adoption state was mutated
+codex_integration:
+  status: PASS_SOURCE_BOUND
+  key: codex
+  installed_module_sha256: 121c9e59466576caaf25a05aa18da1a09de8582e79415ae025b6ccf50675525d
+  evidence: installed and exact release source src/specify_cli/integrations/codex/__init__.py define key = 'codex'; project-scoped integration list/info correctly fails closed without .specify and was not initialized
+production_credential_independence:
+  status: PASS
+  evidence: version/help/integration-help commands completed without production credential, DB, runtime, or repository initialization access
+installation_or_upgrade_performed: true
+shell_profile_evidence:
+  status: UNCHANGED_READBACK_ESTABLISHED
+  checked_profiles: []
+  historical_path_and_before_hash_retention: NOT_RETAINED
+  limitation: Exact per-profile before/after bindings were not retained in the historical qualification evidence; none are fabricated, and active A authority does not require them.
+sol_review: SOL_REVIEW_REQUIRED_BEFORE_A_COMPLETE
+exit_disposition: QUALIFICATION_PASS_FINAL_A_REVIEW_PENDING
