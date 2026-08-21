@@ -1,0 +1,166 @@
+schema_version: farmos.roadmap-supersession-registry.v1-r2-candidate
+status: CANDIDATE_R2_M0_RECONCILED_NOT_ACTIVE
+generated_at: '2026-08-11'
+m0_reconciled_at: '2026-08-21T09:07:50+09:00'
+reconciliation_classification: POST_M0_R2_ACTIVATION_CANDIDATE_RECONCILIATION
+source_candidate_sha256: b80cea19484cde5b821915045edafd582e108b7fdd3e7031741dd99d8d660ddc
+activation_requires:
+- M0 exact read-only verification = VERIFIED
+- final activation gate = PASS
+- explicit Product Owner approval of exact artifact hashes
+- explicit Product Owner approval of Inference & Data Egress Governance amendment exact hashes
+mutation_policy: NO_CODE_DB_PRODUCTION_OR_AUTHORITY_MUTATION_DURING_CANDIDATE
+roadmaps:
+  initial_day1_7:
+    status: HISTORICAL
+    authority: historical
+    superseded_by: day95_220_v1
+    preservation: REQUIRED
+  day94_186:
+    status: SUPERSEDED
+    authority: historical_source
+    superseded_by: day95_220_v1
+    notes: Day186 RC was replaced by the Day220 integrated gate.
+    preservation: REQUIRED
+  day95_220_v1:
+    status: SUPERSEDED
+    authority: approved_historical
+    superseded_by: v3_0_then_v3_1
+    preservation: REQUIRED
+  v3_0:
+    status: SUPERSEDED
+    authority: approved_historical
+    superseded_by: v3_1
+    preservation: REQUIRED
+  v3_1:
+    status: SUPERSEDED
+    authority: approved_historical
+    superseded_by: v4_0_legacy_authority
+    preservation: REQUIRED
+  operational_memory_v1:
+    status: APPROVED_AMENDMENT
+    authority: approved_architectural_amendment
+    incorporated_by:
+    - Day146
+    - Day147
+    - Day148
+    - Day149
+    - Day150
+    preservation: REQUIRED
+  v4_0_draft_upload:
+    status: DRAFT_SOURCE_MATERIAL
+    authority: draft_only
+    may_substitute_for_active_content: false
+    successor_status_source: v4_0_legacy_authority
+    preservation: REQUIRED
+  v4_0_legacy_authority:
+    status: ACTIVE_LEGACY
+    content_verification: VERIFIED_EXACT_LIVE_BLOB
+    mutation_policy: FROZEN
+    authority: temporary_legacy_roadmap_authority_until_v5_activation
+    known_status_evidence: repository activation commit c69f5c3680cb179e868b3c5d0284b02eaee488e5
+    exact_artifact_path: docs/roadmap/master-roadmap-day95-220.md
+    exact_commit: c69f5c3680cb179e868b3c5d0284b02eaee488e5
+    exact_blob_hash: f29253b8c56e93abd3e41c8fb4aa0ccd7e20290d
+    exact_sha256: eb404f65f5b06d38ac5789d27c886763b36f6c10cc1ac9e09b4920f2a95f256d
+    may_use_draft_upload_as_content: false
+    on_v5_activation: SUPERSEDED_LEGACY
+    preservation: REQUIRED
+  day130_5_hermes:
+    status: APPROVED_EXTENSION
+    authority: approved_engineering_product_extension
+    relationship: does_not_renumber_product_days
+    preservation: REQUIRED
+  day150_5_ef1_v1_0:
+    status: APPROVED_BASE_DOCUMENT
+    authority: approved_engineering_foundation
+    execution: NOT_STARTED
+    entry_gate: Day150_formal_closure
+    amended_by: day150_5_ef1_v1_1_amendment
+    production_db_data_write: 0
+    production_release: 0
+    primary_artifact_sha256: c58b52c48fb1c6fa49213a4d57b2187da30187fa7230c6e2e381bfb898c5e546
+    preservation: REQUIRED
+  day150_5_ef1_v1_1_amendment:
+    status: APPROVED_AMENDMENT
+    authority: explicit_Product_Owner_decision
+    execution: NOT_STARTED
+    integration:
+      A: Spec_Kit_Core_qualification_and_version_pin
+      I: Spec_Plan_Tasks_Analyze_Implement_Converge_and_Autonomous_Evidence_Loop
+      J: Independent_Reviewer_and_Governance
+      M: Agent_portability_and_Shadow_parity
+      N: Day_Completion_Record_Development_Memory_Roadmap_Update_Proposal_Session_Bootstrap
+    separate_dc1_allowed: false
+    post_ef_blocking_gate: false
+    resume_after_ef1: Day151_after_resume_lock_verification
+    primary_artifact_sha256: 87060e0f03331539cc4e78ffb872d8bc95f12c69b8c115abdd9685b9b6cdc070
+    preservation: REQUIRED
+  development_control_namespace:
+    status: APPROVED_LOGICAL_NAMESPACE
+    authority: cross_cutting_only
+    physical_placement: EF1_v1_1_A_I_J_M_N
+    product_day: false
+    blocking_stage_after_ef1: false
+  canonical_v4_final_route_a:
+    status: CANDIDATE_NOT_SELECTED
+    authority: none
+    preservation: REQUIRED
+  canonical_v5_route_b_r1:
+    status: SUPERSEDED_CANDIDATE
+    route: APPROVED_DIRECTION
+    name: FarmOS_Canonical_Master_Roadmap_v5_0_Candidate
+    authority: none_until_activation
+    current_position_state: PROVISIONAL_VERIFIED_FROM_AVAILABLE_SOURCES
+    north_star_changed: false
+    day_numbering_changed: false
+    day151_220_order_changed: false
+    day220_target_changed: false
+    activation_state: false
+    superseded_by: canonical_v5_route_b_r2
+    preservation: REQUIRED
+  day150_5_ef1_v1_2_egress_amendment:
+    status: CANDIDATE_AMENDMENT
+    authority: none_until_explicit_human_approval
+    execution: NOT_STARTED
+    integration:
+      A: provider_policy_capability_preflight
+      B: egress_authority_secrets_threat_inventory
+      E: environment_and_verified_scope_policy_binding
+      H: direct_provider_network_deny
+      I: deterministic_egress_policy_fixtures_and_evidence
+      J: protected_policy_reviewer_governance
+      K: router_within_allowed_provider_set_only
+      L: local_provider_assurance_not_implicit_trust
+      M: agent_provider_parity_and_adversarial_bypass_validation
+      N: policy_hashes_in_DCR_memory_roadmap_proposal_bootstrap_resume_lock
+    new_product_day: false
+    post_ef_blocking_gate: false
+    resume_after_ef1: Day151_after_resume_lock_verification
+    production_db_data_write: 0
+    production_release: 0
+    preservation: REQUIRED
+  inference_data_egress_governance_r2:
+    status: CANDIDATE_AUTHORITY_AMENDMENT
+    authority: none_until_v5_R2_activation
+    relationship: extends_agent_model_independence_and_production_authority_without_product_roadmap_redesign
+    terminology: CLOUD_ENABLED_POLICY_GOVERNED_LOCAL_RESILIENT
+    roadmap_day_order_changed: false
+    preservation: REQUIRED
+  canonical_v5_route_b_r2:
+    status: CANDIDATE_R2
+    route: APPROVED_DIRECTION
+    name: FarmOS_Canonical_Master_Roadmap_v5_0_Candidate
+    authority: none_until_activation
+    current_position_state: VERIFIED_ON_ACTIVATION_FROM_POST_DAY150_CURRENT_STATE_CANDIDATE_R2
+    current_position_source_on_activation: docs/roadmap/post-day150-current-state-candidate-r2.yaml
+    superseded_provisional_snapshots_on_activation:
+    - FarmOS_Canonical_Master_Roadmap_v5_0_Candidate_R2.md_section_14_6_current_position_only
+    - FarmOS_Canonical_Master_Roadmap_v5_0_Candidate_R2.md_section_14_10_Day150_closure_ordering_only
+    provisional_snapshot_supersession_does_not_change_product_plan: true
+    includes_candidate_amendment: Inference_Data_Egress_Governance_R2
+    north_star_changed: false
+    day_numbering_changed: false
+    day151_220_order_changed: false
+    day220_target_changed: false
+    activation_state: false

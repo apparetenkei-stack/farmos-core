@@ -1,0 +1,66 @@
+schema_version: farmos.post-day150-current-state-candidate.v1
+status: CANDIDATE_EVIDENCE_ONLY
+active_authority: false
+authority_relationship:
+  activation_effect: BECOMES_CURRENT_POSITION_SOT_ONLY_WITH_EXPLICIT_R2_ACTIVATION
+  supersedes_on_activation:
+    - FarmOS_Canonical_Master_Roadmap_v5_0_Candidate_R2.md section 14.6 provisional current-position snapshot
+    - FarmOS_Canonical_Master_Roadmap_v5_0_Candidate_R2.md section 14.10 obsolete ordering that placed Day150 formal closure after R2 activation
+  does_not_supersede:
+    - Product North Star
+    - product Day numbering
+    - Day151-220 product order
+    - Day220 target
+    - EF-1 A-N order or Day151 resume lock
+  creates_new_roadmap_revision: false
+derived_from_live_core_at: '2026-08-21T09:07:50+09:00'
+last_formally_completed: Day150
+day150:
+  status: CLOSED_COMPLETE
+  closure_commit: a5fff660001487850ba8ed143d1b0d1cf6a1c5c0
+  completion_record: artifacts/day150/day150-completion-record-candidate.json
+  completion_record_status: SUFFICIENT_RETROSPECTIVE_FORMAL_CLOSURE_AUTHORITY_CANDIDATE
+current_engineering_phase: Day150.5 EF-1
+ef1:
+  status: NOT_STARTED
+  base_v1_0: APPROVED_PRIMARY_AUTHORITY_VERIFIED
+  base_v1_0_sha256: c58b52c48fb1c6fa49213a4d57b2187da30187fa7230c6e2e381bfb898c5e546
+  amendment_v1_1: APPROVED_PRIMARY_AUTHORITY_VERIFIED
+  amendment_v1_1_sha256: 87060e0f03331539cc4e78ffb872d8bc95f12c69b8c115abdd9685b9b6cdc070
+  amendment_v1_2: CANDIDATE_R2_HUMAN_APPROVAL_REQUIRED
+  next_executable_subday: Day150.5-A
+  execution_authorized: false
+next_product_day: Day151
+day151:
+  status: NOT_STARTED
+  gate: BLOCKED_UNTIL_EF1_RESUME_LOCK
+roadmap_authority:
+  legacy_v4:
+    status: ACTIVE_LEGACY
+    content_verification: VERIFIED_EXACT_LIVE_BLOB
+    mutation_policy: FROZEN
+    path: docs/roadmap/master-roadmap-day95-220.md
+    authority_commit: c69f5c3680cb179e868b3c5d0284b02eaee488e5
+    git_blob: f29253b8c56e93abd3e41c8fb4aa0ccd7e20290d
+    raw_sha256: eb404f65f5b06d38ac5789d27c886763b36f6c10cc1ac9e09b4920f2a95f256d
+  canonical_v5_route_b_r2:
+    status: CANDIDATE_R2
+    active: false
+    activation: HUMAN_APPROVAL_REQUIRED
+    current_position_source_on_activation: docs/roadmap/post-day150-current-state-candidate-r2.yaml
+m0:
+  result: M0_VERIFIED
+  app_evidence_sha256: 03adb8f7f78f4e04f7323c710d2759c0939c64ef565f19b57ff93e090c362e99
+  app_remote_main: b8dc5438aa6f28fb502f371f3c47d7abbd510779
+  coordination_disposition: VERIFIED_SHADOW_COMPATIBILITY
+  blockers: []
+  current_state_promotion_to_verified: PROPOSED_IN_EXACT_R2_ACTIVATION_ONLY
+operation_counts:
+  external_inference_activation: 0
+  provider_credential_changes: 0
+  production_db_writes: 0
+  production_release: 0
+  runtime_mutation: 0
+  stage: 0
+  commit: 0
+  push: 0

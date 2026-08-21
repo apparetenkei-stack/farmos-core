@@ -1,0 +1,38 @@
+{
+  "schema_version": "farmos.v5-r2-activation-candidate-correction.v1",
+  "classification": "R2_ACTIVATION_CANDIDATE_CORRECTION",
+  "status": "CANDIDATE_NOT_ACTIVE",
+  "creates_new_roadmap_revision": false,
+  "external_source_pack_modified": false,
+  "corrections": [
+    {
+      "artifact": "Inference_Data_Egress_Decision_Contract_Candidate_R2.schema.json",
+      "source_sha256": "b7557865a17b887d66629353213ff53b1b1141c5a61aecb1547ede1b1c9a8a8f",
+      "corrected_sha256": "d23df0f4e0e15cc5099877b6fb612ced004fb77e017e0e04a2cc867a399ed315",
+      "correction": "raw_payload_stored is required and has const false; omission and true both fail validation.",
+      "authority": "FarmOS_Canonical_Master_Roadmap_v5_0_Candidate_R2.md section 14.19.6 and Inference_Data_Egress_Governance_Authority_Amendment_Candidate_R2.md section 9"
+    },
+    {
+      "artifact": "Inference_Data_Egress_Policy_Fixtures_Candidate_R2.json",
+      "source_sha256": "3972b70b8d6eb1ef7092d4f250d42fe2f66a2cf07bfa2751f881eb2e98487324",
+      "corrected_sha256": "eb4e25651bcdac0fa0f0b1e8af0b0043ca588fbea47a3270f544dddbaabd4d50",
+      "correction": "IEG-FX-007 deterministically requires ALLOW_WITH_REDACTION, explicit identifier-removal obligations before routing, raw_payload_stored=false, an explicitly approved C2 policy/provider pair, and Hermes authority=false.",
+      "authority": "Day150_5_EF1_v1_2_Composite_Amendment_Integration_Record_Candidate_R2.md SubDay I and Inference_Data_Egress_Governance_Authority_Amendment_Candidate_R2.md sections 3, 5, 6 and 9"
+    }
+  ],
+  "materialization_normalizations": [
+    {
+      "artifact": "FarmOS_Canonical_Master_Roadmap_v5_0_Candidate_R2.md",
+      "source_sha256": "132cb55c04fb77a45b5e2ce372a021cc81b00ca299cda1c2868d2884494ecbd9",
+      "corrected_sha256": "c496b1fdb192c3fcdd974ccce5f4d2b660aa53e1ea345e33c915149f8a5090b6",
+      "normalization": "Removed trailing whitespace from blockquote lines 5 and 6 so the mandatory activation git diff --check can pass; wording and semantics are unchanged.",
+      "creates_new_roadmap_revision": false
+    }
+  ],
+  "preserved_safety_cases": {
+    "c3_external_deny": "IEG-FX-006",
+    "unknown_external_deny_and_defer": "IEG-FX-004",
+    "fallback_non_widening": "IEG-FX-005",
+    "unsafe_allow_added": false
+  }
+}

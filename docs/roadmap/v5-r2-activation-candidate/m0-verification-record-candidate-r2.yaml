@@ -1,0 +1,140 @@
+schema_version: farmos.canonical-roadmap.m0-verification.v1
+record_status: CANDIDATE_EVIDENCE_ONLY
+mode: READ_ONLY
+performed_at: '2026-08-21T09:07:50+09:00'
+core:
+  repository_path: /Users/hayate/projects/farmos-core
+  branch: main
+  head: a5fff660001487850ba8ed143d1b0d1cf6a1c5c0
+  local_origin_main: a5fff660001487850ba8ed143d1b0d1cf6a1c5c0
+  remote_origin_main: a5fff660001487850ba8ed143d1b0d1cf6a1c5c0
+  ahead_behind: 0/0
+  staged: 0
+  tracked_modified: 0
+  initial_untracked: 7
+  initial_untracked_classification:
+    - artifacts/day150/day150-completion-record-candidate.json: R2_RECONCILIATION_CANDIDATE
+    - docs/roadmap/post-day150-current-state-candidate-r2.yaml: R2_RECONCILIATION_CANDIDATE
+    - artifacts/day150/prefix-expected-catalog/reference-runs/v1/reference-catalog-run-receipt-candidate.json.authorization-attempt-claim: PREEXISTING_PROTECTED_UNRELATED_PRESERVE
+    - artifacts/day150/prefix-expected-catalog/reference-runs/v1/reference-catalog-run-receipt-candidate.json.authorization-consumed: PREEXISTING_PROTECTED_UNRELATED_PRESERVE
+    - scripts/sql/day150_active_projection_read_runtime_select.rollback.sql: PREEXISTING_PROTECTED_UNRELATED_PRESERVE
+    - scripts/sql/day150_active_projection_read_runtime_select.sql: PREEXISTING_PROTECTED_UNRELATED_PRESERVE
+    - tsconfig.tsbuildinfo: PREEXISTING_PROTECTED_UNRELATED_PRESERVE
+  protected_files:
+    evidence: METADATA_AND_SHA256_RECORDED_WITHOUT_CONTENTS
+    mutation: 0
+  coordination_lock:
+    path: coordination.lock
+    sha256: 13ccf2b4e00eb245805a8d525029bbb80ae5d6761924ae0e1f32a1e9b20adda5
+    adoption_status: shadow
+    pinned_commit: 3e9103c46f627666b09dd3f742ea96de3481bdac
+farming_app:
+  evidence_mode: EXTERNAL_READ_ONLY_LIVE_EVIDENCE
+  evidence_path: /Users/hayate/farmos-authority-inputs/r2-2026-08-11/app-evidence/FarmOS_R2_App_M0_Evidence_2026-08-21_v2.json
+  evidence_sha256: 03adb8f7f78f4e04f7323c710d2759c0939c64ef565f19b57ff93e090c362e99
+  repository_path: 'C:\projects\apparetenkei-App\apparetenkei-app'
+  branch: main
+  head: b8dc5438aa6f28fb502f371f3c47d7abbd510779
+  local_origin_main: b8dc5438aa6f28fb502f371f3c47d7abbd510779
+  remote_origin_main: b8dc5438aa6f28fb502f371f3c47d7abbd510779
+  ahead_behind: 0/0
+  staged: 0
+  tracked_modified: 3
+  untracked: 12
+  dirty_state_classification: PREEXISTING_EXTERNAL_READ_ONLY_PRESERVED_NO_R2_MUTATION
+  protected_resources:
+    evidence: BOUNDED_SECRET_SCAN_PASS_AND_SECRET_VALUES_DISPLAYED_ZERO
+    contents_displayed: false
+  coordination_lock:
+    role: farming-app
+    sha256: f2d0467a64ad823c61d3a9865199e3f764b57e1fe1a19af99e131e2b1d588546
+    adoption_status: shadow
+    pinned_commit: 3e9103c46f627666b09dd3f742ea96de3481bdac
+coordination:
+  repository_path: /Users/hayate/projects/farmos-development-coordination
+  branch: main
+  head: 3e9103c46f627666b09dd3f742ea96de3481bdac
+  local_origin_main: 3e9103c46f627666b09dd3f742ea96de3481bdac
+  remote_origin_main: 3e9103c46f627666b09dd3f742ea96de3481bdac
+  dirty_paths: 0
+  core_app_locks_consistent: true
+  disposition: VERIFIED_SHADOW_COMPATIBILITY
+  active_adoption_claimed: false
+legacy_roadmap:
+  status: ACTIVE_LEGACY
+  content_verification: VERIFIED_EXACT_LIVE_BLOB
+  exact_artifact_path: docs/roadmap/master-roadmap-day95-220.md
+  exact_commit: c69f5c3680cb179e868b3c5d0284b02eaee488e5
+  git_blob: f29253b8c56e93abd3e41c8fb4aa0ccd7e20290d
+  sha256: eb404f65f5b06d38ac5789d27c886763b36f6c10cc1ac9e09b4920f2a95f256d
+  draft_upload_used_as_substitute: false
+product_plan_invariance:
+  result: PASS
+  north_star_exact_match: true
+  existing_day_numbers_preserved: true
+  day151_220_order_match: true
+  day151_220_row_count: 70
+  day151_220_section_sha256: 7758bda833d690ac651e683cd59864685f1814d1de16f74a12d654725fcf1e61
+  day220_target_unchanged: true
+  ef1_a_n_order_preserved: true
+  ef1_resume_target: Day151
+  binding_basis: Exact live v4 activation provenance plus R2 Source Registry, Roadmap Inventory, Day151-220 table, Decision Ledger and deterministic validation; partial repository Markdown is not used as the sole product-plan source.
+day150:
+  status: FORMALLY_CLOSED
+  closure_commit: a5fff660001487850ba8ed143d1b0d1cf6a1c5c0
+  evidence_paths:
+    - artifacts/day150/day150-completion-record-candidate.json
+    - docs/architecture/day150-closure-authority-lock.md
+    - artifacts/day150/gate13-durability/qualification/v1/fourth-real-attempt-qualification-result.json
+    - artifacts/day150/gate13-durability/qualification/v1/fourth-real-attempt-terminal.json
+  completion_record_sha256: f52b7eacfdf493b06dafc54f89e93bccfe9149940ff8302f4ca0491ea36b279c
+  historical_aggregate_gate20_object_asserted: false
+  day_reopened: false
+ef1_primary_authority:
+  v1_0:
+    status: APPROVED
+    execution: NOT_STARTED
+    sha256: c58b52c48fb1c6fa49213a4d57b2187da30187fa7230c6e2e381bfb898c5e546
+  v1_1:
+    amendment_decision: APPROVED
+    execution: NOT_STARTED
+    sha256: 87060e0f03331539cc4e78ffb872d8bc95f12c69b8c115abdd9685b9b6cdc070
+  v1_2:
+    status: CANDIDATE_R2_HUMAN_APPROVAL_REQUIRED_NOT_ACTIVE
+inference_egress_baseline:
+  inventory_complete_for_available_core_and_app_sources: true
+  existing_route_status: LEGACY_EGRESS_VERIFICATION_PENDING
+  mutation_policy: MUTATION_FROZEN
+  scope_expansion: PROHIBITED
+  app_policy_gateway: NOT_IMPLEMENTED
+  app_direct_core_hermes_path: CURRENT_DIRECT_PATH_FOUND
+  client_selectable_tenant: false
+  installation_to_farm_binding_from_current_app_source: NOT_PROVEN_FROM_CURRENT_APP_SOURCE
+  core_single_installation_policy_authority: VERIFIED
+  provider_assurance_unknowns: RECORDED_NOT_INFERRED
+  no_secret_value_exposed: true
+runtime_gap_classification:
+  - finding: complete installation-to-farm runtime registry not proven from current App source
+    classification: IEG_RUNTIME_READY_GAP
+    authority: Canonical v5 Activation Pre-Final Gate R2 IEG-RUNTIME-READY
+  - finding: R2 Inference Policy Gateway not implemented in the App direct Hermes path
+    classification: EF1_ENTRY_GAP
+    authority: EF-1 v1.2 integration map A/B/H/I/J/K
+  - finding: direct-provider bypass rejection not yet proven
+    classification: IEG_RUNTIME_READY_GAP
+    authority: Canonical v5 Activation Pre-Final Gate R2 IEG-RUNTIME-READY
+  - finding: fallback non-widening and dedicated prompt redaction not yet runtime-proven
+    classification: IEG_RUNTIME_READY_GAP
+    authority: Canonical v5 Activation Pre-Final Gate R2 IEG-RUNTIME-READY
+determination: M0_VERIFIED
+current_state_proposal: PROVISIONAL_VERIFIED_FROM_AVAILABLE_SOURCES_TO_VERIFIED_IN_EXACT_ACTIVATION_ONLY
+open_activation_blockers: []
+operation_counts:
+  database_writes: 0
+  migrations: 0
+  production_accesses: 0
+  runtime_mutations: 0
+  credential_reads_or_mutations: 0
+  stages: 0
+  commits: 0
+  pushes: 0

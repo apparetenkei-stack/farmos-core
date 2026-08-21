@@ -1,0 +1,165 @@
+{
+  "schema_version": "farmos.v5-r2-activation-manifest-candidate.v1",
+  "status": "READY_FOR_PRODUCT_OWNER_APPROVAL_NOT_ACTIVE",
+  "activation_kind": "DOCS_AUTHORITY_EVIDENCE_ONLY",
+  "pre_activation_git_baseline": "a5fff660001487850ba8ed143d1b0d1cf6a1c5c0",
+  "r2_source_pack": {
+    "name": "FarmOS_Roadmap_Reconciliation_Candidate_Pack_R2_2026-08-11",
+    "manifest_sha256": "051cf91f354252a40774bfc8a347e95e6ecd4897536073ae6a8d506ae2eee7c4",
+    "manifest_entries_verified": 24,
+    "external_source_pack_modified": false
+  },
+  "authority_transition_on_explicit_product_owner_activation": {
+    "v4_0_legacy_authority": "ACTIVE_LEGACY / CONTENT_VERIFIED / MUTATION_FROZEN -> SUPERSEDED_LEGACY",
+    "canonical_v5_route_b_r2": "CANDIDATE_R2 / NOT_ACTIVE -> ACTIVE",
+    "current_position": "PROVISIONAL_VERIFIED_FROM_AVAILABLE_SOURCES -> VERIFIED",
+    "day150": "FORMALLY_CLOSED / UNCHANGED",
+    "ef1_execution": "NOT_STARTED / UNCHANGED",
+    "day151": "NOT_STARTED / BLOCKED_UNTIL_EF1_RESUME_LOCK / UNCHANGED"
+  },
+  "activation_commit_scope": [
+    {
+      "path": "docs/roadmap/v5-r2-authority/FarmOS_Canonical_Master_Roadmap_v5_0_Candidate_R2.md",
+      "sha256": "c496b1fdb192c3fcdd974ccce5f4d2b660aa53e1ea345e33c915149f8a5090b6",
+      "category": "V5_R2_ROADMAP_AUTHORITY",
+      "source": "R2_ACTIVATION_CANDIDATE_CORRECTION"
+    },
+    {
+      "path": "docs/roadmap/v5-r2-authority/FarmOS_Source_Registry_Candidate_R2.json",
+      "sha256": "0a12ab150aec9d0c68a9de7409058302e6d9f22c5eb8335c02b2fdbf712f5ef5",
+      "category": "SOURCE_REGISTRY",
+      "source": "VERIFIED_EXTERNAL_R2_PACK"
+    },
+    {
+      "path": "docs/roadmap/v5-r2-authority/FarmOS_Decision_Ledger_Candidate_R2.json",
+      "sha256": "c336a64c396553ec152d246029ed77b9b8f4531fe5846df154267af5ca0a96b0",
+      "category": "DECISION_LEDGER",
+      "source": "VERIFIED_EXTERNAL_R2_PACK"
+    },
+    {
+      "path": "docs/roadmap/v5-r2-authority/ROADMAP_SUPERSESSION_REGISTRY_Candidate_R2.yaml",
+      "sha256": "724d32da465bcc561ad83e80d4ed7771bc90a0e1eb7c61767631a083c5f2b2fd",
+      "category": "SUPERSESSION_REGISTRY",
+      "source": "REPOSITORY_M0_RECONCILIATION"
+    },
+    {
+      "path": "docs/roadmap/post-day150-current-state-candidate-r2.yaml",
+      "sha256": "a61729d7985c72404e86be333042928f8adf08f0db866d6ac992963571ce43ea",
+      "category": "CURRENT_STATE",
+      "source": "REPOSITORY_CANDIDATE"
+    },
+    {
+      "path": "artifacts/day150/day150-completion-record-candidate.json",
+      "sha256": "f52b7eacfdf493b06dafc54f89e93bccfe9149940ff8302f4ca0491ea36b279c",
+      "category": "DAY150_RETROSPECTIVE_COMPLETION_AUTHORITY",
+      "source": "REPOSITORY_CANDIDATE"
+    },
+    {
+      "path": "docs/roadmap/v5-r2-authority/ef1/FarmOS_Day150_5_EF1_Roadmap_v1.0.pdf",
+      "sha256": "c58b52c48fb1c6fa49213a4d57b2187da30187fa7230c6e2e381bfb898c5e546",
+      "category": "EF1_V1_0_PRIMARY_AUTHORITY_REPRESENTATION",
+      "source": "VERIFIED_EXTERNAL_EF1_PRIMARY"
+    },
+    {
+      "path": "docs/roadmap/v5-r2-authority/ef1/Day150_5_EF1_v1_1_Amendment_Integration_Record.md",
+      "sha256": "87060e0f03331539cc4e78ffb872d8bc95f12c69b8c115abdd9685b9b6cdc070",
+      "category": "EF1_V1_1_PRIMARY_AUTHORITY_REPRESENTATION",
+      "source": "VERIFIED_EXTERNAL_EF1_PRIMARY"
+    },
+    {
+      "path": "docs/roadmap/v5-r2-authority/ef1/Day150_5_EF1_v1_2_Composite_Amendment_Integration_Record_Candidate_R2.md",
+      "sha256": "9c45ae7c07b3c0d5b3a5dc96ac22e826f5c126ccaec50d1c0cbf0eb7b1ec2aaf",
+      "category": "EF1_V1_2_APPROVED_CANDIDATE_INTEGRATION",
+      "source": "VERIFIED_EXTERNAL_R2_PACK"
+    },
+    {
+      "path": "docs/roadmap/v5-r2-authority/Inference_Data_Egress_Governance_Authority_Amendment_Candidate_R2.md",
+      "sha256": "26115a528ed9960995cf85d4b4b980583ad38858587e9ed160c9d2f5b2e4d7cd",
+      "category": "INFERENCE_DATA_EGRESS_AMENDMENT",
+      "source": "VERIFIED_EXTERNAL_R2_PACK"
+    },
+    {
+      "path": "docs/roadmap/v5-r2-authority/Inference_Data_Egress_Policy_Core_Candidate_R2.yaml",
+      "sha256": "c91586afcaeca130e7bcb4707cc066d07075b4b7d9d8d566644c5f041d7fb85f",
+      "category": "CORRECTED_MACHINE_READABLE_POLICY_SET",
+      "source": "VERIFIED_EXTERNAL_R2_PACK"
+    },
+    {
+      "path": "docs/roadmap/v5-r2-authority/Provider_Assurance_Registry_Candidate_R2.yaml",
+      "sha256": "b3754fed7badac5ee7399c6a375bdf86592494f48c1acf2bbbfcab986ee38d6b",
+      "category": "CORRECTED_MACHINE_READABLE_POLICY_SET",
+      "source": "VERIFIED_EXTERNAL_R2_PACK"
+    },
+    {
+      "path": "docs/roadmap/v5-r2-authority/Tenant_Installation_Inference_Policy_Template_R2.yaml",
+      "sha256": "d88ccbd8290598ef0b08f16349e13b4ad0624bb7da8127d9ce5bd67d1a9be2c6",
+      "category": "CORRECTED_MACHINE_READABLE_POLICY_SET",
+      "source": "VERIFIED_EXTERNAL_R2_PACK"
+    },
+    {
+      "path": "docs/roadmap/v5-r2-activation-candidate/Inference_Data_Egress_Decision_Contract_Candidate_R2.schema.json",
+      "sha256": "d23df0f4e0e15cc5099877b6fb612ced004fb77e017e0e04a2cc867a399ed315",
+      "category": "CORRECTED_MACHINE_READABLE_POLICY_SET",
+      "source": "R2_ACTIVATION_CANDIDATE_CORRECTION"
+    },
+    {
+      "path": "docs/roadmap/v5-r2-activation-candidate/Inference_Data_Egress_Policy_Fixtures_Candidate_R2.json",
+      "sha256": "eb4e25651bcdac0fa0f0b1e8af0b0043ca588fbea47a3270f544dddbaabd4d50",
+      "category": "CORRECTED_MACHINE_READABLE_POLICY_SET",
+      "source": "R2_ACTIVATION_CANDIDATE_CORRECTION"
+    },
+    {
+      "path": "docs/roadmap/v5-r2-activation-candidate/R2_ACTIVATION_CANDIDATE_CORRECTION.json",
+      "sha256": "adf23fdd3274726629a93daf4f79b6550a3eaded002578646aeb49c3d2b5b530",
+      "category": "CORRECTION_EVIDENCE",
+      "source": "REPOSITORY_CANDIDATE"
+    },
+    {
+      "path": "docs/roadmap/v5-r2-activation-candidate/m0-verification-record-candidate-r2.yaml",
+      "sha256": "e603341bbf3c3b86a53db60fe3b10a2dfbbc8c1c012a84f996ff051a0d77bcbe",
+      "category": "M0_RECORD",
+      "source": "REPOSITORY_CANDIDATE"
+    },
+    {
+      "path": "docs/roadmap/v5-r2-activation-candidate/v5-r2-rollback-record-candidate.md",
+      "sha256": "c0ce10b9050e94f3e05f57b25e55c8cb370da660186871c21bf63faa43288f60",
+      "category": "ROLLBACK_RECORD",
+      "source": "REPOSITORY_CANDIDATE"
+    },
+    {
+      "path": "docs/roadmap/v5-r2-activation-candidate/v5-r2-activation-manifest-candidate.json",
+      "sha256": "SELF_HASH_RECORDED_BY_PRODUCT_OWNER_REQUEST_AND_ACTIVATION_COMMIT",
+      "category": "ACTIVATION_MANIFEST",
+      "source": "REPOSITORY_CANDIDATE"
+    }
+  ],
+  "excluded_scope": [
+    "src/",
+    "runtime code",
+    "SQL",
+    "migration",
+    "credential",
+    "business data",
+    "database or production state",
+    "coordination.lock mutation",
+    "external operation"
+  ],
+  "activation_requires": {
+    "product_owner_exact_hash_approval": true,
+    "ham_15_22_approval": true,
+    "single_commit_parent_must_equal_pre_activation_baseline": true,
+    "independent_review_p1": 0,
+    "independent_review_p2": 0,
+    "independent_review_go": "YES"
+  },
+  "operation_counts_in_readiness_task": {
+    "stage": 0,
+    "commit": 0,
+    "push": 0,
+    "activation": 0,
+    "day150_execution": 0,
+    "ef1_execution": 0,
+    "day151_execution": 0,
+    "production_or_runtime_mutation": 0
+  }
+}

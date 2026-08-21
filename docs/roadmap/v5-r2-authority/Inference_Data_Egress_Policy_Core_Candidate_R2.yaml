@@ -1,0 +1,120 @@
+schema_version: farmos.inference-data-egress-policy.v1-candidate-r2
+status: CANDIDATE_R2_HUMAN_APPROVAL_REQUIRED
+generated_at: '2026-08-11'
+canonical_posture:
+  cloud: CLOUD_ENABLED_POLICY_GOVERNED
+  local: LOCAL_RESILIENT
+  base_farming_operations_depend_on_ai: false
+  unknown_policy_external_egress: DENY
+principles:
+- PROVIDER_INDEPENDENCE
+- POLICY_BEFORE_INFERENCE
+- HERMES_EGRESS_AUTHORITY_ZERO
+- TENANT_OR_INSTALLATION_OWNED_POLICY
+- PURPOSE_BOUND_DATA_USE
+- NON_WIDENING_FALLBACK
+- FAIL_CLOSED_ON_UNKNOWN
+authority:
+  platform_minimum_policy: human_approved_coordination_SOT
+  tenant_or_installation_policy: verified_farm_scope_owned_policy_bounded_by_platform_minimum
+  field_classification: owning_bounded_context_plus_canonical_taxonomy
+  provider_assurance_registry: versioned_coordination_SOT_registry
+  model_router: selection_only_within_allowed_provider_set
+  hermes: candidate_classifier_and_advisor_only
+classification_taxonomy:
+  C0_PUBLIC:
+    meaning: human-approved public or publication-ready data
+    default_external_egress: ELIGIBLE_IF_PURPOSE_AND_PROVIDER_ALLOW
+  C1_INTERNAL:
+    meaning: routine internal operational data without sensitive personal/commercial detail
+    default_external_egress: TENANT_POLICY_AND_MINIMIZATION_REQUIRED
+  C2_CONFIDENTIAL:
+    meaning: customer, employee, financial, commercial, location or operationally sensitive data
+    default_external_egress: LOCAL_PRIVATE_BYOK_DEFAULT_MANAGED_CLOUD_EXPLICIT_POLICY_ONLY
+  C3_RESTRICTED:
+    meaning: credentials, authentication material, security controls, regulated/high-impact personal data, protected raw evidence
+    default_external_egress: DENY_BY_DEFAULT
+required_decision_inputs:
+- verified_installation_or_tenant_scope
+- highest_data_classification
+- purpose_id
+- provider_assurance_version
+- environment_id
+- platform_policy_version
+- tenant_or_installation_policy_version
+additional_policy_dimensions:
+- retention
+- provider_training_use
+- residency_or_jurisdiction
+- redaction_and_minimization
+- requesting_capability
+- contract_or_DPA_state
+allowed_provider_set_formula:
+- PlatformMinimumPolicy
+- TenantOrInstallationPolicy
+- PurposePolicy
+- DataClassificationPolicy
+- ProviderAssurancePolicy
+- EnvironmentPolicy
+unknown_behavior:
+  state: EGRESS_POLICY_UNRESOLVED
+  external_egress: DENY
+  allowed_next_actions:
+  - USE_EXPLICITLY_ALLOWED_LOCAL_OR_PRIVATE_PROVIDER
+  - REDACT_MINIMIZE_AND_REEVALUATE
+  - REQUEST_HUMAN_CLASSIFICATION_OR_PURPOSE_CONFIRMATION
+  - DEFER_AI_AND_CONTINUE_BASE_OPERATIONS
+hermes:
+  may_propose:
+  - sensitivity_candidate
+  - purpose_candidate
+  - provider_recommendation
+  - redaction_candidate
+  must_not:
+  - AUTHORIZE_EGRESS
+  - OVERRIDE_CANONICAL_CLASSIFICATION
+  - WEAKEN_PLATFORM_OR_TENANT_POLICY
+  - ADD_PROVIDER_OUTSIDE_ALLOWED_SET
+  - WIDEN_RETENTION_TRAINING_RESIDENCY_OR_DISCLOSURE_ON_FALLBACK
+provider_assurance_required_fields:
+- provider_id
+- provider_type
+- endpoint_owner
+- authentication_mode
+- retention_policy
+- training_use_policy
+- residency_or_jurisdiction
+- encryption_and_access_controls
+- DPA_or_contract_state
+- BYOK_or_customer_owned_key_capability
+- allowed_data_classes
+- allowed_purposes
+- audit_log_redaction
+- availability_and_fallback
+routing:
+  policy_gateway_precedes_model_router: true
+  direct_hermes_to_provider_path: PROHIBITED
+  fallback_may_widen_allowed_provider_set: false
+  local_provider_automatically_trusted: false
+audit_evidence_fields:
+- correlation_id
+- timestamp
+- verified_scope
+- purpose_id
+- highest_classification
+- platform_policy_hash
+- tenant_or_installation_policy_hash
+- provider_assurance_hash
+- redaction_obligations
+- allowed_provider_set
+- selected_provider
+- reason_codes
+- input_manifest_hash
+raw_sensitive_payload_in_egress_ledger: false
+current_single_installation:
+  tenant_context_source: verified_installation_and_farm_scope
+  client_selectable_tenant: false
+activation:
+  roadmap_authority: EXACT_HASH_HUMAN_APPROVAL_REQUIRED
+  new_or_expanded_production_external_route: IEG_RUNTIME_READY_REQUIRED
+  existing_routes: M0_INVENTORY_AND_MUTATION_FREEZE_UNTIL_VERIFIED

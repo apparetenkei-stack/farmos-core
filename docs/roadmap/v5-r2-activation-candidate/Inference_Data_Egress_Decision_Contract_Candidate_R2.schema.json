@@ -1,0 +1,171 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:farmos:inference-egress-decision:v1-candidate-r2",
+  "title": "FarmOS Inference Egress Decision Candidate",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "decision_id",
+    "correlation_id",
+    "verified_scope",
+    "purpose_id",
+    "highest_classification",
+    "policy_versions",
+    "allowed_provider_set",
+    "decision",
+    "reason_codes",
+    "raw_payload_stored",
+    "decided_at"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "farmos.inference-egress-decision.v1-candidate"
+    },
+    "decision_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "correlation_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "verified_scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "installation_id",
+        "farm_scope"
+      ],
+      "properties": {
+        "installation_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "farm_scope": {
+          "type": "string",
+          "minLength": 1
+        },
+        "tenant_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "purpose_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "highest_classification": {
+      "enum": [
+        "C0_PUBLIC",
+        "C1_INTERNAL",
+        "C2_CONFIDENTIAL",
+        "C3_RESTRICTED"
+      ]
+    },
+    "policy_versions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "platform",
+        "tenant_or_installation",
+        "provider_assurance"
+      ],
+      "properties": {
+        "platform": {
+          "type": "string",
+          "minLength": 1
+        },
+        "tenant_or_installation": {
+          "type": "string",
+          "minLength": 1
+        },
+        "provider_assurance": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "redaction_obligations": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "uniqueItems": true
+    },
+    "allowed_provider_set": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "uniqueItems": true
+    },
+    "selected_provider": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "decision": {
+      "enum": [
+        "ALLOW",
+        "ALLOW_WITH_REDACTION",
+        "LOCAL_PRIVATE_ONLY",
+        "DENY_EXTERNAL",
+        "DEFER"
+      ]
+    },
+    "reason_codes": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string"
+      },
+      "uniqueItems": true
+    },
+    "input_manifest_hash": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "raw_payload_stored": {
+      "const": false
+    },
+    "decided_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "decision": {
+            "enum": [
+              "ALLOW",
+              "ALLOW_WITH_REDACTION"
+            ]
+          }
+        },
+        "required": [
+          "decision"
+        ]
+      },
+      "then": {
+        "required": [
+          "selected_provider"
+        ],
+        "properties": {
+          "selected_provider": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    }
+  ]
+}

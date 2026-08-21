@@ -1,0 +1,452 @@
+[
+  {
+    "decision_id": "DEC-001",
+    "date_or_day": "Day1–3",
+    "decision": "Raw First / No Destructive Import; preserve original source and derived candidates separately",
+    "status": "ACTIVE",
+    "source": "SR-002/SR-003",
+    "supersedes": "—",
+    "roadmap_reflection": "Incorporated"
+  },
+  {
+    "decision_id": "DEC-002",
+    "date_or_day": "Day1 onward",
+    "decision": "Proposal First / Human in the Loop; AI output is not confirmed business truth",
+    "status": "ACTIVE",
+    "source": "SR-002/SR-016",
+    "supersedes": "—",
+    "roadmap_reflection": "Incorporated"
+  },
+  {
+    "decision_id": "DEC-003",
+    "date_or_day": "Day3 onward",
+    "decision": "AI must not write directly to app business tables; controlled proposal/audit boundaries only",
+    "status": "ACTIVE",
+    "source": "SR-002/SR-016",
+    "supersedes": "—",
+    "roadmap_reflection": "Incorporated"
+  },
+  {
+    "decision_id": "DEC-004",
+    "date_or_day": "Day4–18",
+    "decision": "Knowledge flow uses raw → extracted → candidate → reviewed/verified → projection/apply plan",
+    "status": "ACTIVE",
+    "source": "SR-003",
+    "supersedes": "—",
+    "roadmap_reflection": "Incorporated"
+  },
+  {
+    "decision_id": "DEC-005",
+    "date_or_day": "Day18 onward",
+    "decision": "Application business facts remain in the farming application; Core must not create a competing SOT",
+    "status": "ACTIVE",
+    "source": "SR-003/SR-016",
+    "supersedes": "—",
+    "roadmap_reflection": "Incorporated"
+  },
+  {
+    "decision_id": "DEC-006",
+    "date_or_day": "Day24 onward",
+    "decision": "Review decision is append-only and distinct from Proposal status and business execution result",
+    "status": "ACTIVE",
+    "source": "SR-003/SR-016",
+    "supersedes": "—",
+    "roadmap_reflection": "Incorporated"
+  },
+  {
+    "decision_id": "DEC-007",
+    "date_or_day": "Day32 onward",
+    "decision": "Preview, readiness, approval, execution and audit are separate contracts/states",
+    "status": "ACTIVE",
+    "source": "SR-004/SR-016",
+    "supersedes": "—",
+    "roadmap_reflection": "Incorporated"
+  },
+  {
+    "decision_id": "DEC-008",
+    "date_or_day": "Day38 onward",
+    "decision": "Hermes begins read-only; restricted domains are redacted until authority and disclosure policy exist",
+    "status": "ACTIVE",
+    "source": "SR-004",
+    "supersedes": "—",
+    "roadmap_reflection": "Incorporated"
+  },
+  {
+    "decision_id": "DEC-009",
+    "date_or_day": "Day39 onward",
+    "decision": "AI may create reviewer-facing proposals in ai.proposal_inbox only through a controlled boundary; no autonomous apply",
+    "status": "ACTIVE",
+    "source": "SR-004",
+    "supersedes": "—",
+    "roadmap_reflection": "Incorporated"
+  },
+  {
+    "decision_id": "DEC-010",
+    "date_or_day": "Day50 onward",
+    "decision": "Unknown contract, stale data, missing authority or unsafe input fails closed",
+    "status": "ACTIVE",
+    "source": "SR-004/SR-016",
+    "supersedes": "—",
+    "roadmap_reflection": "Incorporated"
+  },
+  {
+    "decision_id": "DEC-011",
+    "date_or_day": "Day65 onward",
+    "decision": "LLM/provider runtime remains separate from business facts and can fail without stopping the farming app",
+    "status": "ACTIVE",
+    "source": "SR-005/SR-008",
+    "supersedes": "—",
+    "roadmap_reflection": "Incorporated"
+  },
+  {
+    "decision_id": "DEC-012",
+    "date_or_day": "Day69 onward",
+    "decision": "Browser-to-Hermes request body is a strict allow-list; secrets/endpoints/models are server-owned",
+    "status": "ACTIVE",
+    "source": "SR-005/SR-007",
+    "supersedes": "—",
+    "roadmap_reflection": "Incorporated"
+  },
+  {
+    "decision_id": "DEC-013",
+    "date_or_day": "Day77 onward",
+    "decision": "Zero, not fetched, unavailable, unauthorized, failed and stale are distinct states",
+    "status": "ACTIVE",
+    "source": "SR-007/SR-016",
+    "supersedes": "—",
+    "roadmap_reflection": "Incorporated"
+  },
+  {
+    "decision_id": "DEC-014",
+    "date_or_day": "2026-07-10",
+    "decision": "Day220, not Day186, is the integrated Agricultural Knowledge OS completion gate",
+    "status": "ACTIVE",
+    "source": "SR-008",
+    "supersedes": "Old Day186 RC definition",
+    "roadmap_reflection": "Incorporated"
+  },
+  {
+    "decision_id": "DEC-015",
+    "date_or_day": "2026-07-10",
+    "decision": "Use phased gates (120/130/145/160/180/200/220), not a single final big-bang release",
+    "status": "ACTIVE",
+    "source": "SR-008/SR-009",
+    "supersedes": "—",
+    "roadmap_reflection": "Incorporated"
+  },
+  {
+    "decision_id": "DEC-016",
+    "date_or_day": "2026-07-10",
+    "decision": "Plan is unified; implementation responsibilities are separated across Core, app, Sales, Brand, Gateways",
+    "status": "ACTIVE",
+    "source": "SR-008/SR-009",
+    "supersedes": "—",
+    "roadmap_reflection": "Incorporated"
+  },
+  {
+    "decision_id": "DEC-017",
+    "date_or_day": "2026-07-15",
+    "decision": "Dashboard redesign and notes/tags are integrated into Day112–130 without moving Day120/130 gates",
+    "status": "ACTIVE",
+    "source": "SR-010",
+    "supersedes": "Earlier generic Daily Brief/Proposal sequencing",
+    "roadmap_reflection": "Partially incorporated"
+  },
+  {
+    "decision_id": "DEC-018",
+    "date_or_day": "2026-07-18",
+    "decision": "Use separate bounded-context AI leads and a neutral Development Coordination Plane; no free-form mutual repo editing",
+    "status": "ACTIVE",
+    "source": "SR-016/SR-030",
+    "supersedes": "Informal AI-to-AI coordination",
+    "roadmap_reflection": "Incorporated"
+  },
+  {
+    "decision_id": "DEC-019",
+    "date_or_day": "2026-07-18",
+    "decision": "AI consensus never substitutes for Product Owner approval",
+    "status": "ACTIVE",
+    "source": "SR-016",
+    "supersedes": "—",
+    "roadmap_reflection": "Incorporated"
+  },
+  {
+    "decision_id": "DEC-020",
+    "date_or_day": "Day130.5",
+    "decision": "Official Hermes is an isolated, replaceable runtime; Native Runtime remains authoritative/fallback during shadow",
+    "status": "ACTIVE",
+    "source": "SR-012",
+    "supersedes": "Hermes-specific domain ownership",
+    "roadmap_reflection": "Incorporated"
+  },
+  {
+    "decision_id": "DEC-021",
+    "date_or_day": "Day130.5",
+    "decision": "Operator and Observer profiles, Memory/Skill/Session are isolated; Observer produces candidates only",
+    "status": "ACTIVE",
+    "source": "SR-012",
+    "supersedes": "—",
+    "roadmap_reflection": "Incorporated"
+  },
+  {
+    "decision_id": "DEC-022",
+    "date_or_day": "2026-07-21",
+    "decision": "Existing Farm Web URL/SEO remains independent of Core and only receives public projection data",
+    "status": "ACTIVE",
+    "source": "SR-014",
+    "supersedes": "Potential website replacement/direct DB connection",
+    "roadmap_reflection": "Incorporated"
+  },
+  {
+    "decision_id": "DEC-023",
+    "date_or_day": "2026-07-28",
+    "decision": "Operational Memory becomes P0 at Day146; Core owns rebuildable projections, not app facts",
+    "status": "ACTIVE",
+    "source": "SR-018",
+    "supersedes": "Original Day146 scope",
+    "roadmap_reflection": "Incorporated"
+  },
+  {
+    "decision_id": "DEC-024",
+    "date_or_day": "2026-07-28",
+    "decision": "Vector index is derived/rebuildable; no embedding column in work_records; vector DB not MVP requirement",
+    "status": "ACTIVE",
+    "source": "SR-018",
+    "supersedes": "Vector-first storage",
+    "roadmap_reflection": "Incorporated"
+  },
+  {
+    "decision_id": "DEC-025",
+    "date_or_day": "2026-07-28",
+    "decision": "MCP is a bounded capability exposure layer, not the memory/storage model; defer until contracts stabilize",
+    "status": "DEFERRED",
+    "source": "SR-018",
+    "supersedes": "Immediate MCP implementation",
+    "roadmap_reflection": "Incorporated as policy"
+  },
+  {
+    "decision_id": "DEC-026",
+    "date_or_day": "Day146",
+    "decision": "Single Core installation binds exactly one farm scope and one dedicated Operational Memory DB; client cannot select tenant",
+    "status": "ACTIVE",
+    "source": "SR-020",
+    "supersedes": "Implicit/multi-tenant selection",
+    "roadmap_reflection": "Incorporated"
+  },
+  {
+    "decision_id": "DEC-027",
+    "date_or_day": "Day147",
+    "decision": "Projection lifecycle has five states candidate/active/rejected/superseded/failed; append-only; automatic promotion zero",
+    "status": "ACTIVE",
+    "source": "SR-023",
+    "supersedes": "Earlier looser projection statuses",
+    "roadmap_reflection": "Incorporated"
+  },
+  {
+    "decision_id": "DEC-028",
+    "date_or_day": "Day148",
+    "decision": "Daily Operational Projection generation is pure, deterministic and candidate-only; no persistence/promotion",
+    "status": "ACTIVE",
+    "source": "SR-025",
+    "supersedes": "Generator with side effects",
+    "roadmap_reflection": "Incorporated"
+  },
+  {
+    "decision_id": "DEC-029",
+    "date_or_day": "Day149",
+    "decision": "Human review evidence and promotion are distinct commands; expected version/idempotency/lineage/content hash are mandatory",
+    "status": "ACTIVE",
+    "source": "SR-026",
+    "supersedes": "Implicit approval=activation",
+    "roadmap_reflection": "Incorporated"
+  },
+  {
+    "decision_id": "DEC-030",
+    "date_or_day": "2026-08-03",
+    "decision": "v4.0 becomes active roadmap SOT; v3.1 is superseded",
+    "status": "ACTIVE",
+    "source": "SR-022",
+    "supersedes": "v3.1 active authority",
+    "roadmap_reflection": "Legacy authority retained as ACTIVE_LEGACY; exact content pending M0; mutation frozen; later superseded only by approved v5 activation."
+  },
+  {
+    "decision_id": "DEC-031",
+    "date_or_day": "Day150",
+    "decision": "Only active Projection is exposed; candidate/rejected/superseded/failed collapse to safe missing; current/stale/missing/failed exact union",
+    "status": "ACTIVE",
+    "source": "SR-027",
+    "supersedes": "Candidate leakage",
+    "roadmap_reflection": "Implementation active"
+  },
+  {
+    "decision_id": "DEC-032",
+    "date_or_day": "2026-08-07",
+    "decision": "Insert Day150.5 EF-1 after formal Day150 closure without changing product Day numbering or features",
+    "status": "ACTIVE",
+    "source": "SR-028",
+    "supersedes": "Starting EF-1 before Day150 / renumbering",
+    "roadmap_reflection": "Incorporated in v5 R1 and EF-1 v1.1 integration; direct resume to Day151 after resume-lock."
+  },
+  {
+    "decision_id": "DEC-033",
+    "date_or_day": "Day150.5",
+    "decision": "Separate implementer/reviewer; deterministic gates first; Qwen shadow only; production final approval human",
+    "status": "ACTIVE",
+    "source": "SR-028",
+    "supersedes": "AI self-approval / Qwen authority",
+    "roadmap_reflection": "Incorporated in EF-1 v1.1 J/M and canonical governance."
+  },
+  {
+    "decision_id": "DEC-034",
+    "date_or_day": "2026-08-09",
+    "decision": "Adopt Spec Kit for Day spec→plan→tasks, subordinate to roadmap/authority and evidence gates",
+    "status": "ACTIVE",
+    "source": "SR-031",
+    "supersedes": "Ad-hoc prompt-only planning",
+    "roadmap_reflection": "Incorporated into EF-1 v1.1 A/I/J/M/N; no separate DC-1."
+  },
+  {
+    "decision_id": "DEC-035",
+    "date_or_day": "2026-08-09",
+    "decision": "Git/test/Day evidence remains implementation SOT; generate structured Day Completion Records and propose roadmap updates",
+    "status": "ACTIVE",
+    "source": "SR-032",
+    "supersedes": "Copying Git diff into roadmap / memory-only updates",
+    "roadmap_reflection": "Incorporated into EF-1 v1.1 I/N and canonical DCR update loop."
+  },
+  {
+    "decision_id": "DEC-036",
+    "date_or_day": "2026-08-09",
+    "decision": "Development Memory stores structured decisions/lessons and links to evidence; it is not a business SOT or Git duplicate",
+    "status": "ACTIVE",
+    "source": "SR-033",
+    "supersedes": "Unstructured conversation memory as authority",
+    "roadmap_reflection": "Incorporated into EF-1 v1.1 N and canonical Development Memory relationship."
+  },
+  {
+    "decision_id": "DEC-037",
+    "date_or_day": "v4.0",
+    "decision": "North Star remains Agricultural Knowledge OS; product expression expands to Agricultural Chief-of-Staff & Farm Succession OS",
+    "status": "ACTIVE",
+    "source": "SR-021/SR-022",
+    "supersedes": "Complete autonomy framing",
+    "roadmap_reflection": "Incorporated"
+  },
+  {
+    "decision_id": "DEC-038",
+    "date_or_day": "v4.0",
+    "decision": "Day220 includes 7-day founder absence, successor shadow, SOP/exception/competency/delegation continuity",
+    "status": "ACTIVE",
+    "source": "SR-021/SR-022",
+    "supersedes": "Wiki-only succession definition",
+    "roadmap_reflection": "Incorporated"
+  },
+  {
+    "decision_id": "DEC-039",
+    "date_or_day": "v4.0",
+    "decision": "Post-Day220 additions are Capability Packs; completed Day numbers are not renumbered",
+    "status": "ACTIVE",
+    "source": "SR-021/SR-022",
+    "supersedes": "Retroactive Day renumbering",
+    "roadmap_reflection": "Incorporated"
+  },
+  {
+    "decision_id": "DEC-040",
+    "date_or_day": "2026-08-09",
+    "decision": "Adopt Route B direction and approve the name FarmOS Canonical Master Roadmap v5.0 Candidate",
+    "status": "ACTIVE",
+    "source": "SR-036",
+    "supersedes": "Undecided Route A/B candidate choice",
+    "roadmap_reflection": "Incorporated in v5 R1; activation still requires final approval."
+  },
+  {
+    "decision_id": "DEC-041",
+    "date_or_day": "2026-08-09",
+    "decision": "Do not add DC-1 after EF-1; integrate Spec Kit, Development Memory and DCR into EF-1 v1.1 A/I/J/M/N",
+    "status": "ACTIVE",
+    "source": "SR-036",
+    "supersedes": "Separate post-EF DC-1 recommendation",
+    "roadmap_reflection": "Incorporated in dependencies and EF-1 integration record."
+  },
+  {
+    "decision_id": "DEC-042",
+    "date_or_day": "2026-08-09",
+    "decision": "Classify v4 authority as ACTIVE_LEGACY / CONTENT_VERIFICATION_PENDING / MUTATION_FROZEN until v5 activation; never substitute v4 Draft upload",
+    "status": "ACTIVE",
+    "source": "SR-036",
+    "supersedes": "Simple ACTIVE classification with unknown content",
+    "roadmap_reflection": "Incorporated in document authority and supersession registry."
+  },
+  {
+    "decision_id": "DEC-043",
+    "date_or_day": "2026-08-09",
+    "decision": "Current Position remains PROVISIONAL_VERIFIED_FROM_AVAILABLE_SOURCES until M0 verifies live Core/App/roadmap/coordination/protected state",
+    "status": "ACTIVE",
+    "source": "SR-036",
+    "supersedes": "Unqualified current-position verification",
+    "roadmap_reflection": "Incorporated in Current State Candidate and M0 procedure."
+  },
+  {
+    "decision_id": "DEC-044",
+    "date_or_day": "2026-08-09",
+    "decision": "North Star, existing Day numbering, Day151-220 order and Day220 target remain unchanged; v5 major change is authority structure only",
+    "status": "ACTIVE",
+    "source": "SR-036",
+    "supersedes": "Potential product-roadmap redesign interpretation",
+    "roadmap_reflection": "Incorporated and frozen by activation gate."
+  },
+  {
+    "decision_id": "DEC-045",
+    "date_or_day": "2026-08-11",
+    "decision": "Adopt Inference & Data Egress Governance into v5 R2 candidate as a first-class extension of Agent/Model independence; no product roadmap redesign",
+    "status": "PROPOSED",
+    "source": "SR-037/SR-038",
+    "supersedes": "Implicit provider routing without first-class egress authority",
+    "roadmap_reflection": "Incorporated in R2 candidate pending Product Owner approval."
+  },
+  {
+    "decision_id": "DEC-046",
+    "date_or_day": "2026-08-11",
+    "decision": "Use CLOUD_ENABLED_POLICY_GOVERNED / LOCAL_RESILIENT rather than unconditional Cloud-first",
+    "status": "PROPOSED",
+    "source": "SR-037/SR-038",
+    "supersedes": "Ambiguous Cloud-first wording",
+    "roadmap_reflection": "R2 14.19 candidate."
+  },
+  {
+    "decision_id": "DEC-047",
+    "date_or_day": "2026-08-11",
+    "decision": "Policy Gateway computes Allowed Provider Set before Model Router; router cannot widen it and fallback is non-widening",
+    "status": "PROPOSED",
+    "source": "SR-038",
+    "supersedes": "Router-first provider selection",
+    "roadmap_reflection": "R2 invariant, boundary, EF-1 v1.2 K/M and runtime gate."
+  },
+  {
+    "decision_id": "DEC-048",
+    "date_or_day": "2026-08-11",
+    "decision": "Hermes may propose classification/purpose/provider candidates but has zero egress authority",
+    "status": "PROPOSED",
+    "source": "SR-038",
+    "supersedes": "Hermes classification as transmission authority",
+    "roadmap_reflection": "R2 invariant and 14.19."
+  },
+  {
+    "decision_id": "DEC-049",
+    "date_or_day": "2026-08-11",
+    "decision": "Inference egress decision is purpose- and tenant/installation-bound and includes provider assurance/environment policy; unknown denies external egress",
+    "status": "PROPOSED",
+    "source": "SR-038",
+    "supersedes": "Data classification-only external transmission decision",
+    "roadmap_reflection": "R2 policy YAML and decision contract."
+  },
+  {
+    "decision_id": "DEC-050",
+    "date_or_day": "2026-08-11",
+    "decision": "Integrate egress governance through EF-1 v1.2 A/B/E/H/I/J/K/L/M/N without adding a Day or post-EF blocking stage; resume Day151 after lock verification",
+    "status": "PROPOSED",
+    "source": "SR-038/SR-039",
+    "supersedes": "Separate egress engineering Day",
+    "roadmap_reflection": "EF-1 v1.2 integration record and dependencies."
+  }
+]

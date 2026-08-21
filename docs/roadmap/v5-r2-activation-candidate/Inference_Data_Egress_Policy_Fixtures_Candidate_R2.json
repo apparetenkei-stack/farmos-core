@@ -1,0 +1,134 @@
+{
+  "schema_version": "farmos.inference-egress-policy-fixtures.v1-candidate-r2",
+  "status": "CANDIDATE_FIXTURES",
+  "cases": [
+    {
+      "id": "IEG-FX-001",
+      "name": "public agronomic summary may use approved cloud",
+      "input": {
+        "canonical_classification": "C0_PUBLIC",
+        "purpose": "AGRONOMIC_SUMMARY",
+        "tenant_policy": "CLOUD_ALLOWED_FOR_C0",
+        "provider_assurance": "APPROVED_CLOUD"
+      },
+      "hermes_candidate": {
+        "sensitivity_candidate": "C0_PUBLIC"
+      },
+      "expected": {
+        "decision": "ALLOW",
+        "provider_set_source": "POLICY_GATEWAY",
+        "direct_hermes_authority": false
+      }
+    },
+    {
+      "id": "IEG-FX-002",
+      "name": "confidential employee data denied to managed cloud by default",
+      "input": {
+        "canonical_classification": "C2_CONFIDENTIAL",
+        "purpose": "EMPLOYEE_EVALUATION",
+        "tenant_policy": "C2_LOCAL_ONLY",
+        "provider_assurance": "APPROVED_CLOUD"
+      },
+      "hermes_candidate": {
+        "sensitivity_candidate": "C1_INTERNAL"
+      },
+      "expected": {
+        "decision": "DENY_EXTERNAL",
+        "canonical_classification_wins": true,
+        "direct_hermes_authority": false
+      }
+    },
+    {
+      "id": "IEG-FX-003",
+      "name": "confidential operational data may use explicit private provider",
+      "input": {
+        "canonical_classification": "C2_CONFIDENTIAL",
+        "purpose": "OPERATIONAL_EXTRACTION",
+        "tenant_policy": "C2_PRIVATE_ALLOWED",
+        "provider_assurance": "APPROVED_PRIVATE"
+      },
+      "expected": {
+        "decision": "LOCAL_PRIVATE_ONLY"
+      }
+    },
+    {
+      "id": "IEG-FX-004",
+      "name": "unknown classification defers and denies external egress",
+      "input": {
+        "canonical_classification": "UNKNOWN",
+        "purpose": "AGRONOMIC_SUMMARY",
+        "tenant_policy": "CLOUD_ALLOWED_FOR_C0_C1",
+        "provider_assurance": "APPROVED_CLOUD"
+      },
+      "expected": {
+        "decision": "DEFER",
+        "external_egress": "DENY"
+      }
+    },
+    {
+      "id": "IEG-FX-005",
+      "name": "fallback cannot widen policy",
+      "input": {
+        "canonical_classification": "C2_CONFIDENTIAL",
+        "purpose": "OPERATIONAL_EXTRACTION",
+        "allowed_provider_set": [
+          "PRIVATE_A"
+        ],
+        "primary_provider": "PRIVATE_A",
+        "fallback_candidate": "CLOUD_B"
+      },
+      "expected": {
+        "fallback": "REJECT",
+        "allowed_provider_set_unchanged": true
+      }
+    },
+    {
+      "id": "IEG-FX-006",
+      "name": "restricted credential never enters inference payload",
+      "input": {
+        "canonical_classification": "C3_RESTRICTED",
+        "purpose": "DEVELOPMENT_REVIEW",
+        "payload_contains": "CREDENTIAL"
+      },
+      "expected": {
+        "decision": "DENY_EXTERNAL",
+        "payload_rejected_before_router": true,
+        "raw_payload_logged": false
+      }
+    },
+    {
+      "id": "IEG-FX-007",
+      "name": "confidential agronomic summary requires deterministic redaction before approved managed cloud",
+      "input": {
+        "canonical_classification": "C2_CONFIDENTIAL",
+        "purpose": "AGRONOMIC_SUMMARY",
+        "tenant_policy": "C2_MANAGED_CLOUD_ALLOWED_AFTER_REQUIRED_REDACTION",
+        "provider_assurance": "APPROVED_MANAGED_CLOUD_FOR_REDACTED_C2",
+        "payload_contains": [
+          "EXACT_FARM_IDENTIFIER",
+          "EXACT_FIELD_IDENTIFIER",
+          "AGGREGATED_AGRONOMIC_FACTS"
+        ]
+      },
+      "hermes_candidate": {
+        "redaction_candidate": [
+          "REMOVE_EXACT_FARM_IDENTIFIER",
+          "REMOVE_EXACT_FIELD_IDENTIFIER"
+        ]
+      },
+      "expected": {
+        "decision": "ALLOW_WITH_REDACTION",
+        "selected_provider": "APPROVED_MANAGED_CLOUD_FOR_REDACTED_C2",
+        "required_redaction": true,
+        "redaction_obligations": [
+          "REMOVE_EXACT_FARM_IDENTIFIER",
+          "REMOVE_EXACT_FIELD_IDENTIFIER"
+        ],
+        "redaction_must_complete_before_router": true,
+        "raw_payload_stored": false,
+        "provider_set_source": "POLICY_GATEWAY",
+        "direct_hermes_authority": false
+      }
+    }
+  ]
+}

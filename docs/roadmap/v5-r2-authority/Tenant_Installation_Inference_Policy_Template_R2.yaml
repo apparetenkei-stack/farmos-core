@@ -1,0 +1,13 @@
+schema_version: farmos.tenant-installation-inference-policy.v1-candidate-r2
+status: CANDIDATE_TEMPLATE_NOT_ACTIVE
+scope:
+  installation_id: REQUIRED_AT_ACTIVATION
+  farm_scope: REQUIRED_AT_ACTIVATION
+  tenant_id: null
+  client_selectable_tenant: false
+inherits_platform_minimum: true
+may_be_stricter_than_platform: true
+may_be_weaker_than_platform: false
+purpose_rules: []
+default_unknown_action: DENY_EXTERNAL_AND_DEFER_OR_LOCAL_IF_EXPLICITLY_ALLOWED
+activation_requires: Product Owner approval + exact hash + verified scope

@@ -1,0 +1,78 @@
+{
+  "schema_version": "farmos.day-completion-record-candidate.v1",
+  "record_id": "farmos-day150-retrospective-completion-record-candidate-r2",
+  "authority_state": "CANDIDATE_EVIDENCE_ONLY",
+  "materialization_classification": "RETROSPECTIVE_FORMAL_CLOSURE_AUTHORITY_CANDIDATE",
+  "day": "Day150",
+  "day_status": "FORMALLY_CLOSED",
+  "day_reopened": false,
+  "closure_commit": {
+    "commit": "a5fff660001487850ba8ed143d1b0d1cf6a1c5c0",
+    "parent": "ffcc2facbf51f88dda8ce2f0258b92d861367339",
+    "tree": "ad4d89153f376ad7627fedd98467434d8e14eeac",
+    "subject": "feat(hermes): formally close Day150 source qualification",
+    "committed_at": "2026-08-20T21:08:46+09:00",
+    "scope": {
+      "changed_paths": 154,
+      "additions": 34620,
+      "deletions": 291,
+      "name_status_sha256": "828d42d3d9616d7762c7441d1b8c2b334cbf06f9d1af7dc5aa4bff8441402c8e"
+    }
+  },
+  "closure_gate_binding": {
+    "policy_source": "docs/architecture/day150-closure-authority-lock.md",
+    "policy_gate_count": 22,
+    "result": "POST_DAY150_CANONICAL_22_GATE_RESULT_OBJECT_NOT_MATERIALIZED",
+    "final_gate20_result": "POST_DAY150_CANONICAL_GATE20_RESULT_OBJECT_NOT_MATERIALIZED",
+    "interpretation": "The formal closure commit is preserved as complete; the missing aggregate gate object is an authority-materialization gap and does not reopen Day150."
+  },
+  "gate13": {
+    "result": "QUALIFICATION_SUCCESS",
+    "zero_residual": true,
+    "qualification_result_path": "artifacts/day150/gate13-durability/qualification/v1/fourth-real-attempt-qualification-result.json",
+    "qualification_result_sha256": "a479e48828cfd4a8dfda46de5729475c67fd051a7ffb9d688f502562f578e4d2",
+    "terminal_path": "artifacts/day150/gate13-durability/qualification/v1/fourth-real-attempt-terminal.json",
+    "terminal_sha256": "7f772bd23a3962a5997b16a6ed05362826255a6e9e964f69285eef122b644c6f"
+  },
+  "gate17": {
+    "result": "PASS",
+    "authority_status": "PRODUCT_OWNER_APPROVED_CONSUMED_SUCCESS_NON_RUNNABLE",
+    "authority_revision": 13,
+    "authority_registry_path": "artifacts/day150/prefix-expected-catalog/reference-runs/v1/reference-execution-approval-registry.json",
+    "authority_registry_sha256": "51e49f10f3b4f75c2c40eca46623e7d7c01cf4566b7e3f8956d5d4723c7ea825",
+    "derivation_path": "docs/architecture/day150-prefix-expected-catalog-reference-derivation.md",
+    "derivation_sha256": "3a55f8f40393ec292c0966e898b1e87c2c3a983d401df6ac85e9aae26302c7f6"
+  },
+  "repository_reconciliation": {
+    "branch": "main",
+    "head": "a5fff660001487850ba8ed143d1b0d1cf6a1c5c0",
+    "local_origin_main": "a5fff660001487850ba8ed143d1b0d1cf6a1c5c0",
+    "remote_origin_main": "a5fff660001487850ba8ed143d1b0d1cf6a1c5c0",
+    "ahead_behind": "0/0",
+    "staged_paths": 0,
+    "tracked_modified_paths": 0,
+    "protected_resource_state": "PREEXISTING_PROTECTED_AND_UNRELATED_PATHS_PRESERVED",
+    "preexisting_untracked_paths": 5,
+    "r2_reconciliation_candidate_paths": "SEPARATELY_INVENTORIED_BY_ACTIVATION_MANIFEST"
+  },
+  "operation_counts": {
+    "production": 0,
+    "canonical": 0,
+    "b2": 0,
+    "formal_gate2": 0
+  },
+  "next_dependency": {
+    "engineering_phase": "Day150.5 EF-1",
+    "status": "NOT_STARTED",
+    "next_executable_subday": "Day150.5-A",
+    "execution_authorized_by_this_record": false,
+    "next_product_day": "Day151",
+    "day151_gate": "BLOCKED_UNTIL_EF1_RESUME_LOCK"
+  },
+  "post_day150_transition_sufficiency": {
+    "result": "SUFFICIENT_RETROSPECTIVE_FORMAL_CLOSURE_AUTHORITY_CANDIDATE",
+    "basis": "The exact formal closure commit and source-backed closure evidence are bound without asserting a nonexistent aggregate Gate20 or canonical 22-gate result object.",
+    "active_authority": false,
+    "day150_execution_reopened": false
+  }
+}
