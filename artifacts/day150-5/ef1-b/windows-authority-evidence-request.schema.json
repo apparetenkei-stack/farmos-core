@@ -1,0 +1,19 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema",
+  "$id":"https://farmos.local/schemas/ef1-b-windows-authority-evidence-request.v1.json",
+  "title":"Day150.5-B Windows redacted authority evidence request",
+  "type":"object",
+  "additionalProperties":false,
+  "required":["schema_version","generated_at","source_repository","credential_authority_records","lm_studio_authority","provider_routes","operation_counts","validation"],
+  "properties":{
+    "schema_version":{"const":"farmos.ef1-b.windows-authority-evidence.v1"},
+    "generated_at":{"type":"string","format":"date-time"},
+    "source_repository":{"type":"object","required":["root","branch","head","ahead","behind"],"additionalProperties":false,"properties":{"root":{"type":"string"},"branch":{"const":"main"},"head":{"type":"string","pattern":"^[a-f0-9]{40}$"},"ahead":{"const":0},"behind":{"const":0}}},
+    "credential_authority_records":{"type":"array","minItems":1,"items":{"type":"object","additionalProperties":false,"required":["credential_or_authority_id","category","owner","scope","storage_class","storage_location_name","consumer_principal","rotation_method","revocation_method","expiry_semantics","production_authority","evidence_confidence"],"properties":{"credential_or_authority_id":{"type":"string"},"category":{"type":"string"},"owner":{"type":"string"},"scope":{"type":"string"},"storage_class":{"type":"string"},"storage_location_name":{"type":"string"},"consumer_principal":{"type":"string"},"rotation_method":{"type":"string"},"revocation_method":{"type":"string"},"expiry_semantics":{"type":"string"},"production_authority":{"type":"string"},"evidence_confidence":{"type":"string"}}}},
+    "lm_studio_authority":{"type":"object","additionalProperties":false,"required":["endpoint_owner","network_exposure_class","authentication_state","current_consumers_or_routes","policy_gateway_bypass_status"],"properties":{"endpoint_owner":{"type":"string"},"network_exposure_class":{"type":"string"},"authentication_state":{"type":"string"},"current_consumers_or_routes":{"type":"array","items":{"type":"string"}},"policy_gateway_bypass_status":{"type":"string"}}},
+    "provider_routes":{"type":"array","items":{"type":"object","additionalProperties":false,"required":["route_id","provider_class","endpoint_owner","consumer_principal","external_data_route_status","policy_gateway_status"],"properties":{"route_id":{"type":"string"},"provider_class":{"type":"string"},"endpoint_owner":{"type":"string"},"consumer_principal":{"type":"string"},"external_data_route_status":{"type":"string"},"policy_gateway_status":{"type":"string"}}}},
+    "operation_counts":{"type":"object","additionalProperties":false,"required":["repository_mutations","secret_value_reads","credential_store_enumerations","credential_mutations","db_connections","db_writes","runtime_mutations","production_operations"],"properties":{"repository_mutations":{"const":0},"secret_value_reads":{"const":0},"credential_store_enumerations":{"const":0},"credential_mutations":{"const":0},"db_connections":{"const":0},"db_writes":{"const":0},"runtime_mutations":{"const":0},"production_operations":{"const":0}}},
+    "validation":{"type":"object","additionalProperties":false,"required":["secret_values_displayed","source_state_unchanged"],"properties":{"secret_values_displayed":{"const":0},"source_state_unchanged":{"const":true}}}
+  },
+  "not":{"required":["value"]}
+}

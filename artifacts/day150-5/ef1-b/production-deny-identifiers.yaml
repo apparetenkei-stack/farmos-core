@@ -1,0 +1,64 @@
+schema_version: farmos.ef1-b.production-deny-identifiers.v2
+subday: Day150.5-B
+status: CURRENT_SURFACE_CLASS_INVENTORY
+records:
+  - deny_id: production-main-publication
+    class: PROTECTED_GIT_BRANCH
+    canonical_alias: origin/main
+    fingerprint: 09150dcb8a6e50d126190021b8eef9642d375b0f
+    owner: HUMAN_PRODUCT_OWNER
+    source: current Git baseline
+  - deny_id: prod-core-db-logical-target
+    class: SUPABASE_PRODUCTION_PROJECT_DB_CLASS
+    canonical_alias: farmos_core_prod
+    fingerprint: NOT_PERSISTED_RAW_ENDPOINT_PROHIBITED
+    owner: DEDICATED_RELEASE_RUNNER_FUTURE_BOUNDARY
+    source: farm_os_production_target_connection_authority.ts
+  - deny_id: core-production-endpoint-class
+    class: CORE_PRODUCTION_ENDPOINT_CLASS
+    canonical_alias: farmos-core-server-endpoint
+    fingerprint: ENDPOINT_VALUE_NOT_RETAINED
+    owner: FARMOS_CORE_ENDPOINT_OWNER
+    source: Windows response FarmOS Core endpoint configuration class
+  - deny_id: vercel-control-plane
+    class: VERCEL_CONTROL_PLANE
+    canonical_alias: vercel-deployment-authority
+    fingerprint: STORAGE_LOCATION_NOT_VERIFIED
+    owner: VERCEL_PROJECT_OWNER_NOT_PROVEN
+    source: Windows response
+  - deny_id: slack-production-target-class
+    class: SLACK_PRODUCTION_TARGET
+    canonical_alias: slack-app-credentials
+    fingerprint: STORAGE_LOCATION_NOT_VERIFIED
+    owner: SLACK_APP_OWNER_NOT_PROVEN
+    source: Windows response
+  - deny_id: github-ci-deployment-authority
+    class: CI_DEPLOYMENT_AUTHORITY
+    canonical_alias: github-ci-deployment-authority
+    fingerprint: STORAGE_LOCATION_NOT_VERIFIED
+    owner: GITHUB_REPOSITORY_ADMINISTRATOR_NOT_PROVEN
+    source: Windows response
+  - deny_id: windows-lm-studio-listener
+    class: LM_STUDIO_LAN_LISTENER
+    canonical_alias: lm-studio-listener-0.0.0.0-1234
+    fingerprint: RUNTIME_INVENTORY_ALIAS_ONLY
+    owner: WINDOWS_INTERACTIVE_LM_STUDIO_PROCESS_OWNER_NOT_PROVEN
+    source: Windows response
+  - deny_id: docker-privileged-daemon
+    class: DOCKER_PRIVILEGED_CONTROL_PLANE
+    canonical_alias: orbstack-docker-socket
+    fingerprint: NOT_PERSISTED
+    owner: LOCAL_RUNTIME_OPERATOR
+    source: Day150.5-A toolchain-manifest.lock
+  - deny_id: production-provider-endpoint-class
+    class: PRODUCTION_PROVIDER_ENDPOINT_CLASS
+    canonical_alias: registered-provider-endpoint-future-boundary
+    fingerprint: NOT_ESTABLISHED
+    owner: INFERENCE_POLICY_GATEWAY_OWNER_FUTURE_BOUNDARY
+    source: active R2 policy authority
+  - deny_id: credential-store-path-class
+    class: CREDENTIAL_STORE_PATH_CLASS
+    canonical_alias: macos-keychain-and-windows-credential-manager
+    fingerprint: CONTENT_NOT_ENUMERATED
+    owner: HUMAN_PRODUCT_OWNER
+    source: B scope prohibition

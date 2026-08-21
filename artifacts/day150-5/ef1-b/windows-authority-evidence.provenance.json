@@ -1,0 +1,11 @@
+{
+  "schema_version": "farmos.ef1-b.windows-authority-evidence.provenance.v1",
+  "classification": "EXTERNAL_READ_ONLY_REDACTED_AUTHORITY_EVIDENCE",
+  "external_response_path": "/Users/hayate/farmos-authority-inputs/ef1-b/windows/FarmOS_Day150_5_B_Windows_Authority_Evidence_2026-08-21.json",
+  "request_schema_sha256": "b7d7f16aef7866d5034baf204ba4a97a767357fe60e6416521dc87a1da84cf83",
+  "response_sha256": "86640cc5e94c590010154fe2aac67f898f8695344d17b6cbd7fbea50f0e05ea7",
+  "response_generated_at": "2026-08-21T13:15:18.5702690Z",
+  "repository_copy_retained": false,
+  "reconciled_at": "NOT_RECORDED_NO_TRUSTED_CLOCK_EVIDENCE",
+  "validation": {"json_parse":"PASS","schema_validation":"PASS","credential_authority_ids_unique":true,"secret_value_fields":0,"secret_value_exposure":0,"all_operation_counts_zero":true}
+}

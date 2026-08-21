@@ -1,0 +1,215 @@
+schema_version: farmos.ef1-b.authority-graph.v2
+subday: Day150.5-B
+status: RECONCILED_CURRENT_STATE_INVENTORY_PROPOSAL_ONLY
+external_windows_provenance: windows-authority-evidence.provenance.json
+current_state:
+  principals:
+    - id: human-product-owner
+      authority: approval of credentials, policy changes, production release, and roadmap activation
+      production_credential_visibility: HUMAN_APPROVAL_REQUIRED
+    - id: codex
+      authority: repository evidence only
+      can_reference_location: EVIDENCE_BACKED_ONLY
+      can_read_secret_value: NOT_ASSERTED_NO_EVIDENCE
+      can_use_authority: NO_PRODUCTION_AUTHORITY
+      production_credential_visibility: EVIDENCE_BACKED_ONLY_NOT_ASSERTED_READABLE
+    - id: qwen-local-model
+      authority: no independently established credential or egress authority
+      can_reference_location: EVIDENCE_BACKED_ONLY
+      can_read_secret_value: NOT_ASSERTED_NO_EVIDENCE
+      can_use_authority: NOT_AUTHORIZED
+      production_credential_visibility: EVIDENCE_BACKED_ONLY_NOT_ASSERTED_READABLE
+    - id: hermes
+      authority: local adapter supports configured mock or Ollama selection; inventory frozen
+      egress_authority: 0
+      can_use_authority: NO_INDEPENDENT_EGRESS_AUTHORITY
+    - id: model-provider-adapter
+      authority: adapter only
+      policy_widening_authority: false
+    - id: model-router
+      authority: NOT_IMPLEMENTED
+      can_widen_allowed_provider_set: false
+    - id: inference-policy-gateway
+      authority: POLICY_GATEWAY_NOT_PRESENT
+      target_role: FIRST_CLASS_AUTHORITY_BOUNDARY
+    - id: tenant-installation-policy
+      current_normative_owner: VERIFIED_INSTALLATION_FARM_SCOPE
+      client_selectable_tenant: false
+      runtime_binding: NOT_YET_FULLY_PROVEN
+    - id: provider-assurance-registry
+      current_state: NOT_ESTABLISHED
+      provider_presence_authorizes_use: false
+    - id: farming-app-server
+      current_route: CONFIGURED_FARMOS_CORE_HERMES_ROUTE
+      app_direct_lm_studio_path: NO_APP_DIRECT_PATH_FOUND
+    - id: lm-studio-local-server
+      version: 0.4.21+2
+      listener: LAN_LISTENER_0.0.0.0:1234
+      authentication: AUTHENTICATION_NOT_ESTABLISHED
+      classification: CURRENT_RUNTIME_INVENTORY_FINDING_IEG_RUNTIME_READY_GAP
+target_state:
+  production_credential_visibility:
+    codex: 0
+    qwen_local_model: 0
+  inference_path:
+    - Inference Request
+    - verified installation/farm scope
+    - classification
+    - purpose
+    - policy
+    - redaction/minimization
+    - Allowed Provider Set
+    - Model Router
+    - registered Provider
+  invariants:
+    hermes_egress_authority: 0
+    model_provider_adapter_policy_widening_authority: false
+    model_router_cannot_widen_allowed_provider_set: true
+    policy_gateway: FIRST_CLASS_AUTHORITY_BOUNDARY
+    tenant_policy_owner: VERIFIED_INSTALLATION_FARM_SCOPE
+    client_selectable_tenant: false
+    provider_assurance_registry_presence_authorizes_use: false
+  control_ownership:
+    listener_exposure: WINDOWS_APP_RUNTIME_OWNER_WITH_HUMAN_APPROVAL
+    lm_studio_authentication: WINDOWS_APP_RUNTIME_OWNER_WITH_HUMAN_APPROVAL
+    policy_gateway_enforcement: INFERENCE_POLICY_GATEWAY_OWNER_EF1_H_I_J
+    direct_provider_bypass_prevention: NETWORK_PERMISSION_POLICY_OWNER_EF1_H
+    redaction_logging: EGRESS_AUDIT_OWNER_EF1_I_J
+routes:
+  - route_id: app-hermes-server-proxy
+    owner: FARMOS_CORE_ENDPOINT_OWNER
+    source_principal: FARMING_APP_SERVER_ROUTE
+    destination_class: FARMOS_CORE_HERMES_CONFIGURED_ENDPOINT
+    endpoint_owner: FARMOS_CORE_ENDPOINT_OWNER
+    credential_class: farmos-core-daily-brief-token
+    data_classification_state: NOT_ESTABLISHED
+    policy_gateway_state: POLICY_GATEWAY_NOT_PRESENT
+    router_state: NOT_APPLICABLE_CURRENT_ROUTE
+    fallback_owner: NOT_ESTABLISHED
+    redaction_owner: NOT_ESTABLISHED
+    logging_owner: NOT_ESTABLISHED
+    external_egress_classification: CURRENT_ROUTE_NOT_R2_EGRESS_APPROVED
+    production_status: ENDPOINT_CLASS_NOT_PROVEN_PRODUCTION
+    evidence: Windows response route app-hermes-server-proxy
+  - route_id: app-active-projection-server-proxy
+    owner: FARMOS_CORE_ENDPOINT_OWNER
+    source_principal: FARMING_APP_SERVER_ROUTE
+    destination_class: FARMOS_CORE_OPERATIONAL_PROJECTION
+    endpoint_owner: FARMOS_CORE_ENDPOINT_OWNER
+    credential_class: farmos-core-active-projection-token
+    data_classification_state: NOT_ESTABLISHED
+    policy_gateway_state: POLICY_GATEWAY_NOT_PRESENT
+    router_state: NOT_APPLICABLE_CURRENT_ROUTE
+    fallback_owner: NOT_ESTABLISHED
+    redaction_owner: NOT_ESTABLISHED
+    logging_owner: NOT_ESTABLISHED
+    external_egress_classification: CURRENT_ROUTE_NOT_R2_EGRESS_APPROVED
+    production_status: ENDPOINT_CLASS_NOT_PROVEN_PRODUCTION
+    evidence: Windows response route app-active-projection-server-proxy
+  - route_id: app-daily-brief-server-proxy
+    owner: FARMOS_CORE_ENDPOINT_OWNER
+    source_principal: FARMING_APP_SERVER_ROUTE
+    destination_class: FARMOS_CORE_DAILY_BRIEF_AND_PROPOSAL_API
+    endpoint_owner: FARMOS_CORE_ENDPOINT_OWNER
+    credential_class: farmos-core-daily-brief-token
+    data_classification_state: NOT_ESTABLISHED
+    policy_gateway_state: POLICY_GATEWAY_NOT_PRESENT
+    router_state: NOT_APPLICABLE_CURRENT_ROUTE
+    fallback_owner: NOT_ESTABLISHED
+    redaction_owner: NOT_ESTABLISHED
+    logging_owner: NOT_ESTABLISHED
+    external_egress_classification: CURRENT_ROUTE_NOT_R2_EGRESS_APPROVED
+    production_status: ENDPOINT_CLASS_NOT_PROVEN_PRODUCTION
+    evidence: Windows response route app-daily-brief-server-proxy
+  - route_id: app-stable-changes-core-consumer
+    owner: FARMOS_CORE_ENDPOINT_OWNER
+    source_principal: FARMING_APP_SERVER_CONSUMER
+    destination_class: FARMOS_CORE_STABLE_CHANGES
+    endpoint_owner: FARMOS_CORE_ENDPOINT_OWNER
+    credential_class: farmos-core-stable-changes-token-pair
+    data_classification_state: NOT_ESTABLISHED
+    policy_gateway_state: POLICY_GATEWAY_NOT_PRESENT
+    router_state: NOT_APPLICABLE_CURRENT_ROUTE
+    fallback_owner: NOT_ESTABLISHED
+    redaction_owner: NOT_ESTABLISHED
+    logging_owner: NOT_ESTABLISHED
+    external_egress_classification: CURRENT_ROUTE_NOT_R2_EGRESS_APPROVED
+    production_status: ENDPOINT_CLASS_NOT_PROVEN_PRODUCTION
+    evidence: Windows response route app-stable-changes-core-consumer
+  - route_id: browser-supabase-client
+    owner: SUPABASE_PROJECT_OWNER_NOT_PROVEN
+    source_principal: BROWSER_CLIENT
+    destination_class: SUPABASE_MANAGED_BACKEND
+    endpoint_owner: SUPABASE_PROJECT_OWNER_NOT_PROVEN
+    credential_class: supabase-public-client-credentials
+    data_classification_state: NOT_ESTABLISHED
+    policy_gateway_state: NOT_APPLICABLE
+    router_state: NOT_APPLICABLE
+    fallback_owner: NOT_ESTABLISHED
+    redaction_owner: APPLICATION_OWNER_NOT_PROVEN
+    logging_owner: APPLICATION_OWNER_NOT_PROVEN
+    external_egress_classification: BROWSER_DIRECT_EXTERNAL_DATA_ROUTE
+    production_status: PROJECT_NOT_PROVEN_PRODUCTION
+    evidence: Windows response route browser-supabase-client
+  - route_id: browser-open-meteo-weather
+    owner: OPEN_METEO
+    source_principal: BROWSER_CLIENT_PAGE
+    destination_class: EXTERNAL_WEATHER_HTTP_PROVIDER
+    endpoint_owner: OPEN_METEO
+    credential_class: NONE_REPORTED
+    data_classification_state: NOT_ESTABLISHED
+    policy_gateway_state: NOT_APPLICABLE
+    router_state: NOT_APPLICABLE
+    fallback_owner: NOT_ESTABLISHED
+    redaction_owner: APPLICATION_OWNER_NOT_PROVEN
+    logging_owner: APPLICATION_OWNER_NOT_PROVEN
+    external_egress_classification: BROWSER_DIRECT_EXTERNAL_HTTP
+    production_status: NOT_PROVEN
+    evidence: Windows response route browser-open-meteo-weather
+  - route_id: famic-server-fetch-proxy
+    owner: FAMIC
+    source_principal: FARMING_APP_SERVER_ROUTE
+    destination_class: EXTERNAL_PUBLIC_DATA_HTTP_PROVIDER
+    endpoint_owner: FAMIC
+    credential_class: NONE_REPORTED
+    data_classification_state: NOT_ESTABLISHED
+    policy_gateway_state: POLICY_GATEWAY_NOT_PRESENT
+    router_state: NOT_APPLICABLE
+    fallback_owner: NOT_ESTABLISHED
+    redaction_owner: APPLICATION_OWNER_NOT_PROVEN
+    logging_owner: APPLICATION_OWNER_NOT_PROVEN
+    external_egress_classification: SERVER_DIRECT_EXTERNAL_HTTP
+    production_status: NOT_PROVEN
+    evidence: Windows response route famic-server-fetch-proxy
+  - route_id: core-hermes-local-provider-adapter
+    owner: CORE_RUNTIME_OWNER
+    source_principal: HERMES_PROVIDER_ADAPTER
+    destination_class: CONFIGURED_LOCAL_PROVIDER_ENDPOINT
+    endpoint_owner: LOCAL_PROVIDER_OWNER_NOT_PROVEN
+    credential_class: hermes-ollama-runtime-config
+    data_classification_state: NOT_ESTABLISHED
+    policy_gateway_state: POLICY_GATEWAY_NOT_PRESENT
+    router_state: NOT_IMPLEMENTED
+    fallback_owner: NOT_ESTABLISHED
+    redaction_owner: NOT_ESTABLISHED
+    logging_owner: NOT_ESTABLISHED
+    external_egress_classification: INVENTORIED_LOCAL_PROVIDER_ROUTE_NOT_R2_APPROVED
+    production_status: NOT_PROVEN
+    evidence: existing Core Hermes adapter source
+provider_assurance:
+  - provider_class: FARMOS_CORE_HERMES
+    assurance_state: REQUIRES_LATER_VERIFICATION
+  - provider_class: LM_STUDIO_LOCAL
+    assurance_state: NOT_ESTABLISHED
+  - provider_class: OLLAMA_LOCAL
+    assurance_state: NOT_ESTABLISHED
+  - provider_class: SUPABASE_MANAGED_BACKEND
+    assurance_state: REQUIRES_LATER_VERIFICATION
+  - provider_class: OPEN_METEO_PUBLIC_HTTP
+    assurance_state: NOT_ESTABLISHED
+  - provider_class: FAMIC_PUBLIC_HTTP
+    assurance_state: NOT_ESTABLISHED
+operation_counts:
+  production_mutations: 0
+  runtime_mutations: 0
+  credential_mutations: 0
