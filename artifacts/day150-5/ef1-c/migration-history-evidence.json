@@ -1,0 +1,220 @@
+{
+  "schema_version": "farmos.day150-5-c.migration-history-evidence.v2",
+  "evidence_status": "RETAINED_AND_HASH_BOUND__R4_11_SUCCESS",
+  "r4_11_result_sha256": "e59d5276bec6afe2b1ae71dfd14e321b63c5dfd2792af70caba053c4a92cb7a8",
+  "r4_11_audit_sha256": "ea2c2368c2d97fb13006ba4f3155ad0baf853001e18c08f979a97e886fd27e57",
+  "r4_11_journal_sha256": "dbb3e309f974ae028ab824c4f4248578938d65fb0857fee9ffcf0c605a5614f9",
+  "r4_11_manifest_sha256": "7b0f8edfc3980646480d5df54c5621ee75ae2a0f9b946015f52d756a0d6787d5",
+  "canonical_snapshot_sha256": "a7c0cd5f6d80f86f3ffc386dc8193a4e3ef65745c7fd63a7089429e9018ef463",
+  "production_migration_identity_sot": "EXECUTED_MIGRATION_IDENTITY_SOT",
+  "git_migration_sql_body_sot": "MIGRATION_SQL_BODY_SOT",
+  "production_sql_body_equality": "NOT_ESTABLISHED",
+  "production_sql_body_equality_basis": "retained Production history establishes migration identity/version only; authoritative SQL bodies are retained in Git timestamp migration sources",
+  "farming_app_git_head": "b8dc5438aa6f28fb502f371f3c47d7abbd510779",
+  "comparison_complete": true,
+  "production_history_count": 19,
+  "git_timestamp_migration_count": 24,
+  "exact_overlap_count": 19,
+  "production_only_count": 0,
+  "migration_identity_mismatch_count": 0,
+  "unsupported_sql_body_equality_claim_count": 0,
+  "migration_order_anomaly_count": 0,
+  "migration_duplicate_count": 0,
+  "production_history_versions": [
+    "20260618121722",
+    "20260703140000",
+    "20260707183000",
+    "20260708123347",
+    "20260708124706",
+    "20260708134000",
+    "20260708150000",
+    "20260708160000",
+    "20260708160900",
+    "20260708162000",
+    "20260712000000",
+    "20260722000000",
+    "20260722000001",
+    "20260724000000",
+    "20260727000000",
+    "20260728000000",
+    "20260728120000",
+    "20260806000000",
+    "20260807000000"
+  ],
+  "git_timestamp_migration_versions": [
+    "20260618121722",
+    "20260703140000",
+    "20260707183000",
+    "20260708123347",
+    "20260708124706",
+    "20260708134000",
+    "20260708150000",
+    "20260708160000",
+    "20260708160900",
+    "20260708162000",
+    "20260712000000",
+    "20260722000000",
+    "20260722000001",
+    "20260724000000",
+    "20260724000001",
+    "20260724000002",
+    "20260724000003",
+    "20260724000004",
+    "20260724000005",
+    "20260727000000",
+    "20260728000000",
+    "20260728120000",
+    "20260806000000",
+    "20260807000000"
+  ],
+  "git_only": [
+    {
+      "migration_timestamp": "20260724000001",
+      "path": "supabase/migrations/20260724000001_add_work_plan_consumer.sql",
+      "git_presence": true,
+      "production_history_presence": false,
+      "schema_effect_relationship": "NOT_DETERMINISTIC_FROM_RETAINED_EVIDENCE",
+      "classification": "HISTORICAL_SOT_DIVERGENCE",
+      "reconciliation_state": "REQUIRES_DAY150_5_D_RECONCILIATION_PROPOSAL",
+      "explanation": "The retained Windows comparison proves Git presence and absence from production migration history, but retains no migration body or deterministic production effect binding. It is not labeled pending, represented, or production drift in C.",
+      "later_action_owner": "Day150.5-D reconciliation owner with Product Owner approval"
+    },
+    {
+      "migration_timestamp": "20260724000002",
+      "path": "supabase/migrations/20260724000002_add_work_plan_edit_revalidation.sql",
+      "git_presence": true,
+      "production_history_presence": false,
+      "schema_effect_relationship": "NOT_DETERMINISTIC_FROM_RETAINED_EVIDENCE",
+      "classification": "HISTORICAL_SOT_DIVERGENCE",
+      "reconciliation_state": "REQUIRES_DAY150_5_D_RECONCILIATION_PROPOSAL",
+      "explanation": "The retained Windows comparison proves Git presence and absence from production migration history, but retains no migration body or deterministic production effect binding. It is not labeled pending, represented, or production drift in C.",
+      "later_action_owner": "Day150.5-D reconciliation owner with Product Owner approval"
+    },
+    {
+      "migration_timestamp": "20260724000003",
+      "path": "supabase/migrations/20260724000003_fix_work_plan_edit_contract.sql",
+      "git_presence": true,
+      "production_history_presence": false,
+      "schema_effect_relationship": "NOT_DETERMINISTIC_FROM_RETAINED_EVIDENCE",
+      "classification": "HISTORICAL_SOT_DIVERGENCE",
+      "reconciliation_state": "REQUIRES_DAY150_5_D_RECONCILIATION_PROPOSAL",
+      "explanation": "The retained Windows comparison proves Git presence and absence from production migration history, but retains no migration body or deterministic production effect binding. It is not labeled pending, represented, or production drift in C.",
+      "later_action_owner": "Day150.5-D reconciliation owner with Product Owner approval"
+    },
+    {
+      "migration_timestamp": "20260724000004",
+      "path": "supabase/migrations/20260724000004_harden_work_plan_consumer_contract.sql",
+      "git_presence": true,
+      "production_history_presence": false,
+      "schema_effect_relationship": "NOT_DETERMINISTIC_FROM_RETAINED_EVIDENCE",
+      "classification": "HISTORICAL_SOT_DIVERGENCE",
+      "reconciliation_state": "REQUIRES_DAY150_5_D_RECONCILIATION_PROPOSAL",
+      "explanation": "The retained Windows comparison proves Git presence and absence from production migration history, but retains no migration body or deterministic production effect binding. It is not labeled pending, represented, or production drift in C.",
+      "later_action_owner": "Day150.5-D reconciliation owner with Product Owner approval"
+    },
+    {
+      "migration_timestamp": "20260724000005",
+      "path": "supabase/migrations/20260724000005_add_approval_execution_gateway.sql",
+      "git_presence": true,
+      "production_history_presence": false,
+      "schema_effect_relationship": "NOT_DETERMINISTIC_FROM_RETAINED_EVIDENCE",
+      "classification": "HISTORICAL_SOT_DIVERGENCE",
+      "reconciliation_state": "REQUIRES_DAY150_5_D_RECONCILIATION_PROPOSAL",
+      "explanation": "The retained Windows comparison proves Git presence and absence from production migration history, but retains no migration body or deterministic production effect binding. It is not labeled pending, represented, or production drift in C.",
+      "later_action_owner": "Day150.5-D reconciliation owner with Product Owner approval"
+    }
+  ],
+  "production_only": [],
+  "mismatch_sets": {
+    "name_match_version_mismatch": [],
+    "version_match_name_mismatch": [],
+    "ordering_anomalies": [],
+    "duplicates": {
+      "git_versions": [],
+      "git_names": [],
+      "production_versions": [],
+      "production_names": []
+    }
+  },
+  "migration_reconciliation_records": [
+    {"reconciliation_id": "C-RECON-GIT-ONLY-20260724000001", "migration_timestamp": "20260724000001", "owner": "Day150.5-D reconciliation owner with Product Owner approval", "current_status": "REGISTERED_FOR_RECONCILIATION"},
+    {"reconciliation_id": "C-RECON-GIT-ONLY-20260724000002", "migration_timestamp": "20260724000002", "owner": "Day150.5-D reconciliation owner with Product Owner approval", "current_status": "REGISTERED_FOR_RECONCILIATION"},
+    {"reconciliation_id": "C-RECON-GIT-ONLY-20260724000003", "migration_timestamp": "20260724000003", "owner": "Day150.5-D reconciliation owner with Product Owner approval", "current_status": "REGISTERED_FOR_RECONCILIATION"},
+    {"reconciliation_id": "C-RECON-GIT-ONLY-20260724000004", "migration_timestamp": "20260724000004", "owner": "Day150.5-D reconciliation owner with Product Owner approval", "current_status": "REGISTERED_FOR_RECONCILIATION"},
+    {"reconciliation_id": "C-RECON-GIT-ONLY-20260724000005", "migration_timestamp": "20260724000005", "owner": "Day150.5-D reconciliation owner with Product Owner approval", "current_status": "REGISTERED_FOR_RECONCILIATION"}
+  ],
+  "timestamp_external_sql": {
+    "source_artifact": "legacy-sql-classification.csv",
+    "A": 0,
+    "B": 6,
+    "C": 0,
+    "D": 2,
+    "UNCLASSIFIED": 0,
+    "b_production_relationship": "production metadata supports the effect, but timestamp history does not record the filename",
+    "d_production_relationship": "current function identity exists, but retained metadata cannot prove the precursor source body was executed",
+    "no_apply_or_repair_in_c": true
+  },
+  "app_owned_drift": {
+    "unexplained_count": 0,
+    "basis": "R4.11 comparison found no public-schema difference; the five observed changes are platform-managed realtime metadata; B and D timestamp-external findings are individually classified; Git-only history divergence is individually registered for Day150.5-D.",
+    "unresolved_items": []
+  },
+  "metadata_comparison": {
+    "earlier_sanitized_result_sha256": "5891a37a378dccb68ca793f48e145d5a9d6842306bb2b1bf7e153e4ccbc0dcd7",
+    "r4_11_sanitized_result_sha256": "e59d5276bec6afe2b1ae71dfd14e321b63c5dfd2792af70caba053c4a92cb7a8",
+    "counts_equal": true,
+    "semantic_difference_count": 5,
+    "classification": "MANAGED_OR_PLATFORM_METADATA_DRIFT",
+    "paths": ["relations", "columns", "constraints", "indexes", "grants"],
+    "platform_relation_transition": "realtime.messages_2026_08_18 -> realtime.messages_2026_08_25",
+    "app_owned_difference_count": 0,
+    "unexplained_app_owned_drift_count": 0,
+    "reconciliation_id": "C-RECON-R4-11-MANAGED-METADATA-DRIFT"
+  },
+  "reconciliation_proposals": [
+    {
+      "id": "C-RECON-GIT-ONLY-CHAIN",
+      "class": "CANONICAL_MIGRATION_CHAIN_RECONCILIATION",
+      "scope": "the five Git-only timestamp migrations",
+      "owner": "Day150.5-D reconciliation owner",
+      "status": "PROPOSAL_ONLY_DEFERRED",
+      "production_mutation_authorized": false
+    },
+    {
+      "id": "C-RECON-B-LEGACY-REPRESENTATION",
+      "class": "B_CLASSIFIED_LEGACY_SQL_CANONICAL_REPRESENTATION",
+      "scope": "the six B-classified timestamp-external SQL entries",
+      "owner": "Day150.5-D reconciliation owner",
+      "status": "PROPOSAL_ONLY_DEFERRED",
+      "production_mutation_authorized": false
+    },
+    {
+      "id": "C-RECON-D-LEGACY-TREATMENT",
+      "class": "D_CLASSIFIED_LEGACY_SQL_DOCUMENTATION_TREATMENT",
+      "scope": "the two D-classified timestamp-external SQL entries",
+      "owner": "Day150.5-D reconciliation owner",
+      "status": "PROPOSAL_ONLY_DEFERRED",
+      "production_mutation_authorized": false
+    },
+    {
+      "id": "C-RECON-FRESH-REPLAY",
+      "class": "FRESH_REPLAY_REQUIREMENT",
+      "scope": "reproducible baseline work after C classification",
+      "owner": "Day150.5-D reconciliation owner",
+      "status": "PROPOSAL_ONLY_DEFERRED",
+      "production_mutation_authorized": false
+    }
+  ],
+  "no_repair_action": true,
+  "operation_counts": {
+    "production_ddl": 0,
+    "production_dml": 0,
+    "migration_apply": 0,
+    "migration_repair": 0,
+    "db_push": 0,
+    "production_reset": 0,
+    "business_row_reads": 0,
+    "codex_production_connections": 0,
+    "credential_value_exposure": 0
+  }
+}

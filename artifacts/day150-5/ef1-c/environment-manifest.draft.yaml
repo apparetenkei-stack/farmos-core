@@ -1,0 +1,104 @@
+schema_version: farmos.day150-5-c.environment-manifest.v2
+evidence_status: INVENTORIED_WITH_RETAINED_EVIDENCE_BOUNDARIES
+source:
+  evidence_root: /Users/hayate/farmos-authority-inputs/ef1-c/windows/FarmOS_Day150_5_C_Production_Discovery_Final_2026-08-22
+  source_file: environment-manifest.draft.yaml
+  source_status: retained Windows draft; absence is not inferred as disabled or unconfigured
+review_rule: NOT_ESTABLISHED_FROM_RETAINED_EVIDENCE is a truthful coverage result and requires an owned reconciliation record
+categories:
+  auth_provider_configuration:
+    category_id: auth_provider_configuration
+    status: NOT_ESTABLISHED_FROM_RETAINED_EVIDENCE
+    evidence_source: retained Windows environment-manifest.draft.yaml; no provider configuration metadata retained
+    confidence: HIGH_FOR_EVIDENCE_ABSENCE
+    current_owner: FarmOS Core C evidence owner
+    reconciliation_owner: Day150.5-D non-DB verification owner + Product Owner
+    reconciliation_record_id: C-RECON-NONDB-AUTH-PROVIDER
+    future_gate: Day150.5-D
+    notes: No provider configuration fact is asserted; no production connection or credential read was performed by Core reconciliation.
+  storage_buckets:
+    category_id: storage_buckets
+    status: NOT_ESTABLISHED_FROM_RETAINED_EVIDENCE
+    evidence_source: retained Windows environment-manifest.draft.yaml; no bucket inventory retained
+    confidence: HIGH_FOR_EVIDENCE_ABSENCE
+    current_owner: FarmOS Core C evidence owner
+    reconciliation_owner: Day150.5-D non-DB verification owner + Product Owner
+    reconciliation_record_id: C-RECON-NONDB-STORAGE-BUCKETS
+    future_gate: Day150.5-D
+    notes: Bucket existence, configuration, and policy are not inferred from schema metadata.
+  storage_policies:
+    category_id: storage_policies
+    status: NOT_ESTABLISHED_FROM_RETAINED_EVIDENCE
+    evidence_source: retained Windows environment-manifest.draft.yaml; migration identity is not configuration proof
+    confidence: HIGH_FOR_EVIDENCE_ABSENCE
+    current_owner: FarmOS Core C evidence owner
+    reconciliation_owner: Day150.5-D non-DB verification owner + Product Owner
+    reconciliation_record_id: C-RECON-NONDB-STORAGE-POLICIES
+    future_gate: Day150.5-D
+    notes: No storage policy inventory is retained.
+  edge_functions:
+    category_id: edge_functions
+    status: NOT_ESTABLISHED_FROM_RETAINED_EVIDENCE
+    evidence_source: retained Windows environment-manifest.draft.yaml; no Edge Function inventory retained
+    confidence: HIGH_FOR_EVIDENCE_ABSENCE
+    current_owner: FarmOS Core C evidence owner
+    reconciliation_owner: Day150.5-D non-DB verification owner + Product Owner
+    reconciliation_record_id: C-RECON-NONDB-EDGE-FUNCTIONS
+    future_gate: Day150.5-D
+    notes: No function deployment or runtime fact is asserted.
+  edge_function_secret_presence_metadata:
+    category_id: edge_function_secret_presence_metadata
+    status: NOT_ESTABLISHED_FROM_RETAINED_EVIDENCE
+    evidence_source: retained Windows environment-manifest.draft.yaml; no secret-presence metadata retained
+    confidence: HIGH_FOR_EVIDENCE_ABSENCE
+    current_owner: FarmOS Core C evidence owner
+    reconciliation_owner: Day150.5-D non-DB verification owner + Product Owner
+    reconciliation_record_id: C-RECON-NONDB-EDGE-SECRET-METADATA
+    future_gate: Day150.5-D
+    notes: "value_access: NOT_PERFORMED; secret values were not read, copied, or exposed."
+  realtime:
+    category_id: realtime
+    status: REQUIRES_LATER_VERIFICATION
+    evidence_source: R4.11 sanitized metadata result and approved publication metadata; service-level configuration is not retained
+    confidence: MEDIUM
+    current_owner: FarmOS Core C evidence owner
+    reconciliation_owner: Day150.5-D non-DB verification owner + Product Owner
+    reconciliation_record_id: C-RECON-NONDB-REALTIME
+    future_gate: Day150.5-D
+    notes: The observed partition transition is classified as managed/platform metadata drift; it does not establish service-level Realtime configuration.
+  cron:
+    category_id: cron
+    status: NOT_ESTABLISHED_FROM_RETAINED_EVIDENCE
+    evidence_source: retained Windows environment-manifest.draft.yaml; no cron or scheduled-job inventory retained
+    confidence: HIGH_FOR_EVIDENCE_ABSENCE
+    current_owner: FarmOS Core C evidence owner
+    reconciliation_owner: Day150.5-D non-DB verification owner + Product Owner
+    reconciliation_record_id: C-RECON-NONDB-CRON
+    future_gate: Day150.5-D
+    notes: No scheduled-job fact is asserted.
+  webhook_integration_configuration:
+    category_id: webhook_integration_configuration
+    status: NOT_ESTABLISHED_FROM_RETAINED_EVIDENCE
+    evidence_source: retained Windows environment-manifest.draft.yaml; no webhook or integration inventory retained
+    confidence: HIGH_FOR_EVIDENCE_ABSENCE
+    current_owner: FarmOS Core C evidence owner
+    reconciliation_owner: Day150.5-D non-DB verification owner + Product Owner
+    reconciliation_record_id: C-RECON-NONDB-WEBHOOKS
+    future_gate: Day150.5-D
+    notes: No endpoint, recipient, or integration configuration fact is asserted.
+coverage:
+  required_categories: 8
+  reviewed_categories: 8
+  unreviewed_categories: 0
+  verified_configuration_categories: 0
+  not_established_categories: 7
+  requires_later_verification_categories: 1
+  unknown_categories_registered: 8
+  fabricated_configuration_claims: 0
+operation_boundary:
+  production_ddl: 0
+  production_dml: 0
+  migration_mutation: 0
+  business_row_reads: 0
+  credential_value_exposure: 0
+  changes_authorized: false

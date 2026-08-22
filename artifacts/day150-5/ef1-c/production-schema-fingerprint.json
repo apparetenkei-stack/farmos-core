@@ -1,0 +1,113 @@
+{
+  "schema_fingerprint_version": "farmos.day150-5-c.production-schema-fingerprint.v2",
+  "evidence_status": "RETAINED_AND_HASH_BOUND__R4_11_SUCCESS",
+  "source_execution": {
+    "evidence_root": "/Users/hayate/farmos-authority-inputs/ef1-c/windows/FarmOS_Day150_5_C_Production_Discovery_Supplement_2026-08-22",
+    "execution_root": "r4-11-session-pooler-production-execution-20260822T065537Z",
+    "execution_nonce": "ba6bbb56-c9c6-48b1-86e0-ca527b7bdcc7",
+    "target_endpoint_class": "SUPABASE_SESSION_POOLER_ENDPOINT",
+    "target_match": true,
+    "query_id": "day150_5_c_catalog_metadata_snapshot_v1",
+    "query_sha256": "3d5a37ace1be8238baa139d97ef8898f63d65588274dec33489472a26181e87d",
+    "query_source_sha256": "141275654e45a46cafe91e2246b97f6799d442bc6eede60b32cc0a4186e6aa42",
+    "approved_statement_manifest_path": "production-readonly-approved-statement-manifest-r4-11.json",
+    "approved_statement_manifest_sha256": "855ceaaf9ff1f2a0e8201a6b3c5d53106e58c51b2104c7784ae02eb36c0bd333",
+    "result_path": "r4-11-session-pooler-production-execution-20260822T065537Z/execution/authorized-reconnect-ba6bbb56-c9c6-48b1-86e0-ca527b7bdcc7-r4-11.result.sanitized.json",
+    "result_sha256": "e59d5276bec6afe2b1ae71dfd14e321b63c5dfd2792af70caba053c4a92cb7a8",
+    "audit_path": "r4-11-session-pooler-production-execution-20260822T065537Z/execution/authorized-reconnect-ba6bbb56-c9c6-48b1-86e0-ca527b7bdcc7-r4-11.audit.json",
+    "audit_sha256": "ea2c2368c2d97fb13006ba4f3155ad0baf853001e18c08f979a97e886fd27e57",
+    "journal_path": "r4-11-session-pooler-production-execution-20260822T065537Z/execution/authorized-reconnect-ba6bbb56-c9c6-48b1-86e0-ca527b7bdcc7-r4-11.journal.jsonl",
+    "journal_sha256": "dbb3e309f974ae028ab824c4f4248578938d65fb0857fee9ffcf0c605a5614f9",
+    "execution_manifest_path": "r4-11-session-pooler-production-execution-20260822T065537Z/execution/authorized-reconnect-ba6bbb56-c9c6-48b1-86e0-ca527b7bdcc7-r4-11.manifest.json",
+    "execution_manifest_sha256": "7b0f8edfc3980646480d5df54c5621ee75ae2a0f9b946015f52d756a0d6787d5"
+  },
+  "result_contract": "DAY150.5-C/1.0",
+  "postgresql_version": "17.6",
+  "migration_history_count": 19,
+  "generated_reconciled_timestamp_semantics": "LOCAL_CORE_RECONCILIATION_TIME_ONLY; NOT A PRODUCTION OBSERVATION CLOCK",
+  "ownership_rule": "APP_OWNED is the Git-owned public schema and its public-schema objects. PLATFORM_SUPABASE_MANAGED is every non-public snapshot schema and platform-only extension; those objects are excluded from APP_OWNED fingerprints.",
+  "ownership": {
+    "APP_OWNED": ["public"],
+    "PLATFORM_SUPABASE_MANAGED": ["auth", "extensions", "graphql", "graphql_public", "pgbouncer", "realtime", "storage", "supabase_migrations", "vault"],
+    "unclassified": []
+  },
+  "production_counts": {
+    "grants": 2410,
+    "columns": 802,
+    "indexes": 177,
+    "schemas": 10,
+    "triggers": 16,
+    "functions": 122,
+    "relations": 81,
+    "extensions": 5,
+    "constraints": 220,
+    "publications": 2,
+    "rls_policies": 62,
+    "migration_history": 19
+  },
+  "app_owned": {
+    "ownership_label": "APP_OWNED",
+    "schema": "public",
+    "counts": {"relations": 33, "columns": 337, "constraints": 88, "indexes": 46, "functions": 24, "triggers": 11, "rls_policies": 58, "grants": 996, "publications": 1},
+    "category_digests": {
+      "relations": "385293cb1f0b86ad111a1ec11431414cfd7b117748a4bef37a2fffe1158dab29",
+      "columns": "b6b3692daf6613909df4622efb5511cecdd011f776b730099c5067eb3fba41ec",
+      "constraints": "fc39a6a582dd456d307fc567adbdc9e3294d54928cfeba000854db3242d14844",
+      "indexes": "f0dc0566cfcd6cccdad8727bae84c84df2b6656330aeec0572e921ce2439d0fc",
+      "functions": "d8741c75c91d88648a5d99e67271f36bc05d54bb70633b27fd089568495829f4",
+      "triggers": "cbd9d1359820af7d1e02eeee8af1097a54949291d918afe332f5db1cb478a0a4",
+      "rls_policies": "092e3a2509f200b13990c7e4f380285cf97394727e2f4ed80e60dd485df56346",
+      "grants": "2a824186fc8bbcd686d7f7b8e0e7770a8c3d15e0161413fe80fccc29ffe9fc8e",
+      "publications": "ab5a2ff04a8553b4915143617b20aac08ead7f1824d3f95e237fa63a796d609b"
+    }
+  },
+  "APP_OWNED_canonical_schema_fingerprint": "a11ff4532126c06d3c90c8548ff121e0494876f4e1365da6ed51468a40bd1cd1",
+  "app_owned_fingerprint_comparison": {
+    "prior_fingerprint": "a11ff4532126c06d3c90c8548ff121e0494876f4e1365da6ed51468a40bd1cd1",
+    "r4_11_fingerprint": "a11ff4532126c06d3c90c8548ff121e0494876f4e1365da6ed51468a40bd1cd1",
+    "disposition": "REPRODUCED_SAME_APP_OWNED_FINGERPRINT",
+    "comparison_basis": "same public-schema ownership rule and category canonicalization; R4.11 public objects equal the prior sanitized snapshot",
+    "direct_comparison": "ESTABLISHED",
+    "unexplained_app_owned_drift_count": 0
+  },
+  "metadata_comparison": {
+    "earlier_snapshot_role": "earlier canonical/sanitized production metadata result",
+    "earlier_sanitized_result_sha256": "5891a37a378dccb68ca793f48e145d5a9d6842306bb2b1bf7e153e4ccbc0dcd7",
+    "earlier_canonical_snapshot_sha256": "a7c0cd5f6d80f86f3ffc386dc8193a4e3ef65745c7fd63a7089429e9018ef463",
+    "r4_11_result_sha256": "e59d5276bec6afe2b1ae71dfd14e321b63c5dfd2792af70caba053c4a92cb7a8",
+    "comparison_basis": "earlier.result versus R4.11 sanitized result; wrapper/provenance fields excluded",
+    "counts_equal": true,
+    "structural_difference_count": 5,
+    "semantic_difference_count": 5,
+    "differences": [
+      {"metadata_path": "relations", "change": "realtime.messages_2026_08_18 -> realtime.messages_2026_08_25", "classification": "MANAGED_OR_PLATFORM_METADATA_DRIFT"},
+      {"metadata_path": "columns", "change": "realtime.messages_2026_08_18 columns -> realtime.messages_2026_08_25 columns", "classification": "MANAGED_OR_PLATFORM_METADATA_DRIFT"},
+      {"metadata_path": "constraints", "change": "realtime.messages_2026_08_18 constraints -> realtime.messages_2026_08_25 constraints", "classification": "MANAGED_OR_PLATFORM_METADATA_DRIFT"},
+      {"metadata_path": "indexes", "change": "realtime.messages_2026_08_18 indexes -> realtime.messages_2026_08_25 indexes", "classification": "MANAGED_OR_PLATFORM_METADATA_DRIFT"},
+      {"metadata_path": "grants", "change": "realtime.messages_2026_08_18 grants -> realtime.messages_2026_08_25 grants", "classification": "MANAGED_OR_PLATFORM_METADATA_DRIFT"}
+    ],
+    "execution_context_metadata_difference_count": 0,
+    "ordering_or_serialization_difference_count": 0,
+    "app_owned_metadata_difference_count": 0,
+    "unexplained_app_owned_drift_count": 0,
+    "reconciliation_disposition": "EXPLAINED_AS_MANAGED_OR_PLATFORM_METADATA_DRIFT"
+  },
+  "platform_managed_exclusions": {
+    "schemas": ["auth", "extensions", "graphql", "graphql_public", "pgbouncer", "realtime", "storage", "supabase_migrations", "vault"],
+    "extensions": ["extensions.pg_stat_statements", "extensions.pgcrypto", "pg_catalog.plpgsql", "vault.supabase_vault", "extensions.uuid-ossp"],
+    "realtime_platform_relation": "realtime.messages in supabase_realtime_messages_publication"
+  },
+  "security_definer": {
+    "app_owned_count": 16,
+    "app_owned_function_identities_source": "prior reconciled C artifact; R4.11 comparison found no public-function difference"
+  },
+  "read_boundary": {
+    "business_row_reads": 0,
+    "production_DDL": 0,
+    "production_DML": 0,
+    "migration_mutations": 0,
+    "credential_value_exposure": 0,
+    "codex_production_connections_during_core_reconciliation": 0,
+    "source": "R4.11 retained sanitized result, audit, journal, manifest and prior sanitized result"
+  }
+}
