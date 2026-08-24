@@ -1,0 +1,30 @@
+{
+  "schema_version": "farmos.day150-5.cross-repo-completion-binding.v1",
+  "record_id": "farmos-day150-5-d-farming-app-completion-binding",
+  "subday": "Day150.5-D",
+  "status": "COMPLETE",
+  "formal_completion_status": "FORMALLY_COMPLETE",
+  "source_repository": "farming-app",
+  "source_branch": "main",
+  "completion_commit": "2a2c6d03d49eb762e12fb761285179f6b6756f46",
+  "parent_commit": "b8dc5438aa6f28fb502f371f3c47d7abbd510779",
+  "remote_main_adoption": "FAST_FORWARD_MAIN_ADOPTION_PASS",
+  "merge_commit": false,
+  "force_push": false,
+  "qualification": {
+    "canonical_migration_count": 24,
+    "canonical_migration_index_sha256": "497603261ebbcfad2dc35277d52a0eabd4efd446630b78c78330df873a78a6e9",
+    "final_qualification_sha256": "5ab76a8b4d13b2385017f219e9a4510bcc6ba02c98aa02036ed4f606435278f1",
+    "fresh_replay_consecutive_passes": 2,
+    "pgtap_passed": 43,
+    "pgtap_total": 43,
+    "production_operation_count": 0
+  },
+  "core_binding": {
+    "binding_kind": "EXTERNAL_REPOSITORY_COMPLETION_REFERENCE",
+    "core_git_object_required": false,
+    "next_subday": "Day150.5-E",
+    "e_entry_dependency_satisfied": true,
+    "e_implementation_started": false
+  }
+}
