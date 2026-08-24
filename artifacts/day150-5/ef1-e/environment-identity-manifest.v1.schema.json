@@ -1,0 +1,256 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:farmos:environment-identity-manifest:v1",
+  "title": "FarmOS Canonical Environment Identity Manifest v1",
+  "description": "Secret-free, cloud-independent identity contract. The manifest hash is an external pin and is not part of this payload.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "manifest_version",
+    "environment_id",
+    "environment_class",
+    "installation_id",
+    "farm_scope",
+    "business_timezone",
+    "core_endpoint_alias",
+    "allowed_endpoint_aliases",
+    "database_bindings",
+    "integration_identities",
+    "egress_environment_policy",
+    "contract_versions",
+    "provenance"
+  ],
+  "properties": {
+    "manifest_version": {
+      "const": "farmos.environment-identity-manifest.v1"
+    },
+    "environment_id": {
+      "enum": [
+        "apparetenkei-development-primary",
+        "apparetenkei-staging-primary",
+        "apparetenkei-production-primary"
+      ]
+    },
+    "environment_class": {
+      "enum": ["development", "staging", "production"]
+    },
+    "installation_id": {
+      "$ref": "#/$defs/boundedIdentifier"
+    },
+    "farm_scope": {
+      "$ref": "#/$defs/boundedIdentifier"
+    },
+    "business_timezone": {
+      "const": "Asia/Tokyo"
+    },
+    "core_endpoint_alias": {
+      "$ref": "#/$defs/endpointAlias"
+    },
+    "allowed_endpoint_aliases": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 32,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/endpointAlias"
+      }
+    },
+    "database_bindings": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["app_business", "core_operational_memory"],
+      "properties": {
+        "app_business": {
+          "$ref": "#/$defs/databaseBinding"
+        },
+        "core_operational_memory": {
+          "$ref": "#/$defs/databaseBinding"
+        }
+      }
+    },
+    "integration_identities": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/integrationIdentity"
+      }
+    },
+    "egress_environment_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["policy_ref", "policy_sha256"],
+      "properties": {
+        "policy_ref": {
+          "const": "docs/roadmap/v5-r2-authority/Inference_Data_Egress_Policy_Core_Candidate_R2.yaml"
+        },
+        "policy_sha256": {
+          "const": "sha256:c91586afcaeca130e7bcb4707cc066d07075b4b7d9d8d566644c5f041d7fb85f"
+        }
+      }
+    },
+    "contract_versions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["environment_identity_handshake"],
+      "properties": {
+        "environment_identity_handshake": {
+          "const": "farmos.environment-identity-handshake.v1"
+        }
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["authority_id", "revision", "source_commit", "source_path"],
+      "properties": {
+        "authority_id": {
+          "$ref": "#/$defs/boundedReference"
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 2147483647
+        },
+        "source_commit": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{40}$"
+        },
+        "source_path": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 240,
+          "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*://)[A-Za-z0-9._/-]+$"
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {"environment_class": {"const": "development"}},
+        "required": ["environment_class"]
+      },
+      "then": {
+        "properties": {
+          "environment_id": {"const": "apparetenkei-development-primary"},
+          "integration_identities": {
+            "contains": {
+              "type": "object",
+              "properties": {
+                "identity_alias": {"const": "slack-local-no-send"},
+                "delivery_mode": {"const": "NO_SEND"}
+              },
+              "required": ["identity_alias", "delivery_mode"]
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {"environment_class": {"const": "staging"}},
+        "required": ["environment_class"]
+      },
+      "then": {
+        "properties": {
+          "environment_id": {"const": "apparetenkei-staging-primary"},
+          "integration_identities": {
+            "contains": {
+              "type": "object",
+              "properties": {
+                "identity_alias": {"const": "slack-test-primary"},
+                "delivery_mode": {"const": "TEST"}
+              },
+              "required": ["identity_alias", "delivery_mode"]
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {"environment_class": {"const": "production"}},
+        "required": ["environment_class"]
+      },
+      "then": {
+        "properties": {
+          "environment_id": {"const": "apparetenkei-production-primary"},
+          "integration_identities": {
+            "contains": {
+              "type": "object",
+              "properties": {
+                "identity_alias": {"const": "slack-production-primary"},
+                "delivery_mode": {"const": "PRODUCTION"}
+              },
+              "required": ["identity_alias", "delivery_mode"]
+            }
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "boundedIdentifier": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+    },
+    "boundedReference": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$",
+      "not": {"pattern": "^[A-Za-z][A-Za-z0-9+.-]*://"}
+    },
+    "endpointAlias": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[a-z0-9][a-z0-9._:-]*$",
+      "not": {"pattern": "[*?]"}
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$"
+    },
+    "databaseBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "logical_name",
+        "provider_class",
+        "resource_fingerprint",
+        "migration_head",
+        "credential_class"
+      ],
+      "properties": {
+        "logical_name": {"$ref": "#/$defs/boundedIdentifier"},
+        "provider_class": {"$ref": "#/$defs/boundedIdentifier"},
+        "resource_fingerprint": {"$ref": "#/$defs/sha256"},
+        "migration_head": {"$ref": "#/$defs/boundedReference"},
+        "credential_class": {"$ref": "#/$defs/boundedIdentifier"}
+      }
+    },
+    "integrationIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["integration_class", "identity_alias", "delivery_mode"],
+      "properties": {
+        "integration_class": {"const": "slack"},
+        "identity_alias": {
+          "enum": [
+            "slack-local-no-send",
+            "slack-test-primary",
+            "slack-production-primary"
+          ]
+        },
+        "delivery_mode": {
+          "enum": ["NO_SEND", "TEST", "PRODUCTION"]
+        }
+      }
+    }
+  }
+}
