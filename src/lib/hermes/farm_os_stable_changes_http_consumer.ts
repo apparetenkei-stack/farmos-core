@@ -14,6 +14,11 @@ import {
   type FarmOsStableChangesPersistenceRepository,
   type FarmOsStableChangesScope,
 } from "./farm_os_stable_changes_persistence";
+import {
+  fetchFarmOsCoreEnvironmentIdentityBound,
+  type FarmOsCoreEnvironmentIdentityOutboundTarget,
+} from "./farm_os_core_environment_identity_outbound";
+import type { FarmOsCoreEnvironmentIdentityRuntime } from "./farm_os_core_environment_identity_runtime";
 
 export const FARM_OS_STABLE_CHANGES_HTTP_ENDPOINT =
   "/api/farmos-core/work-record-stable-changes" as const;
@@ -269,6 +274,10 @@ export class FarmOsStableChangesHttpConsumer {
     observedAt?: () => string;
     onObservation?: (value: FarmOsStableChangesHttpObservation) => void;
     limits?: { max_pages: number; max_changes: number };
+    environment_identity?: Readonly<{
+      runtime: FarmOsCoreEnvironmentIdentityRuntime;
+      target: FarmOsCoreEnvironmentIdentityOutboundTarget;
+    }>;
   }) {
     if (Object.keys(input.config).length !== 4 ||
       parseBaseUrl(input.config.base_url) !== input.config.base_url ||
@@ -327,7 +336,7 @@ export class FarmOsStableChangesHttpConsumer {
       let response: Response;
       try {
         started = this.now();
-        response = await this.fetchImpl(url, {
+        const init: RequestInit = {
           method: "GET",
           headers: {
             Accept: "application/json",
@@ -339,9 +348,22 @@ export class FarmOsStableChangesHttpConsumer {
           cache: "no-store",
           redirect: "manual",
           signal: controller.signal,
-        });
-      } catch {
+        };
+        const outbound = this.input.environment_identity === undefined ? null :
+          await fetchFarmOsCoreEnvironmentIdentityBound({
+            ...this.input.environment_identity,
+            url,
+            init,
+            fetchImpl: this.fetchImpl,
+          });
+        if (outbound?.result === "DENY") {
+          throw new FarmOsStableChangesHttpConsumerError("CONTRACT_INVALID");
+        }
+        response = outbound?.response ?? await this.fetchImpl(url, init);
+      } catch (error) {
         clearTimeout(timeout);
+        if (error instanceof FarmOsStableChangesHttpConsumerError &&
+          error.code === "CONTRACT_INVALID") throw error;
         this.observe({
           contract_version: FARM_OS_STABLE_CHANGES_CONTRACT_ID,
           status_class: "network", latency_ms: Math.max(0, this.now() - started),

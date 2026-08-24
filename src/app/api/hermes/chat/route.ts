@@ -21,6 +21,8 @@ import {
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+export const FARM_OS_HERMES_CHAT_ENVIRONMENT_HANDSHAKE_ACTIVATION =
+  "DEFERRED_PENDING_AUTHENTICATED_SERVER_TRANSPORT" as const;
 
 const API_BOUNDARY = "hermes_api_chat_minimal_boundary" as const;
 

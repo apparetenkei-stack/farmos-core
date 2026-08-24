@@ -17,6 +17,10 @@ import {
   createHermesDailyFarmBriefProposalProductionReviewAdapter,
   type HermesDailyFarmBriefProductionReviewAdapterResult,
 } from "./hermes_daily_farm_brief_proposal_review_production_adapter";
+import {
+  farmOsCoreEnvironmentIdentityRuntime,
+  type FarmOsCoreEnvironmentIdentityRuntime,
+} from "./farm_os_core_environment_identity_runtime";
 
 export const HERMES_DAY128_LOCAL_REVIEW_RUNTIME_ENABLED_ENV = "HERMES_DAY128_LOCAL_REVIEW_RUNTIME_ENABLED" as const;
 
@@ -44,6 +48,7 @@ export function createHermesDailyFarmBriefProposalReviewServerDependencies(input
   clock:()=>string;
   productionAdapterFactory?:typeof createHermesDailyFarmBriefProposalProductionReviewAdapter;
   localReviewRepositoryResolver?:typeof resolveHermesDay128LocalReviewRepository;
+  environmentIdentityRuntime?:FarmOsCoreEnvironmentIdentityRuntime;
 }):HermesDailyFarmBriefProposalReviewDecisionServiceDependencies{
   let productionAdapter:Promise<HermesDailyFarmBriefProductionReviewAdapterResult>|null=null;
   const resolveProduction=(authorization:Parameters<HermesDailyFarmBriefProposalReviewDecisionServiceDependencies["reviewRepository"]>[0])=>{
@@ -74,6 +79,7 @@ export function createHermesDailyFarmBriefProposalReviewServerDependencies(input
       return (await resolveProduction(authorization)).reviewRepository;
     },
     clock:input.clock,
+    environment_identity:input.environmentIdentityRuntime,
   };
 }
 
@@ -83,4 +89,5 @@ export const hermesDailyFarmBriefProposalReviewServerDependencies=createHermesDa
   authenticationProvider:identity.authenticationProvider,
   actorDirectory:identity.actorDirectory,
   clock:()=>new Date().toISOString(),
+  environmentIdentityRuntime:farmOsCoreEnvironmentIdentityRuntime,
 });

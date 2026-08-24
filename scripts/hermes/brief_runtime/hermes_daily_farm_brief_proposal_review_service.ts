@@ -25,6 +25,11 @@ import {
   type DailyFarmBriefProposalReviewDecisionRepository,
 } from "../../../src/lib/hermes/hermes_daily_farm_brief_proposal_review_decision_boundary";
 import { HERMES_DAY128_PROTECTED_PROPOSAL_ID } from "../../../src/lib/hermes/hermes_daily_farm_brief_proposal_review_decision_postgres_repository";
+import {
+  appendFarmOsCoreObservedIdentityHeaders,
+  type FarmOsCoreEnvironmentIdentityDecision,
+  type FarmOsCoreEnvironmentIdentityRuntime,
+} from "../../../src/lib/hermes/farm_os_core_environment_identity_runtime";
 
 export type HermesDailyFarmBriefProposalReviewServiceDependencies = {
   authenticate: (request: Request) => Promise<unknown>;
@@ -34,6 +39,7 @@ export type HermesDailyFarmBriefProposalReviewServiceDependencies = {
     actor: NonNullable<ReturnType<typeof parseHermesDailyFarmBriefAuthenticatedActorContext>>;
   }) => Promise<HermesDailyFarmBriefProposalReviewReadRepository | null>;
   clock: () => string;
+  environment_identity?: FarmOsCoreEnvironmentIdentityRuntime;
 };
 export type HermesDailyFarmBriefProposalReviewDecisionServiceDependencies = HermesDailyFarmBriefProposalReviewServiceDependencies & {
   reviewRepository: (authorization: {
@@ -49,20 +55,26 @@ function detailError(error:HermesDailyFarmBriefProposalReviewApiError):Response 
 async function authorize(request:Request,deps:HermesDailyFarmBriefProposalReviewServiceDependencies) {
   let authentication:ReturnType<typeof parseHermesDailyFarmBriefAuthenticationResult>;
   try{authentication=parseHermesDailyFarmBriefAuthenticationResult(await deps.authenticate(request));}catch{authentication=null;}
-  if(authentication===null||authentication.status!=="authenticated")return {error:"authentication_required" as const,authentication:null,actor:null};
+  if(authentication===null||authentication.status!=="authenticated")return {error:"authentication_required" as const,authentication:null,actor:null,identityDecision:null};
+  const identityDecision=deps.environment_identity?.verifyRequest({request,transport_authority:"authenticated_server_transport"})??null;
+  if(identityDecision?.decision==="STARTUP_BLOCK")return {error:"identity_unavailable" as const,authentication:null,actor:null,identityDecision:null};
+  if(identityDecision?.decision==="DENY")return {error:"access_forbidden" as const,authentication:null,actor:null,identityDecision:null};
   let actor:ReturnType<typeof parseHermesDailyFarmBriefAuthenticatedActorContext>;
   try{actor=parseHermesDailyFarmBriefAuthenticatedActorContext(await deps.resolveActorContext(authentication));}catch{actor=null;}
-  if(actor===null||actor.principal_ref!==authentication.principal_ref||actor.role!=="administrator"||actor.authorization_verified!==true||actor.allowed_scope_keys.length!==0)return {error:"access_forbidden" as const,authentication:null,actor:null};
-  return {error:null,authentication,actor};
+  if(actor===null||actor.principal_ref!==authentication.principal_ref||actor.role!=="administrator"||actor.authorization_verified!==true||actor.allowed_scope_keys.length!==0)return {error:"access_forbidden" as const,authentication:null,actor:null,identityDecision:null};
+  if(identityDecision?.decision==="ALLOW"&&deps.environment_identity?.verifyBoundUse({use:"database",...identityDecision.verified_scope}).decision!=="ALLOW")return {error:"access_forbidden" as const,authentication:null,actor:null,identityDecision:null};
+  return {error:null,authentication,actor,identityDecision};
 }
+
+function observed(response:Response,decision:FarmOsCoreEnvironmentIdentityDecision|null):Response{return decision===null?response:appendFarmOsCoreObservedIdentityHeaders(response,decision);}
 
 export async function serveHermesDailyFarmBriefProposalReviewList(input:{request:Request;dependencies:HermesDailyFarmBriefProposalReviewServiceDependencies}):Promise<Response>{
   if(input.request.method!=="GET")return listError("method_not_allowed");
   const request=createHermesDailyFarmBriefProposalReviewListRequest({request:input.request,clock:input.dependencies.clock});
   if(request===null)return listError("invalid_request");
-  const authorization=await authorize(input.request,input.dependencies);if(authorization.error!==null)return listError(authorization.error);
+  const authorization=await authorize(input.request,input.dependencies);if(authorization.error!==null)return listError(authorization.error==="identity_unavailable"?"proposal_read_unavailable":authorization.error);
   let repository:HermesDailyFarmBriefProposalReviewReadRepository|null;try{repository=await input.dependencies.readRepository({authentication:authorization.authentication!,actor:authorization.actor!});}catch{repository=null;}if(repository===null)return listError("proposal_read_unavailable");
-  try{const rows=await repository.listDailyBriefProposalRows(100);const proposals=rows.map((row)=>createHermesDailyFarmBriefProposalListItem({row,requestedAt:request.requested_at}));if(proposals.some((item)=>item===null))return listError("proposal_read_unavailable");return new Response(JSON.stringify(createHermesDailyFarmBriefProposalReviewListApiResponse({result:"ok",proposals:proposals as NonNullable<(typeof proposals)[number]>[]})),{status:200,headers:HEADERS});}catch{return listError("proposal_read_unavailable");}
+  try{const rows=await repository.listDailyBriefProposalRows(100);const proposals=rows.map((row)=>createHermesDailyFarmBriefProposalListItem({row,requestedAt:request.requested_at}));if(proposals.some((item)=>item===null))return listError("proposal_read_unavailable");return observed(new Response(JSON.stringify(createHermesDailyFarmBriefProposalReviewListApiResponse({result:"ok",proposals:proposals as NonNullable<(typeof proposals)[number]>[]})),{status:200,headers:HEADERS}),authorization.identityDecision);}catch{return listError("proposal_read_unavailable");}
 }
 
 export async function serveHermesDailyFarmBriefProposalReviewDetail(input:{request:Request;dependencies:HermesDailyFarmBriefProposalReviewServiceDependencies}):Promise<Response>{
@@ -70,9 +82,9 @@ export async function serveHermesDailyFarmBriefProposalReviewDetail(input:{reque
   const request=createHermesDailyFarmBriefProposalReviewDetailRequest({request:input.request,clock:input.dependencies.clock});
   if(request===null)return detailError("invalid_request");
   if(parseHermesDailyFarmBriefProposalSafeReference(request.proposal_ref)===null)return detailError("invalid_proposal_reference");
-  const authorization=await authorize(input.request,input.dependencies);if(authorization.error!==null)return detailError(authorization.error);
+  const authorization=await authorize(input.request,input.dependencies);if(authorization.error!==null)return detailError(authorization.error==="identity_unavailable"?"proposal_read_unavailable":authorization.error);
   let repository:HermesDailyFarmBriefProposalReviewReadRepository|null;try{repository=await input.dependencies.readRepository({authentication:authorization.authentication!,actor:authorization.actor!});}catch{repository=null;}if(repository===null)return detailError("proposal_read_unavailable");
-  try{const row=await repository.findDailyBriefProposalRowBySafeReference(request.proposal_ref);if(row===null)return detailError("proposal_not_found");const proposal=createHermesDailyFarmBriefProposalDetail({row,requestedAt:request.requested_at});if(proposal===null||proposal.proposal_ref!==request.proposal_ref)return detailError("proposal_read_unavailable");return new Response(JSON.stringify(createHermesDailyFarmBriefProposalReviewDetailApiResponse({result:"ok",proposal})),{status:200,headers:HEADERS});}catch{return detailError("proposal_read_unavailable");}
+  try{const row=await repository.findDailyBriefProposalRowBySafeReference(request.proposal_ref);if(row===null)return detailError("proposal_not_found");const proposal=createHermesDailyFarmBriefProposalDetail({row,requestedAt:request.requested_at});if(proposal===null||proposal.proposal_ref!==request.proposal_ref)return detailError("proposal_read_unavailable");return observed(new Response(JSON.stringify(createHermesDailyFarmBriefProposalReviewDetailApiResponse({result:"ok",proposal})),{status:200,headers:HEADERS}),authorization.identityDecision);}catch{return detailError("proposal_read_unavailable");}
 }
 
 function decisionResponse(status:number,body:{ok:false;error:HermesDailyFarmBriefProposalReviewDecisionHttpError}|{ok:true;proposal_ref:string;previous_status:"pending";status:"approved"|"rejected"|"needs_revision";updated_at:string}):Response{
@@ -95,6 +107,7 @@ export async function serveHermesDailyFarmBriefProposalReviewDecision(input:{req
 
   const authorization=await authorize(input.request,input.dependencies);
   if(authorization.error==="authentication_required")return decisionError("unauthenticated");
+  if(authorization.error==="identity_unavailable")return decisionError("unavailable");
   if(authorization.error!==null||authorization.authentication===null||authorization.actor===null)return decisionError("forbidden");
 
   let rawBody:unknown;try{rawBody=await input.request.json();}catch{return decisionError("invalid_request");}
@@ -133,5 +146,5 @@ export async function serveHermesDailyFarmBriefProposalReviewDecision(input:{req
   if(result.result==="expired")return decisionError("expired");
   if(result.result==="invalid_transition")return decisionError("invalid_transition");
   if(result.result!=="recorded"||result.previousStatus!=="pending"||result.nextStatus!==preparation.command.nextStatus||result.updatedAt!==preparation.command.newUpdatedAt||result.proposalUpdateCount!==1||result.auditInsertCount!==1||result.transactionCommitted!==true||result.retryCount!==0)return decisionError("atomic_write_failed");
-  return decisionResponse(200,{ok:true,proposal_ref:proposalRef,previous_status:"pending",status:result.nextStatus,updated_at:result.updatedAt});
+  return observed(decisionResponse(200,{ok:true,proposal_ref:proposalRef,previous_status:"pending",status:result.nextStatus,updated_at:result.updatedAt}),authorization.identityDecision);
 }

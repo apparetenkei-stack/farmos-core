@@ -1,4 +1,11 @@
 import { isHermesOperationalOpaqueReference } from "./hermes_operational_reference_contract";
+import {
+  fetchFarmOsCoreEnvironmentIdentityBound,
+  type FarmOsCoreEnvironmentIdentityOutboundTarget,
+} from "./farm_os_core_environment_identity_outbound";
+import type {
+  FarmOsCoreEnvironmentIdentityRuntime,
+} from "./farm_os_core_environment_identity_runtime";
 
 export const HERMES_OPERATIONAL_READONLY_CLIENT =
   "day92_hermes_operational_readonly_client" as const;
@@ -30,6 +37,11 @@ type EnvMap = Record<string, string | undefined>;
 type JsonRecord = Record<string, unknown>;
 type PrimitiveId = string | number;
 type NullableQuantity = string | number | null;
+
+export type HermesOperationalEnvironmentIdentityBinding = Readonly<{
+  runtime: FarmOsCoreEnvironmentIdentityRuntime;
+  target: FarmOsCoreEnvironmentIdentityOutboundTarget;
+}>;
 
 export type HermesOperationalInventoryRecord = {
   id: PrimitiveId;
@@ -963,6 +975,7 @@ async function readSource<TRecord>(input: {
     | "apparetenkei_work_logs_readonly";
   validateRecord: (value: unknown) => value is TRecord;
   fetchImpl: typeof fetch;
+  environmentIdentity?: HermesOperationalEnvironmentIdentityBinding;
 }): Promise<HermesOperationalReadonlySourceResult<TRecord>> {
   const url = new URL(input.endpointPath, input.baseUrl);
   url.searchParams.set("limit", String(input.limit));
@@ -971,7 +984,7 @@ async function readSource<TRecord>(input: {
   const timeout = setTimeout(() => controller.abort(), input.timeoutMs);
 
   try {
-    const response = await input.fetchImpl(url, {
+    const init: RequestInit = {
       method: "GET",
       headers: {
         Accept: "application/json",
@@ -980,7 +993,24 @@ async function readSource<TRecord>(input: {
       cache: "no-store",
       redirect: "error",
       signal: controller.signal,
-    });
+    };
+    const outbound = input.environmentIdentity === undefined ? null :
+      await fetchFarmOsCoreEnvironmentIdentityBound({
+        ...input.environmentIdentity,
+        url,
+        init,
+        fetchImpl: input.fetchImpl,
+      });
+    if (outbound?.result === "DENY") {
+      return createErrorSource({
+        sourceType: input.sourceType,
+        endpointPath: input.endpointPath,
+        limit: input.limit,
+        errorCode: "invalid_response",
+        fetchPerformed: outbound.fetch_performed,
+      });
+    }
+    const response = outbound?.response ?? await input.fetchImpl(url, init);
 
     if (!response.ok) {
       return createErrorSource({
@@ -1093,6 +1123,7 @@ async function readDay122Source<TRecord>(input: {
   validateRecordValues: (value: JsonRecord) => boolean;
   recordReference: (value: TRecord) => string;
   fetchImpl: typeof fetch;
+  environmentIdentity?: HermesOperationalEnvironmentIdentityBinding;
 }): Promise<HermesOperationalReadonlySourceResult<TRecord>> {
   const url = new URL(input.endpointPath, input.baseUrl);
   url.searchParams.set("limit", String(input.limit));
@@ -1100,13 +1131,16 @@ async function readDay122Source<TRecord>(input: {
   const timeout = setTimeout(() => controller.abort(), input.timeoutMs);
 
   try {
-    const response = await input.fetchImpl(url, {
+    const init: RequestInit = {
       method: "GET",
       headers: { Accept: "application/json", Authorization: `Bearer ${input.token}` },
       cache: "no-store",
       redirect: "error",
       signal: controller.signal,
-    });
+    };
+    const outbound = input.environmentIdentity === undefined ? null : await fetchFarmOsCoreEnvironmentIdentityBound({ ...input.environmentIdentity, url, init, fetchImpl: input.fetchImpl });
+    if (outbound?.result === "DENY") return createErrorSource({ sourceType: input.sourceType, endpointPath: input.endpointPath, limit: input.limit, errorCode: "invalid_response", fetchPerformed: outbound.fetch_performed });
+    const response = outbound?.response ?? await input.fetchImpl(url, init);
     if (!response.ok || response.redirected) {
       return createErrorSource({ sourceType: input.sourceType, endpointPath: input.endpointPath, limit: input.limit, errorCode: "remote_http_error", fetchPerformed: true, httpStatus: response.status });
     }
@@ -1192,6 +1226,7 @@ export async function readHermesOperationalReadonlySources(input?: {
   env?: EnvMap;
   limit?: unknown;
   fetchImpl?: typeof fetch;
+  environmentIdentity?: HermesOperationalEnvironmentIdentityBinding;
 }): Promise<HermesOperationalReadonlyFourSourceClientResult> {
   const env = input?.env ?? process.env;
   const config = resolveConfig({
@@ -1267,6 +1302,7 @@ export async function readHermesOperationalReadonlySources(input?: {
       expectedSource: "apparetenkei_inventory_readonly",
       validateRecord: validateInventoryRecord,
       fetchImpl,
+      environmentIdentity: input?.environmentIdentity,
     }),
     readSource<HermesOperationalWorkLogRecord>({
       baseUrl: config.baseUrl,
@@ -1278,6 +1314,7 @@ export async function readHermesOperationalReadonlySources(input?: {
       expectedSource: "apparetenkei_work_logs_readonly",
       validateRecord: validateWorkLogRecord,
       fetchImpl,
+      environmentIdentity: input?.environmentIdentity,
     }),
     readDay122Source<HermesOperationalFieldRecord>({
       baseUrl: config.baseUrl,
@@ -1293,6 +1330,7 @@ export async function readHermesOperationalReadonlySources(input?: {
       validateRecordValues: validateFieldRecordValues,
       recordReference: (record) => record.reference,
       fetchImpl,
+      environmentIdentity: input?.environmentIdentity,
     }),
     readDay122Source<HermesOperationalCropCycleRecord>({
       baseUrl: config.baseUrl,
@@ -1308,6 +1346,7 @@ export async function readHermesOperationalReadonlySources(input?: {
       validateRecordValues: validateCropCycleRecordValues,
       recordReference: (record) => record.reference,
       fetchImpl,
+      environmentIdentity: input?.environmentIdentity,
     }),
   ]);
   const cropCycle = validateCropCycleFieldRelations({ field, cropCycle: unvalidatedCropCycle });
@@ -1356,6 +1395,7 @@ export async function readHermesOperationalReadonlyFields(input?: {
   env?: EnvMap;
   limit?: unknown;
   fetchImpl?: typeof fetch;
+  environmentIdentity?: HermesOperationalEnvironmentIdentityBinding;
 }): Promise<
   HermesOperationalReadonlySourceResult<HermesOperationalFieldRecord>
 > {
@@ -1385,5 +1425,6 @@ export async function readHermesOperationalReadonlyFields(input?: {
     validateRecordValues: validateFieldRecordValues,
     recordReference: (record) => record.reference,
     fetchImpl: input?.fetchImpl ?? fetch,
+    environmentIdentity: input?.environmentIdentity,
   });
 }

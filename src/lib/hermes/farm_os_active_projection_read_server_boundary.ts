@@ -27,6 +27,11 @@ import {
 import {
   loadFarmOsProjectionFirstLocalPostgresConfig,
 } from "./farm_os_projection_first_production_service";
+import {
+  appendFarmOsCoreObservedIdentityHeaders,
+  farmOsCoreEnvironmentIdentityRuntime,
+  type FarmOsCoreEnvironmentIdentityRuntime,
+} from "./farm_os_core_environment_identity_runtime";
 
 export type FarmOsActiveProjectionReadServerDependencies = Readonly<{
   authenticate: (request: Request) => Promise<unknown>;
@@ -39,6 +44,7 @@ export type FarmOsActiveProjectionReadServerDependencies = Readonly<{
     installation_scope: FarmOsActiveProjectionReadInstallationScope;
     requested_at: string;
   }) => Promise<unknown>;
+  environment_identity?: FarmOsCoreEnvironmentIdentityRuntime;
 }>;
 
 const RESPONSE_HEADERS = Object.freeze({
@@ -126,6 +132,17 @@ export async function serveFarmOsActiveProjectionRead(input: {
     return errorResponse("unauthorized", 401);
   }
 
+  const identityDecision = input.dependencies.environment_identity?.verifyRequest({
+    request: input.request,
+    transport_authority: "authenticated_server_transport",
+  });
+  if (identityDecision?.decision === "STARTUP_BLOCK") {
+    return errorResponse("internal_error", 500);
+  }
+  if (identityDecision?.decision === "DENY") {
+    return errorResponse("forbidden", 403);
+  }
+
   let authorization: FarmOsActiveProjectionReadAuthorizationResult | null;
   try {
     authorization = parseAuthorization(
@@ -154,6 +171,17 @@ export async function serveFarmOsActiveProjectionRead(input: {
       await input.dependencies.installation_binding_loader(),
     );
     if (binding === null) return errorResponse("internal_error", 500);
+    if (identityDecision?.decision === "ALLOW") {
+      const useDecision = input.dependencies.environment_identity?.verifyBoundUse({
+        use: "database",
+        environment_id: identityDecision.verified_scope.environment_id,
+        installation_id: binding.installation_id,
+        farm_scope: binding.farm_scope,
+      });
+      if (useDecision?.decision !== "ALLOW") {
+        return errorResponse("forbidden", 403);
+      }
+    }
     const requestedAt = input.dependencies.clock();
     if (!canonicalRequestedAt(requestedAt)) {
       return errorResponse("internal_error", 500);
@@ -169,10 +197,16 @@ export async function serveFarmOsActiveProjectionRead(input: {
       }),
     );
     if (response === null) return errorResponse("internal_error", 500);
-    return new Response(JSON.stringify(response), {
+    const successfulResponse = new Response(JSON.stringify(response), {
       status: 200,
       headers: RESPONSE_HEADERS,
     });
+    return identityDecision === undefined
+      ? successfulResponse
+      : appendFarmOsCoreObservedIdentityHeaders(
+          successfulResponse,
+          identityDecision,
+        );
   } catch {
     return errorResponse("internal_error", 500);
   }
@@ -239,5 +273,6 @@ export function createFarmOsActiveProjectionReadProductionDependencies(input: {
         await adapter.close();
       }
     },
+    environment_identity: farmOsCoreEnvironmentIdentityRuntime,
   };
 }

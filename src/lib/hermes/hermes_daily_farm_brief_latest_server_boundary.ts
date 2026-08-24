@@ -23,12 +23,17 @@ import {
   createHermesDailyFarmBriefPilotIdentityBoundary,
 } from "./hermes_daily_farm_brief_pilot_authentication";
 import { createHermesDailyFarmBriefProductionRepositoryBundle } from "./hermes_daily_farm_brief_production_repository_bundle";
+import {
+  farmOsCoreEnvironmentIdentityRuntime,
+  type FarmOsCoreEnvironmentIdentityRuntime,
+} from "./farm_os_core_environment_identity_runtime";
 
 export function createHermesDailyFarmBriefLatestServerDependencies(input: {
   authenticationProvider: HermesDailyFarmBriefServerAuthenticationProvider;
   actorDirectory: HermesDailyFarmBriefActorDirectory;
   readRepository: HermesDailyFarmBriefPersistedReadRepository;
   clock: () => string;
+  environmentIdentityRuntime?: FarmOsCoreEnvironmentIdentityRuntime;
 }): HermesDailyFarmBriefLatestReadDependencies {
   return {
     authenticate: (request) => authenticateHermesDailyFarmBriefServerRequest(input.authenticationProvider, request),
@@ -41,6 +46,7 @@ export function createHermesDailyFarmBriefLatestServerDependencies(input: {
       return selected.status === "selected" ? selected.source : null;
     },
     clock: input.clock,
+    environment_identity: input.environmentIdentityRuntime,
   };
 }
 
@@ -50,6 +56,7 @@ export function createHermesDailyFarmBriefProductionLatestServerBoundary(input: 
   actorDirectory: HermesDailyFarmBriefActorDirectory;
   clock: () => string;
   executor?: HermesDailyFarmBriefProductionReadExecutor;
+  environmentIdentityRuntime?: FarmOsCoreEnvironmentIdentityRuntime;
 }) {
   const productionRepository = createHermesDailyFarmBriefProductionReadRepository(input.environment, input.executor);
   return {
@@ -60,6 +67,7 @@ export function createHermesDailyFarmBriefProductionLatestServerBoundary(input: 
       actorDirectory: input.actorDirectory,
       readRepository: productionRepository.repository,
       clock: input.clock,
+      environmentIdentityRuntime: input.environmentIdentityRuntime,
     }),
   } as const;
 }
@@ -68,6 +76,7 @@ export function createHermesDailyFarmBriefPilotLatestServerBoundary(input: {
   environment: Readonly<Record<string, string | undefined>>;
   clock: () => string;
   executor?: HermesDailyFarmBriefProductionReadExecutor;
+  environmentIdentityRuntime?: FarmOsCoreEnvironmentIdentityRuntime;
 }) {
   const identity = createHermesDailyFarmBriefPilotIdentityBoundary(input.environment);
   const repositoryBundle = identity.state === "ready" && input.executor === undefined
@@ -86,13 +95,14 @@ export function createHermesDailyFarmBriefPilotLatestServerBoundary(input: {
     authentication_state: ready ? "ready" : "denied",
     actor_directory_state: ready ? "ready" : "denied",
     repository_state: ready ? "ready" : "denied",
-    dependencies: createHermesDailyFarmBriefLatestServerDependencies({ authenticationProvider, actorDirectory, readRepository, clock: input.clock }),
+    dependencies: createHermesDailyFarmBriefLatestServerDependencies({ authenticationProvider, actorDirectory, readRepository, clock: input.clock, environmentIdentityRuntime: input.environmentIdentityRuntime }),
   } as const;
 }
 
 export const hermesDailyFarmBriefLatestServerBoundary = createHermesDailyFarmBriefPilotLatestServerBoundary({
   environment: process.env,
   clock: () => new Date().toISOString(),
+  environmentIdentityRuntime: farmOsCoreEnvironmentIdentityRuntime,
 });
 
 export const hermesDailyFarmBriefLatestServerDependencies = hermesDailyFarmBriefLatestServerBoundary.dependencies;

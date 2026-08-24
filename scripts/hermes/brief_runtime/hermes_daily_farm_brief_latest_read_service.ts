@@ -13,6 +13,10 @@ import {
   createHermesDailyFarmBriefRoleAwareLatestCandidate,
 } from "./hermes_daily_farm_brief_latest_read_boundary";
 import { deriveHermesDailyFarmBusinessDate } from "./hermes_daily_farm_brief_generation_contract";
+import {
+  appendFarmOsCoreObservedIdentityHeaders,
+  type FarmOsCoreEnvironmentIdentityRuntime,
+} from "../../../src/lib/hermes/farm_os_core_environment_identity_runtime";
 
 export type HermesDailyFarmBriefLatestReadDependencies = {
   authenticate: (request: Request) => Promise<unknown>;
@@ -21,6 +25,7 @@ export type HermesDailyFarmBriefLatestReadDependencies = {
   ) => Promise<unknown>;
   readLatestSource: () => Promise<unknown>;
   clock: () => string;
+  environment_identity?: FarmOsCoreEnvironmentIdentityRuntime;
 };
 
 const RESPONSE_HEADERS = {
@@ -51,6 +56,17 @@ export async function serveHermesDailyFarmBriefLatestRead(input: {
   }
   if (authentication === null || authentication.status === "unauthenticated") return response("authentication_required", 401);
 
+  const identityDecision = input.dependencies.environment_identity?.verifyRequest({
+    request: input.request,
+    transport_authority: "authenticated_server_transport",
+  });
+  if (identityDecision?.decision === "STARTUP_BLOCK") {
+    return response("latest_read_failed", 500);
+  }
+  if (identityDecision?.decision === "DENY") {
+    return response("access_forbidden", 403);
+  }
+
   let actor: ReturnType<typeof parseHermesDailyFarmBriefAuthenticatedActorContext>;
   try {
     actor = parseHermesDailyFarmBriefAuthenticatedActorContext(await input.dependencies.resolveActorContext(authentication));
@@ -58,6 +74,12 @@ export async function serveHermesDailyFarmBriefLatestRead(input: {
     actor = null;
   }
   if (actor === null || actor.principal_ref !== authentication.principal_ref) return response("access_forbidden", 403);
+
+  if (identityDecision?.decision === "ALLOW" &&
+    input.dependencies.environment_identity?.verifyBoundUse({
+      use: "database",
+      ...identityDecision.verified_scope,
+    }).decision !== "ALLOW") return response("access_forbidden", 403);
 
   let source: ReturnType<typeof parseHermesDailyFarmBriefLatestReadSource>;
   try {
@@ -85,8 +107,11 @@ export async function serveHermesDailyFarmBriefLatestRead(input: {
   const latest = parseHermesDailyFarmBriefLatestCandidate(candidate);
   if (latest === null || latest.role !== actor.role) return response("latest_read_failed", 500);
 
-  return new Response(JSON.stringify(createHermesDailyFarmBriefLatestApiResponse({ result: "ok", latest })), {
+  const successfulResponse = new Response(JSON.stringify(createHermesDailyFarmBriefLatestApiResponse({ result: "ok", latest })), {
     status: 200,
     headers: RESPONSE_HEADERS,
   });
+  return identityDecision === undefined
+    ? successfulResponse
+    : appendFarmOsCoreObservedIdentityHeaders(successfulResponse, identityDecision);
 }
