@@ -443,7 +443,7 @@ export function destroyFarmOsDay150PrefixReferenceVerifiedRuntimeSnapshot(
 export function createFarmOsDay150PrefixReferenceSanitizedTsxEnvironment(input: Readonly<{
   ambient_environment?: NodeJS.ProcessEnv;
   snapshot: FarmOsDay150PrefixReferenceVerifiedRuntimeSnapshot;
-}>): NodeJS.ProcessEnv {
+}>): Readonly<Record<string, string>> {
   if (!verifyFarmOsDay150PrefixReferenceVerifiedRuntimeSnapshot(input.snapshot)) {
     throw new Error("DAY150_VERIFIED_RUNTIME_ENVIRONMENT_REJECTED");
   }
@@ -500,7 +500,7 @@ const farmOsDay150PrefixReferenceMacOsUserTextEncoding = (): string =>
   `0x${process.getuid!().toString(16).toUpperCase()}:0x0:0x0`;
 
 export function validateFarmOsDay150PrefixReferenceVerifiedRuntimeChildEnvironment(
-  environment: NodeJS.ProcessEnv,
+  environment: Readonly<Record<string, string | undefined>>,
 ): boolean {
   const keys = Object.keys(environment).sort();
   return keys.length ===
@@ -564,7 +564,7 @@ export async function runFarmOsDay150PrefixReferenceVerifiedRuntimeChild(input: 
     if (tsxTsconfigPath === undefined) {
       throw new Error("DAY150_VERIFIED_RUNTIME_TSCONFIG_ENVIRONMENT_REJECTED");
     }
-    const environment: NodeJS.ProcessEnv = Object.freeze({
+    const environment: Readonly<Record<string, string>> = Object.freeze({
       TSX_TSCONFIG_PATH: tsxTsconfigPath,
       FARM_OS_DAY150_VERIFIED_RUNTIME_ROOT: snapshot.snapshot_root,
       FARM_OS_DAY150_VERIFIED_RUNTIME_SOURCE_DIGEST: snapshot.executable_source_digest,
@@ -582,7 +582,7 @@ export async function runFarmOsDay150PrefixReferenceVerifiedRuntimeChild(input: 
         const child = spawn(process.execPath,
           ["--import", "tsx", loadTarget, ...(input.arguments ?? [])], {
             cwd: snapshot.snapshot_root,
-            env: environment,
+            env: environment as NodeJS.ProcessEnv,
             stdio: ["ignore", "pipe", "pipe"],
           });
         let stdout = "";

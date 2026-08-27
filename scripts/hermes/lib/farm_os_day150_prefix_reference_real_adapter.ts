@@ -300,7 +300,8 @@ function createActualPrimitivePort(): FarmOsDay150PrimitiveSystemEffectPort {
                 resolve(bounded("STDIN_LIMIT_EXCEEDED")); return;
               }
               const child = spawn(request.executable, [...request.argv], {
-                env: request.environment, windowsHide: true, stdio: ["pipe", "pipe", "pipe"],
+                env: request.environment as NodeJS.ProcessEnv,
+                windowsHide: true, stdio: ["pipe", "pipe", "pipe"],
               });
               activeChildren.add(child);
               let closeSettlementResolve: (() => void) | null = null;

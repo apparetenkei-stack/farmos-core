@@ -1,0 +1,19 @@
+{
+  "schema_version": "farmos.core-memory-fresh-baseline-qualification.v1",
+  "baseline_id": "farmos.core-memory-initial-catalog-baseline.v1",
+  "baseline_sha256": "sha256:bc07a3ba8bb487d49c579fe0afbe354f30041a696352da3457ec0b9ae090fae5",
+  "postgres_image": "postgres@sha256:7958605b474b3d264a969cb3a123d6aa00ad1e1fe9da8a69984dabb704d93317",
+  "migration_count": 6,
+  "migration_head": "202608110001_production_target_execution_durability",
+  "fresh_replay_1": {
+    "status": "PASS",
+    "catalog_fingerprint": "sha256:3a8f2bb577e01052b2584de967ccaf669d825ee306b3fc1c5f5534d421a79e83"
+  },
+  "fresh_replay_2": {
+    "status": "PASS",
+    "catalog_fingerprint": "sha256:3a8f2bb577e01052b2584de967ccaf669d825ee306b3fc1c5f5534d421a79e83"
+  },
+  "fingerprint_equality": true,
+  "runtime_readonly_role_bounded": true,
+  "production_connection_query_write": "0/0/0"
+}

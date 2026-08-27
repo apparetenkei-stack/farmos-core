@@ -1,0 +1,30 @@
+{
+  "schema_version": "farmos.day150-5-e5.secure-bootstrap-request.v1",
+  "status": "MANUAL_SECURE_CORE_STAGING_BOOTSTRAP_REQUIRED",
+  "command": "sh scripts/hermes/bootstrap_farm_os_day150_5_e5_secure_credentials.sh",
+  "prompt_count": 1,
+  "supersedes_prompt_count": 8,
+  "superseded_status": "INVALIDATED_NOT_EXECUTED",
+  "secret_argv_count": 0,
+  "secret_repository_count": 0,
+  "human_prompt": "App Business Staging readonly DB password",
+  "core_secret_generation": "AUTOMATED_OPENSSL_CSPRNG_EXPECT_KEYCHAIN_HIDDEN_PROMPT",
+  "keychain_services": [
+    "jp.apparetenkei.farmos-core-staging.app-business-readonly",
+    "jp.apparetenkei.farmos-core-staging.core-memory-bootstrap",
+    "jp.apparetenkei.farmos-core-staging.core-memory-readonly"
+  ],
+  "post_input_order": [
+    "DERIVE_VERIFIED_SUPABASE_FINGERPRINTS_FROM_INTERNAL_PROVIDER_TUPLES",
+    "APP_BUSINESS_READ_ONLY_CREDENTIAL_VERIFICATION",
+    "APP_BUSINESS_STAGING_PRODUCTION_FINGERPRINT_DENY",
+    "CORE_MEMORY_CONTAINER_AND_VOLUME_MATERIALIZATION",
+    "CORE_MEMORY_RUNTIME_ROLE_MATERIALIZATION",
+    "READ_ONLY_RESOURCE_VERIFICATION",
+    "CANONICAL_ENVIRONMENT_MANIFEST_MATERIALIZATION",
+    "EXTERNAL_MANIFEST_PIN_MATERIALIZATION",
+    "CORE_STAGING_RUNTIME_MATERIALIZATION",
+    "READ_ONLY_SMOKE",
+    "TAILSCALE_PRIVATE_HTTPS_MATERIALIZATION"
+  ]
+}

@@ -1,0 +1,42 @@
+#!/usr/bin/expect -f
+set timeout 30
+
+set account "active-projection-read-staging"
+set service "jp.apparetenkei.farmos-core-staging.active-projection-read"
+set token [string trim [exec /opt/homebrew/bin/openssl rand -hex 32 2>@1]]
+
+if {[string length $token] != 64} {
+  puts stderr "E5_STAGING_ACTIVE_PROJECTION_TOKEN_GENERATION_FAILED"
+  exit 1
+}
+
+if {$argv eq {--self-test}} {
+  puts "E5_STAGING_ACTIVE_PROJECTION_TOKEN_GENERATION_SELF_TEST_PASS"
+  exit 0
+}
+
+log_user 0
+spawn -noecho /usr/bin/security add-generic-password -U \
+  -a $account -s $service -w
+expect {
+  -re {(?i)password.*:} {
+    send -- "$token\r"
+    exp_continue
+  }
+  eof {}
+  timeout {
+    puts stderr "E5_STAGING_ACTIVE_PROJECTION_KEYCHAIN_WRITE_TIMEOUT"
+    exit 1
+  }
+}
+set child_status [wait]
+if {[lindex $child_status 3] != 0} {
+  puts stderr "E5_STAGING_ACTIVE_PROJECTION_KEYCHAIN_WRITE_FAILED"
+  exit 1
+}
+
+set clipboard [open "|/usr/bin/pbcopy" w]
+puts -nonewline $clipboard $token
+close $clipboard
+
+puts "E5_STAGING_ACTIVE_PROJECTION_TOKEN_MATERIALIZED"

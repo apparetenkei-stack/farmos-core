@@ -1,0 +1,38 @@
+name: farmos-core-memory-staging
+
+services:
+  postgres:
+    image: postgres@sha256:7958605b474b3d264a969cb3a123d6aa00ad1e1fe9da8a69984dabb704d93317
+    container_name: farmos-core-memory-staging-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: farmos_core_memory_staging
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD_FILE: /run/secrets/bootstrap_password
+      TZ: Asia/Tokyo
+    ports:
+      - "127.0.0.1:55432:5432"
+    volumes:
+      - core_memory_staging_data:/var/lib/postgresql/data
+    secrets:
+      - bootstrap_password
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d farmos_core_memory_staging"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    networks:
+      - core_memory_staging_loopback
+
+volumes:
+  core_memory_staging_data:
+    name: farmos-core-memory-staging-postgres-data
+
+secrets:
+  bootstrap_password:
+    file: ${FARMOS_CORE_MEMORY_STAGING_BOOTSTRAP_PASSWORD_FILE:?secure bootstrap password file is required}
+
+networks:
+  core_memory_staging_loopback:
+    name: farmos-core-memory-staging-loopback
+    driver: bridge

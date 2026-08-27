@@ -20,6 +20,10 @@ import {
   type FarmOsProjectionFirstScopedReadEvent,
 } from "./farm_os_projection_first_postgres_read_adapter";
 import {
+  FARM_OS_CORE_MEMORY_READ_RUNTIME_ENVIRONMENT,
+  loadFarmOsCoreMemoryStagingReadPoolConfig,
+} from "./farm_os_core_memory_read_runtime_config";
+import {
   FarmOsProjectionFirstRuntime,
   FarmOsProjectionFirstService,
   type FarmOsProjectionFirstEvent,
@@ -63,6 +67,11 @@ function requiredEnvironment(environment: Environment, name: string): string {
 export function loadFarmOsProjectionFirstLocalPostgresConfig(
   environment: Environment,
 ): PoolConfig {
+  if (environment[
+    FARM_OS_CORE_MEMORY_READ_RUNTIME_ENVIRONMENT.staging_enabled
+  ] === "true") {
+    return loadFarmOsCoreMemoryStagingReadPoolConfig({ environment });
+  }
   const host = environment.PGHOST ?? "127.0.0.1";
   const port = Number(environment.PGPORT ?? "5432");
   if (

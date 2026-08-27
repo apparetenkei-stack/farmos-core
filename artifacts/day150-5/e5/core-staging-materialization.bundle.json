@@ -1,0 +1,225 @@
+{
+  "schema_version": "farmos.day150-5-e5.core-staging-materialization-bundle.v1",
+  "status": "CORE_STAGING_LOCAL_MATERIALIZATION_PASS_EXTERNAL_ENDPOINT_REQUIRED",
+  "scope": "STAGING_ONLY",
+  "baseline": {
+    "repository": "farmos-core",
+    "branch": "feature/day150-5-e-environment-identity-handshake",
+    "source_commit": "72ceaa6f779e875776d2f916c1fa003d08fb3528"
+  },
+  "canonical_identity": {
+    "environment_id": "apparetenkei-staging-primary",
+    "environment_class": "staging",
+    "installation_id": "apparetenkei-farmos-core-staging-01",
+    "farm_scope": "apparetenkei-primary-farm",
+    "business_timezone": "Asia/Tokyo",
+    "runtime_identity": "farmos-core-staging-primary",
+    "endpoint_alias": "farmos-core-staging-primary",
+    "manifest_version": "farmos.environment-identity-manifest.v1",
+    "environment_manifest_sha256": "sha256:f150cc743e73bbe651068c55e48d5fbd94991c34bc3f4561a40714d920d56fbe",
+    "environment_manifest_sha256_status": "MATERIALIZED_EXTERNAL_PIN_VERIFIED",
+    "migration_head": "202608110001_production_target_execution_durability",
+    "integration_identity": "slack-test-primary",
+    "delivery_mode": "TEST"
+  },
+  "authority_sources": {
+    "installation_farm_timezone": "PRODUCT_OWNER_DAY150_5_E5_APPROVED_AUTHORITY",
+    "environment_contract": "src/lib/hermes/farm_os_environment_identity_contract.ts",
+    "handshake_contract": "src/lib/hermes/farm_os_environment_identity_handshake.ts",
+    "runtime_binding": "src/lib/hermes/farm_os_core_environment_identity_runtime.ts",
+    "e4_reconciliation_run": "20260825T230921Z-2cf32bfc-a3c1-419d-bbfd-5862fb8ba4f1",
+    "e4_reconciliation_evidence_sha256": "sha256:d3fada060d010033c0cad527e25f8486532c5c821b82145fb2ae8ae86d099275",
+    "e4_reconciliation_sha_classification": "LINEAGE_EVIDENCE_ONLY_NOT_ENVIRONMENT_MANIFEST_PIN"
+  },
+  "staging_manifest": {
+    "payload_status": "READY_SCHEMA_VALIDATED",
+    "external_pin_status": "MATERIALIZED_VERIFIED",
+    "hash_rule": "CANONICAL_ENVIRONMENT_MANIFEST_JSON_BYTES_SHA256_EXTERNAL_PIN",
+    "payload_self_hash_allowed": false,
+    "e4_reconciliation_evidence_sha_allowed_as_pin": false,
+    "self_report_as_trust_anchor": false,
+    "canonical_json_required": true,
+    "secret_field_count": 0,
+    "production_uri_count": 0,
+    "staging_raw_credential_count": 0
+  },
+  "staging_database": {
+    "status": "BOTH_DATABASE_BINDINGS_READY",
+    "project_creation_required": false,
+    "migration_allowed": false,
+    "seed_allowed": false,
+    "reset_allowed": false,
+    "write_allowed": false,
+    "bindings": {
+      "app_business": {
+        "logical_name": "apparetenkei-staging-primary",
+        "logical_name_status": "PROVIDER_VERIFIED",
+        "provider_class": "managed_postgres",
+        "resource_fingerprint": "sha256:d24a9c40a082703e8f2a26241e365cc8e2b3b879eae443841bac8d91b12add69",
+        "resource_fingerprint_status": "PRODUCT_OWNER_PROVIDER_VERIFIED",
+        "migration_head": "20260807000000",
+        "credential_class": "app-business-staging-readonly",
+        "status": "READONLY_VERIFIED"
+      },
+      "core_operational_memory": {
+        "logical_name": "farmos_core_memory_staging",
+        "logical_name_status": "APPROVED",
+        "provider_class": "containerized_postgres",
+        "provider_scope": "customer_owned_staging",
+        "resource_alias": "farmos-core-memory-staging-postgres",
+        "volume_name": "farmos-core-memory-staging-postgres-data",
+        "listener": "127.0.0.1:55432",
+        "postgres_major": 17,
+        "resource_fingerprint": "sha256:0e987f1889bd975488e94028ff8842aafbd5c0b672ef00aa5a24ce8b65f2b767",
+        "migration_head": "202608110001_production_target_execution_durability",
+        "credential_class": "core-memory-staging-readonly",
+        "status": "RESOURCE_CATALOG_AND_READONLY_BINDING_VERIFIED"
+      }
+    },
+    "production_credential_reuse": 0,
+    "production_endpoint_fallback": 0
+  },
+  "core_memory_schema_bootstrap": {
+    "tracked_manifest": "db/provisioning/manifest.json",
+    "tracked_migration_count": 6,
+    "fresh_baseline_complete": true,
+    "baseline_id": "farmos.core-memory-initial-catalog-baseline.v1",
+    "baseline_sha256": "sha256:bc07a3ba8bb487d49c579fe0afbe354f30041a696352da3457ec0b9ae090fae5",
+    "qualified_catalog_fingerprint": "sha256:3a8f2bb577e01052b2584de967ccaf669d825ee306b3fc1c5f5534d421a79e83",
+    "fresh_replay_count": 2,
+    "fresh_replay_fingerprint_equal": true,
+    "apply_attempt_count": 2,
+    "committed_migration_count": 6,
+    "rollback_verified": true,
+    "missing_prerequisite": null,
+    "local_day3_bootstrap_allowed": false,
+    "ephemeral_reference_bootstrap_allowed": false,
+    "migration_head": "202608110001_production_target_execution_durability",
+    "status": "FRESH_BASELINE_REPLAY_VERIFIED"
+  },
+  "provider_discovery": {
+    "app_business": {
+      "provider": "supabase",
+      "provider_class": "managed_postgres",
+      "organization_name": "apparetenkei-farm",
+      "project_name": "apparetenkei-staging-primary",
+      "region": "ap-northeast-1",
+      "project_status": "ACTIVE_HEALTHY",
+      "postgres_major": 17,
+      "migration_count": 24,
+      "migration_head": "20260807000000",
+      "raw_project_ref_emitted": false,
+      "authority_status": "PRODUCT_OWNER_PROVIDER_VERIFIED"
+    },
+    "production_app_business_deny": {
+      "project_name": "Appare-app",
+      "region": "ap-northeast-1",
+      "project_status": "ACTIVE_HEALTHY",
+      "postgres_major": 17,
+      "resource_fingerprint": "sha256:26783e0e593e7d714588d4cb2980be33b9ea21db24ae9dee788224769a54e48f",
+      "resource_fingerprint_status": "PRODUCT_OWNER_PROVIDER_VERIFIED_DENY_PIN",
+      "different_from_staging": true,
+      "production_database_connection": 0
+    },
+    "core_repository_candidate": "docker-compose.yml postgres:17",
+    "candidate_classification": "UNSCOPED_SINGLE_RESOURCE_MECHANISM_NOT_STAGING_PROVIDER_AUTHORITY",
+    "candidate_fixed_container": "farmos-postgres",
+    "candidate_fixed_listener": "127.0.0.1:5432",
+    "candidate_fixed_data_path": "./data/postgres",
+    "isolated_docker_authority": "TEST_AND_DISPOSABLE_ONLY",
+    "pinned_coordination_provider_authority": "ABSENT",
+    "approved_core_memory_staging_provider": "containerized_postgres",
+    "approved_provider_scope": "customer_owned_staging",
+    "decision": "PRODUCT_OWNER_AUTHORITY_APPLIED"
+  },
+  "runtime_separation": {
+    "production_service_label": "com.apparetenkei.farmos-core",
+    "staging_service_label": "com.apparetenkei.farmos-core-staging",
+    "staging_service_status": "RUNNING",
+    "production_listener": "127.0.0.1:3000",
+    "staging_listener": "127.0.0.1:3100",
+    "staging_listener_status": "READY_LOOPBACK_ONLY",
+    "core_memory_db_listener": "127.0.0.1:55432",
+    "core_memory_db_listener_status": "READY_LOOPBACK_ONLY",
+    "credential_namespace": "FARMOS_CORE_STAGING_ONLY",
+    "production_namespace_fallback": 0
+  },
+  "external_endpoint": {
+    "existing_mechanism": "TAILSCALE_PRIVATE_HTTPS",
+    "staging_alias": "farmos-core-staging-primary",
+    "https_endpoint": null,
+    "status": "MANUAL_TAILSCALE_SERVICE_MATERIALIZATION_REQUIRED",
+    "new_provider_or_auth_scheme": false,
+    "production_endpoint_mutation": 0
+  },
+  "authentication": {
+    "identity_headers_are_authentication": false,
+    "chat_authenticated_app_to_core_transport": "PENDING",
+    "chat_environment_handshake_activation": "DEFERRED_PENDING_AUTHENTICATED_SERVER_TRANSPORT",
+    "new_authentication_scheme": false
+  },
+  "slack": {
+    "identity": "slack-test-primary",
+    "delivery_mode": "TEST",
+    "resource": "NOT_ESTABLISHED",
+    "effective_delivery": "NO_DELIVERY",
+    "production_fallback": 0
+  },
+  "manual_secure_inputs": {
+    "old_manual_command": "INVALIDATED_NOT_EXECUTED",
+    "bootstrap_status": "CREDENTIALS_MATERIALIZED",
+    "required_order": [
+      "AUTHORITY_BACKED_STAGING_BINDINGS",
+      "HIDDEN_STAGING_CREDENTIAL_INPUT",
+      "READ_ONLY_DATABASE_IDENTITY_VERIFICATION",
+      "RESOURCE_FINGERPRINT_ESTABLISHMENT",
+      "CANONICAL_MANIFEST_MATERIALIZATION",
+      "SCHEMA_VALIDATION",
+      "CANONICAL_JSON_SHA256_EXTERNAL_PIN",
+      "RUNTIME_BINDING"
+    ],
+    "delivery_rule": "MAC_TERMINAL_OR_APPROVED_SECRET_STORE_ONLY_NEVER_CHAT",
+    "required": [
+      {
+        "variable_name": "FARMOS_CORE_STAGING_APP_BUSINESS_DATABASE_URL",
+        "credential_class": "app-business-staging-readonly",
+        "macos_keychain_service": "jp.apparetenkei.farmos-core-staging.app-business-readonly"
+      }
+    ],
+    "human_secret_prompt_count": 1,
+    "core_memory_credentials": {
+      "generation": "OPENSSL_CSPRNG_48_BYTES_EACH_EXPECT_KEYCHAIN_HIDDEN_PROMPT",
+      "independence_required": true,
+      "human_entered": false,
+      "bootstrap_keychain_service": "jp.apparetenkei.farmos-core-staging.core-memory-bootstrap",
+      "runtime_keychain_service": "jp.apparetenkei.farmos-core-staging.core-memory-readonly",
+      "status": "MATERIALIZED_IN_KEYCHAIN"
+    },
+    "required_non_secret_authority_inputs": [],
+    "app_business_provider_source": {
+      "authority": "farmos.day150-5-e5.supabase-resource-fingerprint.v1",
+      "provider_metadata_status": "PRODUCT_OWNER_VERIFIED",
+      "raw_project_ref_emitted": false,
+      "provider_credential_required": false,
+      "status": "SAFE_FINGERPRINTS_PRODUCT_OWNER_VERIFIED"
+    }
+  },
+  "production_counters": {
+    "database_connection": 0,
+    "database_query": 0,
+    "database_write": 0,
+    "migration": 0,
+    "core_restart": 0,
+    "core_config_mutation": 0,
+    "release": 0,
+    "slack_delivery": 0,
+    "credential_reuse": 0
+  },
+  "repository_mutation_boundary": {
+    "main_worktree_mutation": 0,
+    "stage": 0,
+    "commit": 0,
+    "push": 0,
+    "merge": 0
+  }
+}

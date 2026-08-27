@@ -31,6 +31,7 @@ reviews/
 !scripts/
 !scripts/sql/
 !scripts/sql/*.sql
+!db/provisioning/core-memory-initial-catalog-baseline.v1.sql
 
 # Local isolated PostgreSQL execution artifacts
 /reports/day147a5-isolated-postgres/runs/*/

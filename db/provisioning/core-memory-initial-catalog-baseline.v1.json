@@ -1,0 +1,88 @@
+{
+  "schema_version": "farmos.core-memory-initial-catalog-baseline-authority.v1",
+  "baseline_id": "farmos.core-memory-initial-catalog-baseline.v1",
+  "baseline_sql_path": "db/provisioning/core-memory-initial-catalog-baseline.v1.sql",
+  "baseline_sha256": "sha256:bc07a3ba8bb487d49c579fe0afbe354f30041a696352da3457ec0b9ae090fae5",
+  "postgres_major": 17,
+  "product_owner_authority": "LONG_LIVED_CORE_MEMORY_FRESH_BASELINE",
+  "source_artifacts": [
+    {
+      "path": "src/lib/hermes/farm_os_day150_prefix_initial_catalog_authority.ts",
+      "sha256": "sha256:027d09fb6d1f6e2a5c5dc50a31762f88dbc4c98175de98da9e75411f27c3b8f5"
+    },
+    {
+      "path": "scripts/sql/day3_roles_and_proposal_inbox.sql",
+      "sha256": "sha256:645921b4a710450bc2f48aba9908727a5c888fa1125731800399df2d35b7e2c2"
+    },
+    {
+      "path": "scripts/sql/day146_operational_memory_snapshot_persistence.sql",
+      "sha256": "sha256:017c69c6cbfcf8efbe2cd042c32cfb88a848b6f48d65f23189f47dc22e6cefdc"
+    }
+  ],
+  "expected_prerequisite_objects": [
+    "schema:ai",
+    "table:ai.proposal_inbox",
+    "table:ai.operational_memory_source_snapshots",
+    "table:ai.operational_memory_snapshot_state_events",
+    "table:ai.operational_memory_daily_projections",
+    "table:ai.operational_memory_projection_state_events",
+    "table:ai.operational_memory_projection_lineage",
+    "table:ai.operational_memory_ingestion_rejections",
+    "function:ai.reject_operational_memory_immutable_mutation()",
+    "function:ai.persist_operational_memory_bundle(jsonb,jsonb,jsonb,jsonb,jsonb,jsonb)",
+    "trigger:ai.operational_memory_source_snapshots_append_only",
+    "trigger:ai.operational_memory_snapshot_state_events_append_only",
+    "trigger:ai.operational_memory_daily_projections_append_only",
+    "trigger:ai.operational_memory_projection_state_events_append_only",
+    "trigger:ai.operational_memory_projection_lineage_append_only",
+    "trigger:ai.operational_memory_ingestion_rejections_append_only"
+  ],
+  "forbidden_business_data": true,
+  "migration_manifest_path": "db/provisioning/manifest.json",
+  "migration_manifest_sha256": "sha256:2535b8df1444a8abaf2341e8c821db4801b0e5e1fdfdfb3c11262a439a97958b",
+  "migrations": [
+    {
+      "migration_id": "202607260001_eligible_proposal_persistence",
+      "sequence": 202607260001,
+      "checksum": "sha256:41fbbfb931f03ad42c0c52159749fa8529c84321d6fcc643930c2b03c5c2ee4b",
+      "apply_script": "db/migrations/202607260001_eligible_proposal_persistence.sql",
+      "verification_script": "db/migrations/202607260001_eligible_proposal_persistence.verify.sql"
+    },
+    {
+      "migration_id": "202607300001_daily_operational_projection_candidate_foundation",
+      "sequence": 202607300001,
+      "checksum": "sha256:350489282b921b879a9c4fab8280cfd38ff7432ed75cc70a905a7dabd45846bf",
+      "apply_script": "db/migrations/202607300001_daily_operational_projection_candidate_foundation.sql",
+      "verification_script": "db/migrations/202607300001_daily_operational_projection_candidate_foundation.verify.sql"
+    },
+    {
+      "migration_id": "202607310001_daily_operational_projection_candidate_activation",
+      "sequence": 202607310001,
+      "checksum": "sha256:e55b7b2c33d432b37d9733d599f8ed4dd7de99a82fb64c5f90158dae7addbbc2",
+      "apply_script": "db/migrations/202607310001_daily_operational_projection_candidate_activation.sql",
+      "verification_script": "db/migrations/202607310001_daily_operational_projection_candidate_activation.verify.sql"
+    },
+    {
+      "migration_id": "202608030001_daily_operational_projection_command_ledger",
+      "sequence": 202608030001,
+      "checksum": "sha256:98504d23be1922d339acf0c7384ad1a5f9b6257e44a07a9073200b21bd79ef0a",
+      "apply_script": "db/migrations/202608030001_daily_operational_projection_command_ledger.sql",
+      "verification_script": "db/migrations/202608030001_daily_operational_projection_command_ledger.verify.sql"
+    },
+    {
+      "migration_id": "202608070001_stable_changes_consumer_persistence",
+      "sequence": 202608070001,
+      "checksum": "sha256:835b76ba23380d388c3532136564a5c83d04a2e9decf473726ef971ced8c6de0",
+      "apply_script": "db/migrations/202608070001_stable_changes_consumer_persistence.sql",
+      "verification_script": "db/migrations/202608070001_stable_changes_consumer_persistence.verify.sql"
+    },
+    {
+      "migration_id": "202608110001_production_target_execution_durability",
+      "sequence": 202608110001,
+      "checksum": "sha256:e230647582fc3b1fb26d017034227cdf9b86384f6be7767f0c266ba4768ebc34",
+      "apply_script": "db/migrations/202608110001_production_target_execution_durability.sql",
+      "verification_script": "db/migrations/202608110001_production_target_execution_durability.verify.sql"
+    }
+  ],
+  "final_migration_head": "202608110001_production_target_execution_durability"
+}

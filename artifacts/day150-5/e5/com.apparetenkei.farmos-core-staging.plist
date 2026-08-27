@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.apparetenkei.farmos-core-staging</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/sh</string>
+    <string>/Users/hayate/projects/farmos-core-day150-5-e/scripts/hermes/run_farm_os_day150_5_e5_core_staging.sh</string>
+  </array>
+  <key>WorkingDirectory</key>
+  <string>/Users/hayate/projects/farmos-core-day150-5-e</string>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>FARMOS_CORE_STAGING_RUNTIME_ENABLED</key>
+    <string>true</string>
+    <key>FARMOS_CORE_STAGING_RUNTIME_IDENTITY</key>
+    <string>farmos-core-staging-primary</string>
+    <key>FARMOS_CORE_STAGING_ENVIRONMENT_MANIFEST_PATH</key>
+    <string>/Users/hayate/Library/Application Support/FarmOS/staging/e5/environment-identity-manifest.v1.json</string>
+    <key>FARMOS_CORE_STAGING_ENVIRONMENT_MANIFEST_PIN_PATH</key>
+    <string>/Users/hayate/Library/Application Support/FarmOS/staging/e5/environment-identity-manifest.v1.pin.json</string>
+    <key>FARMOS_CORE_STAGING_RUNTIME_IDENTITY_PATH</key>
+    <string>/Users/hayate/Library/Application Support/FarmOS/staging/e5/core-staging-observed-identity.json</string>
+    <key>FARMOS_CORE_STAGING_RUNTIME_CONFIG_PATH</key>
+    <string>/Users/hayate/Library/Application Support/FarmOS/staging/e5/core-staging-runtime-config.json</string>
+    <key>FARMOS_CORE_STAGING_APP_BUSINESS_CONNECTION_IDENTITY_PATH</key>
+    <string>/Users/hayate/Library/Application Support/FarmOS/staging/e5/app-business-connection-identity.json</string>
+  </dict>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+  <key>ThrottleInterval</key>
+  <integer>10</integer>
+  <key>StandardOutPath</key>
+  <string>/Users/hayate/Library/Logs/FarmOS/core-staging.stdout.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/hayate/Library/Logs/FarmOS/core-staging.stderr.log</string>
+</dict>
+</plist>
