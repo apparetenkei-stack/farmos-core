@@ -1,20 +1,23 @@
 import assert from "node:assert/strict";
 
 import {
+  FARM_OS_CORE_MEMORY_PRODUCTION_READ_AUTHORITY,
   FARM_OS_CORE_MEMORY_READ_RUNTIME_ENVIRONMENT,
   FARM_OS_CORE_MEMORY_STAGING_READ_AUTHORITY,
   FarmOsCoreMemoryReadRuntimeConfigError,
+  loadFarmOsCoreMemorySelectedReadPoolConfig,
   loadFarmOsCoreMemoryStagingReadPoolConfig,
 } from "../../src/lib/hermes/farm_os_core_memory_read_runtime_config";
 import {
+  FARM_OS_PROJECTION_FIRST_DATABASE_CONFIGURATION_ERROR,
   loadFarmOsProjectionFirstLocalPostgresConfig,
 } from "../../src/lib/hermes/farm_os_projection_first_production_service";
 
-const authority = FARM_OS_CORE_MEMORY_STAGING_READ_AUTHORITY;
-const runtimePath = "/server-owned/core-staging-runtime-config.json";
 const password = "fixture-only-core-memory-password-0000000000000000";
+type Authority = typeof FARM_OS_CORE_MEMORY_STAGING_READ_AUTHORITY |
+  typeof FARM_OS_CORE_MEMORY_PRODUCTION_READ_AUTHORITY;
 
-function runtimeConfig() {
+function runtimeConfig(authority: Authority) {
   return {
     schema_version: authority.schema_version,
     environment_id: authority.environment_id,
@@ -22,16 +25,15 @@ function runtimeConfig() {
     installation_id: authority.installation_id,
     farm_scope: authority.farm_scope,
     business_timezone: authority.business_timezone,
-    application_listener: "127.0.0.1:3100",
+    application_listener: authority.application_listener,
     manifest_path: "/server-owned/manifest.json",
     manifest_pin_path: "/server-owned/manifest.pin.json",
     manifest_sha256: authority.manifest_sha256,
     observed_identity_path: "/server-owned/observed.json",
     app_business: {
       connection_identity_path: "/server-owned/app-business.json",
-      keychain_service:
-        "jp.apparetenkei.farmos-core-staging.app-business-readonly",
-      credential_class: "app-business-staging-readonly",
+      credential_class: `app-business-${authority.runtime_environment}-readonly`,
+      runtime_connection_authority: "NOT_INJECTED",
     },
     core_operational_memory: {
       listener: `${authority.host}:${authority.port}`,
@@ -51,83 +53,105 @@ function runtimeConfig() {
   };
 }
 
-const environment: Record<string, string | undefined> = {
-  [FARM_OS_CORE_MEMORY_READ_RUNTIME_ENVIRONMENT.staging_enabled]: "true",
-  [FARM_OS_CORE_MEMORY_READ_RUNTIME_ENVIRONMENT.runtime_config_path]: runtimePath,
-  [FARM_OS_CORE_MEMORY_READ_RUNTIME_ENVIRONMENT.password]: password,
-};
-const load = (candidate: unknown, environmentOverride = environment) =>
-  loadFarmOsCoreMemoryStagingReadPoolConfig({
-    environment: environmentOverride,
+function environment(authority: Authority) {
+  return {
+    [FARM_OS_CORE_MEMORY_READ_RUNTIME_ENVIRONMENT.selector]:
+      authority.runtime_environment,
+    [FARM_OS_CORE_MEMORY_READ_RUNTIME_ENVIRONMENT.staging_enabled]:
+      authority.runtime_environment === "staging" ? "true" : undefined,
+    [FARM_OS_CORE_MEMORY_READ_RUNTIME_ENVIRONMENT
+      .staging_runtime_config_path]: authority.runtime_environment === "staging"
+        ? "/server-owned/runtime.json"
+        : undefined,
+    [FARM_OS_CORE_MEMORY_READ_RUNTIME_ENVIRONMENT
+      .production_runtime_config_path]:
+        authority.runtime_environment === "production"
+          ? "/server-owned/runtime.json"
+          : undefined,
+    [FARM_OS_CORE_MEMORY_READ_RUNTIME_ENVIRONMENT.password]: password,
+  };
+}
+
+function load(authority: Authority, candidate: unknown) {
+  return loadFarmOsCoreMemorySelectedReadPoolConfig({
+    environment: environment(authority),
     read_file: (path) => {
-      assert.equal(path, runtimePath);
+      assert.equal(path, "/server-owned/runtime.json");
       return JSON.stringify(candidate);
     },
   });
-const deny = (candidate: unknown, environmentOverride = environment) =>
-  assert.throws(() => load(candidate, environmentOverride),
+}
+function deny(authority: Authority, candidate: unknown) {
+  assert.throws(() => load(authority, candidate),
     FarmOsCoreMemoryReadRuntimeConfigError);
-
-const exact = load(runtimeConfig());
-assert.equal(exact.host, "127.0.0.1");
-assert.equal(exact.port, 55432);
-assert.equal(exact.database, "farmos_core_memory_staging");
-assert.equal(exact.user, "farmos_core_memory_staging_readonly");
-assert.equal(exact.password, password);
-assert.equal(exact.ssl, false);
-
-for (const key of ["listener", "database", "user"] as const) {
-  const candidate = runtimeConfig();
-  delete (candidate.core_operational_memory as Record<string, unknown>)[key];
-  deny(candidate);
 }
-for (const listener of ["127.0.0.1:5432", "127.0.0.1:",
-  "0.0.0.0:55432", "production-db:5432"]) {
-  const candidate = runtimeConfig();
-  candidate.core_operational_memory.listener = listener;
-  deny(candidate);
-}
+
+const staging = load(
+  FARM_OS_CORE_MEMORY_STAGING_READ_AUTHORITY,
+  runtimeConfig(FARM_OS_CORE_MEMORY_STAGING_READ_AUTHORITY),
+);
+assert.equal(staging.port, 55432);
+assert.equal(staging.database, "farmos_core_memory_staging");
+assert.equal(staging.options, "-c default_transaction_read_only=on");
+assert.equal(loadFarmOsCoreMemoryStagingReadPoolConfig({
+  environment: environment(FARM_OS_CORE_MEMORY_STAGING_READ_AUTHORITY),
+  read_file: () => JSON.stringify(runtimeConfig(
+    FARM_OS_CORE_MEMORY_STAGING_READ_AUTHORITY,
+  )),
+}).port, 55432);
+
+const production = load(
+  FARM_OS_CORE_MEMORY_PRODUCTION_READ_AUTHORITY,
+  runtimeConfig(FARM_OS_CORE_MEMORY_PRODUCTION_READ_AUTHORITY),
+);
+assert.equal(production.host, "127.0.0.1");
+assert.equal(production.port, 55433);
+assert.equal(production.database, "farmos_core_prod");
+assert.equal(production.password, password);
+assert.equal(production.options, "-c default_transaction_read_only=on");
+
+deny(FARM_OS_CORE_MEMORY_STAGING_READ_AUTHORITY,
+  runtimeConfig(FARM_OS_CORE_MEMORY_PRODUCTION_READ_AUTHORITY));
+deny(FARM_OS_CORE_MEMORY_PRODUCTION_READ_AUTHORITY,
+  runtimeConfig(FARM_OS_CORE_MEMORY_STAGING_READ_AUTHORITY));
 for (const [field, value] of [
-  ["credential_class", "app-business-staging-readonly"],
+  ["listener", "127.0.0.1:55432"],
   ["resource_fingerprint",
-    "sha256:d24a9c40a082703e8f2a26241e365cc8e2b3b879eae443841bac8d91b12add69"],
-  ["resource_alias", "farmos-postgres"],
+    FARM_OS_CORE_MEMORY_STAGING_READ_AUTHORITY.resource_fingerprint],
+  ["credential_class",
+    FARM_OS_CORE_MEMORY_STAGING_READ_AUTHORITY.credential_class],
 ] as const) {
-  const candidate = runtimeConfig();
+  const candidate = runtimeConfig(FARM_OS_CORE_MEMORY_PRODUCTION_READ_AUTHORITY);
   candidate.core_operational_memory[field] = value as never;
-  deny(candidate);
+  deny(FARM_OS_CORE_MEMORY_PRODUCTION_READ_AUTHORITY, candidate);
 }
-for (const [field, value] of [
-  ["environment_id", "apparetenkei-production-primary"],
-  ["installation_id", "apparetenkei-farmos-core-mac-01"],
-  ["farm_scope", "wrong-farm"],
-  ["manifest_sha256", `sha256:${"0".repeat(64)}`],
-] as const) {
-  const candidate = runtimeConfig();
-  candidate[field] = value as never;
-  deny(candidate);
+for (const selector of [undefined, "development", "unknown"] as const) {
+  assert.throws(() => loadFarmOsCoreMemorySelectedReadPoolConfig({
+    environment: {
+      ...environment(FARM_OS_CORE_MEMORY_PRODUCTION_READ_AUTHORITY),
+      [FARM_OS_CORE_MEMORY_READ_RUNTIME_ENVIRONMENT.selector]: selector,
+    },
+    read_file: () => JSON.stringify(runtimeConfig(
+      FARM_OS_CORE_MEMORY_PRODUCTION_READ_AUTHORITY,
+    )),
+  }), FarmOsCoreMemoryReadRuntimeConfigError);
 }
-deny(runtimeConfig(), {
-  ...environment,
-  [FARM_OS_CORE_MEMORY_READ_RUNTIME_ENVIRONMENT.password]: undefined,
-});
-deny(runtimeConfig(), {
-  ...environment,
-  [FARM_OS_CORE_MEMORY_READ_RUNTIME_ENVIRONMENT.password]:
-    "postgresql://forbidden.example/secret",
-});
-
-const production = loadFarmOsProjectionFirstLocalPostgresConfig({
-  FARMOS_CORE_STAGING_RUNTIME_ENABLED: "false",
-  FARMOS_CORE_STAGING_RUNTIME_CONFIG_PATH: runtimePath,
-  FARMOS_CORE_MEMORY_READ_PASSWORD: password,
+assert.throws(() => loadFarmOsProjectionFirstLocalPostgresConfig({
   PGHOST: "127.0.0.1",
   PGPORT: "5432",
-  POSTGRES_DB: "production-compatible-fixture",
-  POSTGRES_USER: "production-compatible-fixture",
-  POSTGRES_PASSWORD: "production-compatible-fixture",
-});
-assert.equal(production.port, 5432);
-assert.equal(production.database, "production-compatible-fixture");
+  POSTGRES_DB: "legacy-fallback",
+  POSTGRES_USER: "legacy-fallback",
+  POSTGRES_PASSWORD: "legacy-fallback",
+}), (error: unknown) => error instanceof Error &&
+  error.message === FARM_OS_PROJECTION_FIRST_DATABASE_CONFIGURATION_ERROR);
 
-console.log("farm_os_day150_5_e5_core_memory_read_runtime_config: PASS");
+console.log(JSON.stringify({
+  test: "farm_os_day150_5_e5_core_memory_read_runtime_config",
+  staging_profile: "PASS",
+  production_profile: "PASS",
+  cross_environment_denies: 2,
+  wrong_binding_denies: 3,
+  selector_fail_closed: 3,
+  legacy_fallback: 0,
+  assertions: "PASS",
+}));

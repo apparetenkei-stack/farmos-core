@@ -13,6 +13,8 @@
   <string>/Users/hayate/projects/farmos-core-day150-5-e</string>
   <key>EnvironmentVariables</key>
   <dict>
+    <key>FARMOS_CORE_RUNTIME_ENVIRONMENT</key>
+    <string>staging</string>
     <key>FARMOS_CORE_STAGING_RUNTIME_ENABLED</key>
     <string>true</string>
     <key>FARMOS_CORE_STAGING_RUNTIME_IDENTITY</key>

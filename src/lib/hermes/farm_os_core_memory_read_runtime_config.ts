@@ -1,19 +1,50 @@
 import { readFileSync } from "node:fs";
 import type { PoolConfig } from "pg";
 
+import { FARM_OS_CORE_RUNTIME_ENVIRONMENT_SELECTOR } from
+  "./farm_os_core_environment_identity_runtime";
+
 export const FARM_OS_CORE_MEMORY_READ_RUNTIME_ENVIRONMENT = Object.freeze({
+  selector: FARM_OS_CORE_RUNTIME_ENVIRONMENT_SELECTOR,
   staging_enabled: "FARMOS_CORE_STAGING_RUNTIME_ENABLED",
-  runtime_config_path: "FARMOS_CORE_STAGING_RUNTIME_CONFIG_PATH",
+  staging_runtime_config_path: "FARMOS_CORE_STAGING_RUNTIME_CONFIG_PATH",
+  production_runtime_config_path: "FARMOS_CORE_PRODUCTION_RUNTIME_CONFIG_PATH",
   password: "FARMOS_CORE_MEMORY_READ_PASSWORD",
 } as const);
 
+type CoreMemoryRuntimeAuthority = Readonly<{
+  runtime_environment: "staging" | "production";
+  schema_version: string;
+  environment_id: string;
+  runtime_identity: string;
+  installation_id: string;
+  farm_scope: string;
+  business_timezone: string;
+  application_listener: string;
+  manifest_sha256: `sha256:${string}`;
+  provider_class: "containerized_postgres";
+  provider_scope: "customer_owned_staging" | "customer_owned_production";
+  resource_alias: string;
+  resource_fingerprint: `sha256:${string}`;
+  credential_class: string;
+  keychain_service: string;
+  keychain_account: string;
+  postgres_major: 17;
+  host: "127.0.0.1";
+  port: number;
+  database: string;
+  user: string;
+}>;
+
 export const FARM_OS_CORE_MEMORY_STAGING_READ_AUTHORITY = Object.freeze({
+  runtime_environment: "staging",
   schema_version: "farmos.core-staging-runtime-config.v1",
   environment_id: "apparetenkei-staging-primary",
   runtime_identity: "farmos-core-staging-primary",
   installation_id: "apparetenkei-farmos-core-staging-01",
   farm_scope: "apparetenkei-primary-farm",
   business_timezone: "Asia/Tokyo",
+  application_listener: "127.0.0.1:3100",
   manifest_sha256:
     "sha256:f150cc743e73bbe651068c55e48d5fbd94991c34bc3f4561a40714d920d56fbe",
   provider_class: "containerized_postgres",
@@ -30,7 +61,37 @@ export const FARM_OS_CORE_MEMORY_STAGING_READ_AUTHORITY = Object.freeze({
   port: 55_432,
   database: "farmos_core_memory_staging",
   user: "farmos_core_memory_staging_readonly",
-} as const);
+} satisfies CoreMemoryRuntimeAuthority);
+
+export const FARM_OS_CORE_MEMORY_PRODUCTION_READ_AUTHORITY = Object.freeze({
+  runtime_environment: "production",
+  schema_version: "farmos.core-production-runtime-config.v1",
+  environment_id: "apparetenkei-production-primary",
+  runtime_identity: "farmos-core-production-primary",
+  installation_id: "apparetenkei-farmos-core-mac-01",
+  farm_scope: "apparetenkei-primary-farm",
+  business_timezone: "Asia/Tokyo",
+  application_listener: "127.0.0.1:3000",
+  manifest_sha256:
+    "sha256:f8e050e87ed765632640cf987ee6d7ec613947f5ac14d79989f0604d0ba6d7ad",
+  provider_class: "containerized_postgres",
+  provider_scope: "customer_owned_production",
+  resource_alias: "farmos-core-memory-production-postgres",
+  resource_fingerprint:
+    "sha256:4e9ce7978c3341b7cf2172e539be7e5d646b6fd8d30508b9477f541669cf553f",
+  credential_class: "core-memory-production-readonly",
+  keychain_service:
+    "jp.apparetenkei.farmos-core-production.core-memory-readonly",
+  keychain_account: "core-memory-production-readonly",
+  postgres_major: 17,
+  host: "127.0.0.1",
+  port: 55_433,
+  database: "farmos_core_prod",
+  // The immutable E5 baseline owns this least-privilege login name in both
+  // isolated resources. Resource, port, database, fingerprint, credential
+  // class, and distinct Keychain secret enforce environment separation.
+  user: "farmos_core_memory_staging_readonly",
+} satisfies CoreMemoryRuntimeAuthority);
 
 type Environment = Readonly<Record<string, string | undefined>>;
 type JsonRecord = Record<string, unknown>;
@@ -92,21 +153,44 @@ export class FarmOsCoreMemoryReadRuntimeConfigError extends Error {
   }
 }
 
-export function loadFarmOsCoreMemoryStagingReadPoolConfig(input: Readonly<{
+function selectedAuthority(environment: Environment): Readonly<{
+  authority: CoreMemoryRuntimeAuthority;
+  runtime_config_path_key: string;
+}> | null {
+  const selected = environment[FARM_OS_CORE_RUNTIME_ENVIRONMENT_SELECTOR];
+  if (selected === "staging" && environment[
+    FARM_OS_CORE_MEMORY_READ_RUNTIME_ENVIRONMENT.staging_enabled
+  ] === "true") {
+    return Object.freeze({
+      authority: FARM_OS_CORE_MEMORY_STAGING_READ_AUTHORITY,
+      runtime_config_path_key:
+        FARM_OS_CORE_MEMORY_READ_RUNTIME_ENVIRONMENT.staging_runtime_config_path,
+    });
+  }
+  if (selected === "production") {
+    return Object.freeze({
+      authority: FARM_OS_CORE_MEMORY_PRODUCTION_READ_AUTHORITY,
+      runtime_config_path_key:
+        FARM_OS_CORE_MEMORY_READ_RUNTIME_ENVIRONMENT.production_runtime_config_path,
+    });
+  }
+  return null;
+}
+
+export function loadFarmOsCoreMemorySelectedReadPoolConfig(input: Readonly<{
   environment: Environment;
   read_file?: (path: string) => string;
 }>): PoolConfig {
-  const authority = FARM_OS_CORE_MEMORY_STAGING_READ_AUTHORITY;
-  const path = input.environment[
-    FARM_OS_CORE_MEMORY_READ_RUNTIME_ENVIRONMENT.runtime_config_path
-  ];
+  const selected = selectedAuthority(input.environment);
   const password = input.environment[
     FARM_OS_CORE_MEMORY_READ_RUNTIME_ENVIRONMENT.password
   ];
-  if (input.environment[
-    FARM_OS_CORE_MEMORY_READ_RUNTIME_ENVIRONMENT.staging_enabled
-  ] !== "true" || typeof path !== "string" || path.length === 0 ||
-    !validPassword(password)) {
+  if (selected === null || !validPassword(password)) {
+    throw new FarmOsCoreMemoryReadRuntimeConfigError();
+  }
+  const { authority } = selected;
+  const path = input.environment[selected.runtime_config_path_key];
+  if (typeof path !== "string" || path.length === 0) {
     throw new FarmOsCoreMemoryReadRuntimeConfigError();
   }
 
@@ -129,6 +213,7 @@ export function loadFarmOsCoreMemoryStagingReadPoolConfig(input: Readonly<{
     value.installation_id !== authority.installation_id ||
     value.farm_scope !== authority.farm_scope ||
     value.business_timezone !== authority.business_timezone ||
+    value.application_listener !== authority.application_listener ||
     value.manifest_sha256 !== authority.manifest_sha256 ||
     value.production_fallback !== false ||
     memory.provider_class !== authority.provider_class ||
@@ -156,6 +241,19 @@ export function loadFarmOsCoreMemoryStagingReadPoolConfig(input: Readonly<{
     connectionTimeoutMillis: 2_000,
     query_timeout: 10_000,
     statement_timeout: 10_000,
-    application_name: "farmos-core-staging-active-projection-readonly",
+    options: "-c default_transaction_read_only=on",
+    application_name:
+      `farmos-core-${authority.runtime_environment}-active-projection-readonly`,
   });
+}
+
+export function loadFarmOsCoreMemoryStagingReadPoolConfig(input: Readonly<{
+  environment: Environment;
+  read_file?: (path: string) => string;
+}>): PoolConfig {
+  if (input.environment[FARM_OS_CORE_RUNTIME_ENVIRONMENT_SELECTOR] !==
+      "staging") {
+    throw new FarmOsCoreMemoryReadRuntimeConfigError();
+  }
+  return loadFarmOsCoreMemorySelectedReadPoolConfig(input);
 }

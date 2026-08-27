@@ -32,6 +32,7 @@ import {
 } from "../../src/lib/hermes/farm_os_projection_first_runtime";
 import {
   createFarmOsProjectionFirstProductionService,
+  FARM_OS_PROJECTION_FIRST_DATABASE_CONFIGURATION_ERROR,
   FarmOsProjectionFirstProductionService,
 } from "../../src/lib/hermes/farm_os_projection_first_production_service";
 import {
@@ -575,18 +576,18 @@ for (const response of safeFailures) {
 }
 
 const productionEvents: string[] = [];
-const configuredFactory = createFarmOsProjectionFirstProductionService({
+assert.throws(() => createFarmOsProjectionFirstProductionService({
   environment: {
     FARMOS_INSTALLATION_ID: installationId,
     FARMOS_AUTHORIZED_FARM_SCOPE: farmScope,
     FARMOS_BUSINESS_TIMEZONE: "Asia/Tokyo",
-    POSTGRES_DB: "test_database",
-    POSTGRES_USER: "test_user",
-    POSTGRES_PASSWORD: "test_only_placeholder",
+    POSTGRES_DB: "legacy_fallback_denied",
+    POSTGRES_USER: "legacy_fallback_denied",
+    POSTGRES_PASSWORD: "legacy_fallback_denied",
   },
   onEvent: (event) => productionEvents.push(event),
-});
-await configuredFactory.close();
+}), (error: unknown) => error instanceof Error &&
+  error.message === FARM_OS_PROJECTION_FIRST_DATABASE_CONFIGURATION_ERROR);
 assert.deepEqual(productionEvents, [
   "FARMOS_PROJECTION_FIRST_BINDING_LOADED",
 ]);

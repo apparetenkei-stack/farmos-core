@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.apparetenkei.farmos-core</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/sh</string>
+    <string>__FARMOS_CORE_RELEASE_DIRECTORY__/scripts/hermes/run_farm_os_day150_5_e_production_core.sh</string>
+  </array>
+  <key>WorkingDirectory</key>
+  <string>__FARMOS_CORE_RELEASE_DIRECTORY__</string>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>FARMOS_CORE_RUNTIME_ENVIRONMENT</key>
+    <string>production</string>
+    <key>FARMOS_CORE_PRODUCTION_RUNTIME_IDENTITY</key>
+    <string>farmos-core-production-primary</string>
+    <key>FARMOS_CORE_PRODUCTION_ENVIRONMENT_MANIFEST_PATH</key>
+    <string>/Users/hayate/Library/Application Support/FarmOS/production/e5/environment-identity-manifest.v1.json</string>
+    <key>FARMOS_CORE_PRODUCTION_ENVIRONMENT_MANIFEST_PIN_PATH</key>
+    <string>/Users/hayate/Library/Application Support/FarmOS/production/e5/environment-identity-manifest.v1.pin.json</string>
+    <key>FARMOS_CORE_PRODUCTION_RUNTIME_IDENTITY_PATH</key>
+    <string>/Users/hayate/Library/Application Support/FarmOS/production/e5/core-production-observed-identity.json</string>
+    <key>FARMOS_CORE_PRODUCTION_RUNTIME_CONFIG_PATH</key>
+    <string>/Users/hayate/Library/Application Support/FarmOS/production/e5/core-production-runtime-config.json</string>
+    <key>FARMOS_CORE_RELEASE_DIRECTORY</key>
+    <string>__FARMOS_CORE_RELEASE_DIRECTORY__</string>
+    <key>FARMOS_PRODUCTION_ACTIVE_PROJECTION_AUTHORITY_PATH</key>
+    <string>__FARMOS_ACTIVE_PROJECTION_AUTHORITY_PATH__</string>
+  </dict>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+  <key>ThrottleInterval</key>
+  <integer>10</integer>
+  <key>StandardOutPath</key>
+  <string>/Users/hayate/Library/Logs/FarmOS/core-web.stdout.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/hayate/Library/Logs/FarmOS/core-web.stderr.log</string>
+</dict>
+</plist>

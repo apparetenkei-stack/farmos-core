@@ -111,6 +111,13 @@ function completeCandidate(): Record<string, unknown> {
   const candidate = createMutableFarmOsDay1505EEnvironmentManifestFixture(
     "staging",
   );
+  candidate.provenance = {
+    authority_id: "farmos.day150-5-e5.staging-environment-authority.v1",
+    revision: 1,
+    source_commit: "72ceaa6f779e875776d2f916c1fa003d08fb3528",
+    source_path:
+      "artifacts/day150-5/ef1-e/environment-identity-manifest.v1.schema.json",
+  };
   candidate.installation_id = FARM_OS_CORE_STAGING_INSTALLATION_ID;
   const bindings = candidate.database_bindings as Record<string, unknown>;
   const appBusiness = bindings.app_business as Record<string, unknown>;
@@ -281,7 +288,7 @@ console.log(JSON.stringify({
   handshake_happy_path: "PASS",
   mismatch_passed: mismatchCases.length,
   mismatch_total: mismatchCases.length,
-  production_manifest_selectable: false,
+  staging_loader_production_manifest_selectable: false,
   production_fallback_count: 0,
   external_network_calls: 0,
   assertions: "PASS",
